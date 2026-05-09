@@ -1,5 +1,5 @@
 name: plugin_kit_workspace
-description: Pub workspace root — see packages/ and example/ for the actual packages.
+description: A powerful plug'n'play plugin system for any Dart project.
 publish_to: none
 
 environment:
