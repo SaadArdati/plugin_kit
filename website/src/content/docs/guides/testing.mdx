@@ -1,0 +1,255 @@
+---
+title: Testing
+description: Patterns for unit-testing plugins, services, and runtime behavior.
+---
+
+import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+Plugins are plain Dart classes, so most of what you do to test them is what you would do for any Dart class: construct, poke, assert. The parts that are specific to Plugin Kit are how to set up a registry, a bus, a context, or a whole runtime without spinning up your actual application.
+
+Three common levels of test, from cheapest to most integrated.
+
+This page is the verification pass for the guide path: after a feature is a
+plugin, its behavior should be testable at the same level you expect it to
+work.
+
+## Level 1: Test a service in isolation
+
+A `PluginService` is a class with a `config` getter. For unit tests, construct it and feed it settings directly.
+
+```dart
+test('NotificationService applies the configured channel', () {
+  final service = NotificationService();
+  service.injectSettings({'channel': 'slack'}, hash: 'test-1');
+
+  expect(service.channel, 'slack');
+});
+```
+
+For `StatefulPluginService`, the same approach works until you need `attach`. At that point, step up to Level 2.
+
+<Aside type="note" title="`pluginId` is not set until resolution">
+`PluginService.pluginId` and `serviceId` are stamped by the registry on resolve. If your test needs those values populated, construct the service through a `ServiceRegistry` instead of calling the constructor directly.
+</Aside>
+
+## Level 2: Real registry, real bus, real context
+
+When your target depends on `ServiceRegistry`, `EventBus`, or a `PluginContext`, wire them up directly in the test.
+
+```dart
+import 'package:plugin_kit/plugin_kit.dart';
+import 'package:test/test.dart';
+
+void main() {
+  test('plugin registers notification service', () {
+    final registry = ServiceRegistry();
+    final plugin = NotificationPlugin();
+
+    plugin.register(registry.scopedFor(plugin.pluginId));
+
+    final service = registry.resolve<NotificationService>(const ServiceId('notification_service'));
+    expect(service, isNotNull);
+  });
+}
+```
+
+To exercise `attach` and event behavior, pair the registry with a bus and a context.
+
+```dart
+test('plugin answers notification requests', () async {
+  final registry = ServiceRegistry();
+  final bus = EventBus();
+  final context = SessionPluginContext(
+    registry: registry,
+    bus: bus,
+    globalBus: EventBus(),
+  );
+
+  final plugin = NotificationPlugin();
+  plugin.register(registry.scopedFor(plugin.pluginId));
+  plugin.attach(context);
+
+  final result = await bus.request<NotificationRequest, bool>(
+    NotificationRequest('hello'),
+  );
+
+  expect(result, isTrue);
+});
+```
+
+This is the sweet spot for most plugin tests. Fast, no runtime setup, and it exercises real registry and bus behavior.
+
+## Level 3: Through the runtime
+
+When your test cares about runtime concerns (enablement precedence, settings reconciliation, session lifecycle), reach for `PluginRuntimeManager`.
+
+```dart
+void main() {
+  late PluginRuntimeManager manager;
+
+  setUp(() {
+    manager = PluginRuntimeManager();
+  });
+
+  tearDown(() async {
+    await manager.dispose();
+  });
+
+  test('session plugin attaches on session creation', () async {
+    final plugin = NotificationPlugin();
+    manager.addPlugin(plugin);
+    manager.init();
+
+    final session = await manager.createSession();
+
+    expect(session.isPluginEnabled(const PluginId('notification')), isTrue);
+  });
+}
+```
+
+### Lifecycle tracking
+
+A tiny subclass with a list of strings is enough to assert lifecycle order.
+
+```dart
+class TrackingPlugin extends SessionPlugin {
+  @override
+  final PluginId pluginId;
+  final List<String> calls = [];
+
+  TrackingPlugin(this.pluginId);
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    calls.add('register');
+  }
+
+  @override
+  void attach(SessionPluginContext context) {
+    calls.add('attach');
+  }
+
+  @override
+  Future<void> detach(SessionPluginContext context) async {
+    calls.add('detach');
+  }
+}
+
+test('session lifecycle runs in the expected order', () async {
+  final plugin = TrackingPlugin(const PluginId('trackee'));
+  manager.addPlugin(plugin);
+  manager.init();
+
+  final session = await manager.createSession();
+  await session.dispose();
+
+  expect(plugin.calls, ['register', 'attach', 'detach']);
+});
+```
+
+### Settings reconciliation
+
+Pass `initialSettings` on init, or call `updateSettings` later.
+
+```dart
+test('plugin disables after updateSettings', () async {
+  final plugin = TrackingPlugin(const PluginId('toggle_me'));
+  manager.addPlugin(plugin);
+  manager.init();
+  final session = await manager.createSession();
+
+  await manager.updateSettings(
+    const RuntimeSettings(
+      plugins: {PluginId('toggle_me'): PluginConfig(enabled: false)},
+    ),
+  );
+
+  expect(session.isPluginEnabled(const PluginId('toggle_me')), isFalse);
+  expect(plugin.calls, ['register', 'attach', 'detach']);
+});
+```
+
+Toggling a plugin off runs its `detach`. Toggling back on runs `register` and `attach` again, same as global. Your assertions can rely on that.
+
+## Testing `StatefulPluginService` directly
+
+For stateful services, attach them against a real context, exercise whatever the service reacts to, then detach to verify cleanup.
+
+```dart
+test('ChatBuffer records messages while attached', () async {
+  final registry = ServiceRegistry();
+  final bus = EventBus();
+  final context = SessionPluginContext(
+    registry: registry,
+    bus: bus,
+    globalBus: EventBus(),
+  );
+
+  final buffer = ChatBuffer();
+  registry.registerSingleton<ChatBuffer>(
+    pluginId: const PluginId('chat'),
+    serviceId: const ServiceId('buffer'),
+    instance: buffer,
+  );
+
+  registry.resolve<ChatBuffer>(const ServiceId('buffer')); // stamps identity
+  buffer.attach(context);
+
+  await bus.emit<NewMessageEvent>(event: NewMessageEvent('hi'));
+  expect(buffer.messages, hasLength(1));
+
+  await buffer.detach();
+  await bus.emit<NewMessageEvent>(event: NewMessageEvent('bye'));
+  expect(buffer.messages, hasLength(1)); // detached; subscription cancelled
+});
+```
+
+The important bit: resolve the service through the registry once before calling `attach`. That is what stamps `pluginId` and `serviceId` onto the instance.
+
+## Stubbing the event bus
+
+If your test target uses a real bus but you do not want to also test the bus, use a real `EventBus` as a stub. Nothing prevents you from emitting events "from outside" to drive whatever handler you are testing.
+
+You rarely need to mock the bus itself. It is simple, fast, and well-exercised. Testing against a real `EventBus()` usually gives better signal than a mock would.
+
+## Where failures surface
+
+When a lifecycle phase produces errors, the runtime aggregates them into `PluginLifecycleException` and throws after the phase finishes. Assertions are straightforward.
+
+```dart
+expect(
+  () => manager.init(),
+  throwsA(isA<PluginLifecycleException>()),
+);
+```
+
+The exception carries a `phase` string (`'attachGlobal'`, `'attachSession'`, `'detachSession'`, `'updateSessionSettings'`, etc.) and a list of `(pluginId, error, stackTrace)` tuples, which is usually what you want to assert against.
+
+```dart
+test('bad plugin surfaces in PluginLifecycleException', () async {
+  manager.addPlugin(CrashingPlugin());
+
+  try {
+    manager.init();
+    fail('expected PluginLifecycleException');
+  } on PluginLifecycleException catch (e) {
+    expect(e.phase, 'attachGlobal');
+    expect(e.failures.first.$1, const PluginId('crashing_plugin'));
+  }
+});
+```
+
+## Patterns that age well
+
+- Prefer Level 2 (registry + bus + context) for most plugin tests. Fast, no runtime setup, and it catches real behavior.
+- Use Level 3 for anything that involves settings reconciliation, enablement precedence, or multiple sessions.
+- Keep a small `TrackingPlugin` helper in your test file for lifecycle assertions. You will reuse it.
+- If a plugin depends on another plugin's service, register both in the test. Do not mock the service. The registry was designed for exactly this kind of swap.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard title="Adding a Plugin" description="The workflow this page helps you verify." href="/guides/adding-a-plugin/" />
+  <LinkCard title="Plugin Services" description="Subscription tracking is what makes Level 2 tests tidy." href="/concepts/plugin-services/" />
+  <LinkCard title="Logging" description="What PluginLifecycleException looks like at runtime." href="/guides/logging/" />
+</CardGrid>

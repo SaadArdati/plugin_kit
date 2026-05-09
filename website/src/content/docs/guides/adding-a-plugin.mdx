@@ -1,0 +1,479 @@
+---
+title: Adding a Plugin
+description: Turn one feature into a plugin without turning the plugin class into a dumping ground.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+Adding a plugin is smaller than it sounds.
+
+Most of the time, it is one ordinary Dart service plus a thin class that gives
+the runtime a name for the feature.
+
+Here is the whole move up front:
+
+```dart
+import 'package:plugin_kit/plugin_kit.dart';
+
+class NotificationService {
+  Future<void> send(String message) async {
+    print(message);
+  }
+}
+
+class NotificationPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('my_notifier');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerLazySingleton<NotificationService>(
+      const ServiceId('notification_service'),
+      () => NotificationService(),
+    );
+  }
+}
+
+final runtime = PluginRuntime(
+  plugins: [NotificationPlugin()],
+)..init();
+
+final session = await runtime.createSession();
+final notifications = session.resolve<NotificationService>(
+  const ServiceId('notification_service'),
+);
+
+await notifications.send('Build completed.');
+await runtime.dispose();
+```
+
+That already buys you three things:
+
+- the feature has a runtime identity
+- the service lives inside an isolated session
+- the runtime can later enable, disable, replace, or configure it
+
+If your app has anything that looks like "open the thing", "close the thing",
+"have more than one open at once", or "let the user choose which features
+apply", that shell starts paying rent quickly.
+
+## Unpack the example
+
+The notification feature is a good first shape because it is boring on purpose.
+No clever architecture yet. Just one service, one plugin, one session.
+
+Start with the boring Dart class first:
+
+```dart
+class NotificationService {
+  Future<void> send(String message) async {
+    print(message);
+  }
+}
+```
+
+That is intentional. Plugin Kit does not require every useful class to inherit
+from something. A service can stay ordinary until it needs settings,
+identity, or lifecycle.
+
+## Wrap the feature in a plugin
+
+Now give the feature an identity and register the service.
+
+```dart
+import 'package:plugin_kit/plugin_kit.dart';
+
+class NotificationPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('my_notifier');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerLazySingleton<NotificationService>(
+      const ServiceId('notification_service'),
+      () => NotificationService(),
+    );
+  }
+}
+```
+
+That is already a real plugin.
+
+The important pieces are:
+
+- `pluginId` is the runtime identity for the feature
+- `register(...)` contributes services to the session registry
+- `serviceId` is the slot other code resolves later
+- `ScopedServiceRegistry` already knows which plugin is registering
+
+## Pick the scope deliberately
+
+Default to `SessionPlugin`.
+
+A session is one isolated unit of work: one document, one chat, one workspace,
+one tenant, one sandbox. If your app opens more than one of the thing, the
+plugin belongs in the session scope.
+
+Use `GlobalPlugin` when there should be exactly one of something for the whole
+runtime:
+
+- telemetry
+- app-wide settings
+- a shared auth client
+- a coordinator that watches all sessions
+
+<Aside type="tip" title="Default to session scope when unsure">
+Session scope prevents accidental state sharing. Promote to a global plugin
+once shared behavior is obvious.
+</Aside>
+
+## Run it
+
+Add the plugin to a runtime, create a session, and resolve the service.
+
+```dart
+final runtime = PluginRuntime(
+  plugins: [NotificationPlugin()],
+)..init();
+
+final session = await runtime.createSession();
+
+final notifications = session.resolve<NotificationService>(
+  const ServiceId('notification_service'),
+);
+
+await notifications.send('Build completed.');
+
+await runtime.dispose();
+```
+
+You now have:
+
+- a feature with a runtime identity
+- a service registered in a named slot
+- a session that owns an isolated registry
+- a runtime that controls lifecycle and cleanup
+
+That is the core move. Everything else in this folder is a refinement of that
+shape.
+
+## Reacting when the session is alive
+
+`register(...)` says what the plugin provides. Once a session opens, your
+code may need to:
+
+- subscribe to events
+- answer typed requests
+- start background work
+- resolve services registered by other plugins
+
+The idiomatic home for that logic is a `StatefulPluginService`. Its
+`attach(...)` gives you `on`, `onRequest`, and `emit` helpers that
+track their own subscriptions and cancel them on detach, so you never
+have to remember the cleanup step.
+
+Here is the notification feature extended with a request/response handler:
+
+```dart
+class NotificationRequest {
+  final String message;
+  NotificationRequest(this.message);
+}
+
+class NotificationPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('my_notifier');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerLazySingleton<NotificationService>(
+      const ServiceId('notification_service'),
+      () => NotificationService(),
+    );
+
+    registry.registerLazySingleton<NotificationHandler>(
+      const ServiceId('notification_handler'),
+      () => NotificationHandler(),
+    );
+  }
+}
+
+class NotificationHandler extends StatefulPluginService {
+  @override
+  void attach() {
+    onRequest<NotificationRequest, bool>((request) async {
+      final service = context.resolve<NotificationService>(
+        const ServiceId('notification_service'),
+      );
+      await service.send(request.event.message);
+      return true;
+    });
+  }
+}
+```
+
+Notice that the plugin class did not override `attach(...)`. When the
+session starts, the plugin's base `attach(...)` walks every
+`StatefulPluginService` it owns and attaches each one for you.
+
+You can still override the plugin's own `attach(...)` when you actually
+need it: resolving a service from a different plugin at startup,
+coordinating across plugins, or starting a shared resource. `Plugin.attach`
+and `Plugin.detach` are pure user hooks; the framework runs orchestration
+(stateful service attach/detach, subscription cleanup) around them, so no
+`super` call is needed. When you use `Plugin.on`, `onRequest`, `bind`, or
+`emit` inside the override, pass `context` as the first positional argument:
+`on<E>(context, (e) => ...)`.
+
+<Aside type="note" title="Resolve peers in attach, not register">
+`register(...)` is for contributing your own services. By the time
+`attach(...)` runs, the runtime has collected the enabled plugins for that
+scope, built the context, and applied settings. That is the right moment to
+resolve other plugins' services.
+</Aside>
+
+## Keep the plugin class thin
+
+A plugin class should mostly be wiring:
+
+- `pluginId`
+- `description`
+- `register(...)`
+- `attach(...)`
+- `detach(...)`
+
+When the class starts holding real behavior, move that behavior out.
+
+| If the feature needs... | Put it in... |
+|---|---|
+| plain reusable behavior | an ordinary Dart class |
+| typed settings and registry identity | `PluginService` |
+| session lifecycle, subscriptions, timers, or mutable session state | `StatefulPluginService` |
+| shared domain data used by many plugins | a custom context |
+
+This is the difference between a plugin that stays readable and a plugin that
+slowly turns into a second application hidden inside one class.
+
+## Add settings when someone needs control
+
+If your service needs runtime configuration, promote it to `PluginService`
+and read from `config`.
+
+```dart
+class NotificationService extends PluginService {
+  String get channel => config.getString('channel') ?? 'default';
+  String get prefix => config.getString('prefix') ?? '';
+
+  Future<void> send(String message) async {
+    print('[$channel] $prefix$message');
+  }
+}
+```
+
+Settings target the plugin and service slot:
+
+```dart
+final settings = RuntimeSettings(
+  services: {
+    const PluginId('my_notifier').service(
+      const ServiceId('notification_service'),
+    ): ServiceSettings(
+      config: {'channel': 'builds', 'prefix': '> '},
+    ),
+  },
+);
+```
+
+`PluginId.service(...)` returns a `Pin` for the slot owned by that plugin.
+For runtime construction without the chain, use `Pin('my_notifier',
+['notification_service'])` (or `Pin.wildcard(['notification_service'])` for
+the wildcard form).
+
+You do not need to hand-parse a map inside your app code. The registry
+injects the effective settings when the service is resolved.
+
+### Who is "someone"
+
+Settings are user-facing by default. That is the headline use: let the
+person using your app decide how a feature behaves, through a settings
+screen or a config file they edit.
+
+But nothing in the contract says settings have to come from an end user.
+The host app can inject them too, and that is completely fine. Plugin Kit
+treats both the same way.
+
+### User-facing example: API keys
+
+The canonical user-driven case is a service that needs a secret only the
+user can supply. Suppose your app has a chat plugin that talks to an
+external API, and that API wants a key:
+
+```dart
+class ChatBackendService extends PluginService {
+  String? get apiKey => config.getString('api_key');
+  String get model => config.getString('model') ?? 'claude-opus-4-7';
+
+  Future<ChatReply> reply(String prompt) async {
+    final key = apiKey;
+    if (key == null) {
+      throw StateError('No API key configured.');
+    }
+    // Call the upstream API with key and model.
+    return ChatReply.stub();
+  }
+}
+```
+
+A settings UI (more on capabilities in a minute) can read the expected
+shape, render a text field, and push the new value back into
+`RuntimeSettings.services`. The plugin never has to know whether that
+field came from a keychain, a dotfile, or a dialog the user just closed.
+
+### Developer-facing example: one plugin, many apps
+
+Since settings are just a `Map`, the host app developer can inject them
+directly. If you maintain a shelf of plugins shared across several apps,
+this is how you flip the same plugin into different modes without
+forking plugin code.
+
+```dart
+const myNotifier = PluginId('my_notifier');
+const notificationService = ServiceId('notification_service');
+
+final appASettings = RuntimeSettings(
+  services: {
+    myNotifier.service(notificationService): ServiceSettings(
+      config: {'channel': 'slack', 'prefix': '[builds] '},
+    ),
+  },
+);
+
+final appBSettings = RuntimeSettings(
+  services: {
+    myNotifier.service(notificationService): ServiceSettings(
+      config: {'channel': 'console', 'prefix': ''},
+    ),
+  },
+);
+```
+
+Same plugin code, two runtimes, two behaviors, zero `if (appName == 'A')`
+branches buried inside the plugin. The user-facing and developer-facing
+cases can also mix: some config keys come from the app developer, others
+from the end user, and they all land in the same `config` node on the
+service.
+
+## Make it discoverable without instantiating it
+
+Sometimes the host app needs to know things about your service before
+deciding whether to touch it. What file formats does it support? Is it slow?
+Does it belong in the "experimental" pane of a settings screen? Does the
+CEO insist it appear first?
+
+Capabilities are the answer. A `Capability` is an empty abstract base
+class. You subclass it with whatever fields you want, attach instances
+during registration, and the host reads them back through the registry
+without instantiating the service.
+
+```dart
+class SupportsFileFormats extends Capability {
+  final Set<String> extensions;
+  const SupportsFileFormats(this.extensions);
+}
+
+class IsSlowCapability extends Capability {
+  const IsSlowCapability();
+}
+
+registry.registerLazySingleton<NotificationService>(
+  const ServiceId('notification_service'),
+  () => NotificationService(),
+  capabilities: {
+    const SupportsFileFormats({'txt', 'md'}),
+    const IsSlowCapability(),
+  },
+);
+```
+
+And on the reading side:
+
+```dart
+final slow = context.registry.resolveCapability<IsSlowCapability>(
+  const ServiceId('notification_service'),
+);
+if (slow != null) {
+  // Maybe do not call this on the UI thread.
+}
+```
+
+`resolveCapability` returns the capability instance (or `null` when the
+slot's winner does not carry it), so the same call serves as a presence
+check and as access to capability fields like `SupportsFileFormats.extensions`.
+
+The runtime does not know what `SupportsFileFormats` or `IsSlowCapability`
+mean. It just holds them. Defining a schema for your settings UI, tagging
+slots for routing, marking which plugins the CEO loves: that is all up to
+you. See [Capabilities](/concepts/capabilities/) for the full reader-side
+story.
+
+## A useful authoring checklist
+
+<Steps>
+
+1. **Name the feature.**
+
+   Pick a short, stable `pluginId`. Lowercase and underscores age well:
+   `notification`, `sql_language`, `markdown_preview`.
+
+2. **Pick the scope.**
+
+   Use `SessionPlugin` for document/chat/workspace behavior. Use
+   `GlobalPlugin` for truly shared runtime behavior.
+
+3. **Write the service first.**
+
+   Keep it as a normal Dart class unless it needs settings or lifecycle.
+
+4. **Register one clear slot.**
+
+   Prefer descriptive service ids like `notification_service` over vague
+   names like `service`.
+
+5. **Put reactions in a service, not the plugin class.**
+
+   Event subscriptions, typed request handlers, timers, and background
+   tasks belong in a `StatefulPluginService`'s `attach(...)`, where
+   subscriptions are tracked for you. Keep the plugin's own `attach(...)`
+   for plugin-wide wiring like peer resolution.
+
+6. **Promote only when needed.**
+
+   Reach for `PluginService`, `StatefulPluginService`, capabilities, and
+   custom contexts when the feature earns them.
+
+</Steps>
+
+## Where to go next
+
+<CardGrid>
+  <LinkCard
+    title="Plugin Services"
+    description="Move settings, state, and subscriptions out of the plugin class."
+    href="/concepts/plugin-services/"
+  />
+  <LinkCard
+    title="Configuration"
+    description="Read injected settings with ConfigNode instead of hand-parsing maps."
+    href="/concepts/configuration/"
+  />
+  <LinkCard
+    title="Settings & Overrides"
+    description="Enable, disable, reprioritize, and configure plugins at runtime."
+    href="/guides/settings/"
+  />
+  <LinkCard
+    title="Custom Contexts"
+    description="Add domain fields like current document, user, or tool registry to the context."
+    href="/concepts/custom-context/"
+  />
+</CardGrid>

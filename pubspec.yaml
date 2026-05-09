@@ -1,0 +1,17 @@
+name: plugin_kit_workspace
+description: Pub workspace root — see packages/ and example/ for the actual packages.
+publish_to: none
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+workspace:
+  - packages/plugin_kit
+  - packages/plugin_kit_dialog
+  - packages/flutter_plugin_kit
+  - packages/flutter_plugin_kit/example
+  - example/code_editor
+  - example/model_embassy
+  - example/villain_lair
+  - example/plugin_kit_dialog_demo
+  - example/state_garden

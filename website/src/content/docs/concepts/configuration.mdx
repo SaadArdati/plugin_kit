@@ -1,0 +1,173 @@
+---
+title: Configuration
+description: Type-safe settings access with ConfigNode and JSON support.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Configuration gets annoying fast.
+
+A feature starts with two booleans. Then it wants a model id. Then a nested
+map. Then half the values arrive from JSON, env vars, or a form submission, and
+suddenly three services are all hand-parsing the same `Map<String, dynamic>`
+slightly differently.
+
+`ConfigNode` exists to stop that drift. It is the typed settings wrapper
+exposed on every `PluginService`. It takes a `Map<String, dynamic>` and gives
+you predictable read helpers with light coercion. The goal is convenience, not
+a full schema engine.
+
+You do not usually construct `ConfigNode` yourself. The registry injects one
+into your service during resolution, and your service reads from it.
+
+That sounds small, but it is the difference between a runtime settings screen
+being fun to build and being a swamp of `Map<String, dynamic>` casts. The host
+can stay dynamic. Services still get typed reads.
+
+This page is about the service side of configuration: "I have settings, how
+do I read them safely?" The runtime side, including plugin enablement,
+priority overrides, and live reconciliation, lives in [Settings & Overrides](/guides/settings/).
+
+## Where it comes from
+
+The flow is always the same:
+
+1. Settings enter the system through `RuntimeSettings`.
+2. The `ServiceRegistry` resolves a `PluginService`.
+3. The registry injects the service's effective settings.
+4. The service reads those settings through `config`.
+
+```dart
+class AnthropicService extends PluginService {
+  String get apiKey => config.getString('api_key') ?? '';
+  double get temperature => config.getDouble('temperature') ?? 0.7;
+}
+```
+
+## Core getters
+
+`ConfigNode` is intentionally small.
+
+| Method | Behavior |
+|---|---|
+| `get<T>(key)` | exact typed lookup, no coercion |
+| `getString(key)` | string lookup |
+| `getInt(key)` | int lookup with numeric and string coercion |
+| `getDouble(key)` | double lookup with numeric and string coercion |
+| `getBool(key)` | bool lookup with string and numeric coercion |
+| `list<T>(key)` | typed list lookup |
+| `map(key)` | `Map<String, dynamic>` lookup, or `{}` when absent or invalid |
+| `has(key)` | `true` when the key exists and is non-null |
+| `raw(key)` | untyped raw value |
+
+## Coercion rules
+
+This is where `ConfigNode` is deliberately pragmatic.
+
+**`getInt`** accepts `int`, `num` (via `toInt()`), and string values parseable as ints.
+
+**`getDouble`** accepts `double`, `num` (via `toDouble()`), and string values parseable as doubles.
+
+**`getBool`** accepts `bool`, the strings `'true'`/`'false'`, and numeric values where `0` is `false` and anything else is `true`.
+
+The point is not magic. The point is to be forgiving enough for real-world settings payloads (which often arrive as JSON strings, environment variables, or form submissions) without making the API vague.
+
+## A realistic example
+
+```dart
+class ModelConfig extends PluginService {
+  String get provider => config.getString('provider') ?? 'openai';
+  String get model => config.getString('model') ?? 'gpt-4.1-mini';
+  double get temperature => config.getDouble('temperature') ?? 0.7;
+  bool get streaming => config.getBool('streaming') ?? true;
+  List<String> get tools => config.list<String>('tools') ?? const [];
+}
+```
+
+With settings arriving as:
+
+```dart
+final settings = RuntimeSettings(
+  services: {
+    Pin('router', ['model_config']): const ServiceSettings(
+      config: {
+        'provider': 'anthropic',
+        'model': 'claude-sonnet-4-5-20250929',
+        'temperature': 0.4,
+        'streaming': true,
+        'tools': ['search', 'browser'],
+      },
+    ),
+  },
+);
+```
+
+The service reads every field through the typed getters with no manual parsing.
+
+When you have a real `double` or `bool` in code, pass it as `double` or `bool`. The [coercion rules](#coercion-rules) above are the forgiving fallback for values you cannot control, not a style to reach for on purpose. If `temperature` or `streaming` arrived as `'0.4'` / `'true'` (out of a JSON payload, env var, or form submission), `getDouble` and `getBool` would still handle it, but that is the rescue path.
+
+## Lists and nested maps
+
+For structured settings, use `list<T>(...)` and `map(...)`.
+
+```dart
+final tools = config.list<String>('tools') ?? const [];
+final headers = config.map('headers');
+final timeoutMs = headers['timeout_ms'];
+```
+
+`map(...)` returns an empty map when the value is missing or cannot be cast. You never end up with a null reference exception from this API.
+
+<Aside type="note" title="ConfigNode is key-based, not path-based">
+There is no dot-notation traversal (`config.get('http.headers.x-api-key')`). If you want to walk into a nested structure, read the nested map and index into it yourself. Keep the surface small on purpose.
+</Aside>
+
+## Raw access
+
+If you need the source value exactly as stored, use `raw(...)`.
+
+```dart
+final payload = config.raw('advanced_payload');
+```
+
+Useful when the shape is highly dynamic, when you want custom decoding, or when the typed helpers are too narrow.
+
+## `ConfigNode` is read-only, on purpose
+
+Treat `config` as the current effective settings snapshot for that service. Do not mutate it.
+
+If your service needs to react to changed settings:
+
+- Override `injectSettings(...)` in the service for service-local reactions.
+- Or use `Plugin.onPluginSettingsChanged(...)` at the plugin level for broader reactions.
+
+`ConfigNode` is the read model handed to the service by the registry. It is a window, not a container you fill in.
+
+## What `ConfigNode` is not
+
+| Not | Not |
+|---|---|
+| a schema validator | a required-field enforcer |
+| a deep object mapper | a defaults manager (beyond what you write in getters) |
+
+That is all intentional. The runtime handles delivery. Your service handles meaning. If you need metadata a host app can read without instantiating the service (a settings schema, a supported-formats list, a "this is slow" tag), attach a [custom `Capability`](/concepts/capabilities/) at registration time.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Plugin Services"
+    description="The classes ConfigNode is attached to."
+    href="/concepts/plugin-services/"
+  />
+  <LinkCard
+    title="Capabilities"
+    description="How to attach a schema and UI hints to a configurable slot."
+    href="/concepts/capabilities/"
+  />
+  <LinkCard
+    title="Settings and Overrides"
+    description="Where the settings config comes from in the first place."
+    href="/guides/settings/"
+  />
+</CardGrid>

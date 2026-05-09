@@ -1,0 +1,195 @@
+---
+title: Sessions
+description: Per-session isolation, the global vs session bus split, and explicit cross-scope routing.
+---
+
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+A `PluginSession` is one isolated execution scope: its own service registry, its own event bus, its own context,
+its own enabled-plugin set. The typical lifetime is one document, one chat, one tab, one workspace, one sandbox.
+
+This page covers session isolation and the rules for talking across scopes.
+For the runtime that spawns sessions and the settings reconciliation that
+flows through them, see [Runtime](/concepts/runtime/).
+
+## A session
+
+```dart
+// Editor opens a new document
+final session = await manager.createSession(
+  // Optional.
+  contextFactory: (registry, sessionBus, globalBus) => EditorSessionContext(
+    registry: registry,
+    bus: sessionBus,
+    globalBus: globalBus,
+    document: currentDocument,
+  ),
+);
+
+// Later, when the user closes the tab
+await session.dispose();
+```
+
+Under the hood, `createSession(...)`:
+
+<Steps>
+
+1. Parses session-scoped service overrides.
+2. Determines enabled session plugins.
+3. Creates a fresh session registry.
+4. Runs `register` on each enabled session plugin.
+5. Materializes wildcard overrides onto the winners.
+6. Builds the session context.
+7. Runs `attach` on each enabled session plugin.
+
+</Steps>
+
+Disposal runs the reverse:
+
+<Steps>
+
+1. Enabled session plugins run `detach`.
+2. The session bus is disposed.
+3. The session is removed from `runtime.sessions`.
+
+</Steps>
+
+Two sessions sharing the same runtime never leak state into each other.
+They see the same global registry, but their service registries and event buses
+are independent instances. Opening a second document never disturbs the first.
+
+## Sessions stay sealed
+
+Each session's registry is genuinely isolated from every other session's.
+A `LazySingleton` registered in a session's `register` hook is built the first time it resolves
+in that session. A different session asking for the same slot gets its own instance, lazily built
+the first time it resolves there.
+
+That isolation has practical consequences:
+
+- Per-session caches do not bleed: one session can cache the previous query while another runs a fresh one.
+- A misbehaving plugin that holds a `Stream` open or accumulates state cannot
+poison other sessions; close the session and that state goes with it.
+- Two implementations of the same slot can compete *per session*: settings can
+give session A a `MockBackend` for testing and session B a `RealBackend`.
+
+Closing a session disposes the session bus, runs every enabled session plugin's
+`detach`, and removes the session from `runtime.sessions`. Anything session-scoped
+is cleaned up. Global plugins keep running.
+
+## Global bus and session buses are isolated
+
+The global bus and each session bus are separate `EventBus` instances. A global
+plugin's `context.bus` IS the global bus; a session plugin's `context.bus` is that session's own bus.
+They do not share handlers, and there is no automatic forwarding between them.
+
+Cross-scope communication is explicit, in both directions.
+
+### Global plugin to all sessions
+
+To broadcast to every active session, keep the broadcast logic in a `StatefulPluginService<GlobalPluginContext>`. The service has a bound `context`, so it can call `sessions.emit` safely while the global plugin remains the owner that registers it.
+
+```dart
+class ThemeService extends StatefulPluginService<GlobalPluginContext> {
+  Future<void> broadcast(Theme theme) async {
+    await context.sessions.emit<AppThemeChanged>(AppThemeChanged(theme));
+  }
+}
+
+class ThemePlugin extends GlobalPlugin<GlobalPluginContext> {
+  @override
+  PluginId get pluginId => const PluginId('theme');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<ThemeService>(
+      const ServiceId('theme_service'),
+      ThemeService(),
+    );
+  }
+}
+
+// In your app shell, resolve and call:
+final themeService = runtime.globalRegistry.resolve<ThemeService>(
+  const ServiceId('theme_service'),
+);
+await themeService.broadcast(currentTheme);
+
+class ThemeAwarePlugin extends SessionPlugin<SessionPluginContext> {
+  @override
+  PluginId get pluginId => const PluginId('theme_aware');
+
+  @override
+  void attach(SessionPluginContext context) {
+    on<AppThemeChanged>(context, (e) {
+      // fires because ThemeService.broadcast used sessions.emit
+    });
+  }
+}
+```
+
+Emitting on `context.bus` from a global plugin only fires handlers registered on the global bus. Session plugins will not see it unless you go through `sessions.emit` (or some other explicit path).
+
+### Session plugin to global scope
+
+A session plugin that needs to reach global-scope handlers emits on `context.globalBus`:
+
+```dart
+context.globalBus.emit<DocumentSaved>(
+  event: DocumentSaved(documentId: context.document.id),
+);
+```
+
+### Global plugin to global plugin
+
+Uses the global bus directly:
+
+```dart
+context.bus.emit<SystemReady>(event: SystemReady());
+```
+
+### Session plugin to session plugin (same session)
+
+Uses that session's bus:
+
+```dart
+context.bus.emit<UserMessage>(event: UserMessage(text));
+```
+
+The separation is deliberate. Fire-and-forget cross-scope forwarding tends to produce surprising fan-out as the app grows. Making every cross-scope emit an explicit choice keeps the routing auditable.
+
+## Custom context types
+
+You can subclass `GlobalPluginContext` and `SessionPluginContext` to carry domain-specific fields: the current user, the active document, a tool registry, a telemetry client. When you do, you have to supply a factory the runtime can use to build your subclass.
+
+- Global: `runtime.init(globalContextFactory: ...)`
+- Session: `runtime.createSession(contextFactory: ...)`
+
+Forget the factory and the runtime throws `StateError`. That is on purpose: the default factories only build the base types, and silently downcasting would hide the misconfiguration until a plugin tried to read a field that did not exist. A loud failure at setup beats a quiet one at runtime.
+
+See [Custom Contexts](/concepts/custom-context/) for the full pattern.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Runtime"
+    description="The other half: the lifecycle engine that spawns sessions, settings reconciliation, enablement precedence."
+    href="/concepts/runtime/"
+  />
+  <LinkCard
+    title="Plugins"
+    description="`SessionPlugin` vs `GlobalPlugin`, scope-specific lifecycle hooks."
+    href="/concepts/plugins/"
+  />
+  <LinkCard
+    title="Custom Contexts"
+    description="Extending `SessionPluginContext` and `GlobalPluginContext` with domain-specific fields."
+    href="/concepts/custom-context/"
+  />
+  <LinkCard
+    title="Event Bus"
+    description="The model behind the bus instances each scope owns."
+    href="/concepts/event-bus/"
+  />
+</CardGrid>

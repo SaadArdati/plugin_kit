@@ -1,0 +1,288 @@
+---
+title: Getting Started
+description: Add Plugin Kit, write two plugins for the same slot, and watch the runtime pick the winner.
+---
+
+import { CardGrid, LinkCard, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+import PubVersion from '../../components/PubVersion.astro';
+
+<PubVersion />
+
+You will write two plugins, register the same service from each, and watch the runtime pick the winner.
+
+## Packages
+
+| Package | Description |
+|---|---|
+| [`plugin_kit`](https://github.com/SaadArdati/plugin_kit/tree/main/packages/plugin_kit) | Dart-only runtime: plugins, services, registry, event bus, settings, capabilities. |
+| [`flutter_plugin_kit`](https://github.com/SaadArdati/plugin_kit/tree/main/packages/flutter_plugin_kit) | Flutter ergonomics: scope widgets, a `State` mixin that auto-cancels bus subscriptions, a `ChangeNotifier` adapter, and `BuildContext.watchEvent` / `readEvent` extensions. Optional. |
+| [`plugin_kit_dialog`](https://github.com/SaadArdati/plugin_kit/tree/main/packages/plugin_kit_dialog) | Flutter customization UI on top of any `PluginRuntime`. Optional, but the visual proof. |
+
+Both Flutter packages are optional. The runtime is the part you build on.
+
+## Install
+
+Plugin Kit is a plain Dart package. Add it to your `pubspec.yaml`.
+
+<Tabs>
+  <TabItem label="Local path">
+
+  ```yaml
+  dependencies:
+    plugin_kit: ^PUBVER_plugin_kit
+  ```
+
+  Find the latest version on pub.dev and add it to your dependencies.
+
+  </TabItem>
+  <TabItem label="Git">
+
+  ```yaml
+  dependencies:
+    plugin_kit:
+      git:
+        url: https://github.com/SaadArdati/plugin_kit
+        ref: main
+  ```
+
+  Use this if you want to consume it directly from GitHub without waiting for a pub.dev release.
+
+  </TabItem>
+</Tabs>
+
+Then run `dart pub get` (or `flutter pub get`) and you are set.
+
+If your shell is Flutter and you want a scope widget to carry the runtime/session through the tree (plus a `State` mixin that auto-cancels bus subscriptions), add `flutter_plugin_kit` the same way. The Dart-only setup works without it; [`flutter_plugin_kit`](/guides/flutter-plugin-kit/) covers what it adds and when it pays for itself.
+
+If you want the visual customization UI as well, add `plugin_kit_dialog` to your `pubspec.yaml` the same way.
+The runtime works without it; [Plugin Kit Dialog](/guides/plugin-kit-dialog/) covers when and how to mount it.
+
+## The whole example
+
+Copy this into a fresh Dart file and run it. Walkthrough is below.
+
+```dart
+import 'package:plugin_kit/plugin_kit.dart';
+
+abstract class Greeter {
+  String greet(String name);
+}
+
+class CasualGreeter implements Greeter {
+  @override
+  String greet(String name) => 'Hello, $name.';
+}
+
+class FormalGreeter implements Greeter {
+  @override
+  String greet(String name) => 'Good day, $name.';
+}
+
+class CasualPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('casual');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<Greeter>(
+      const ServiceId('greeter'),
+      CasualGreeter(),
+    );
+  }
+}
+
+class FormalPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('formal');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<Greeter>(
+      const ServiceId('greeter'),
+      FormalGreeter(),
+      priority: 100,
+    );
+  }
+}
+
+Future<void> main() async {
+  final runtime = PluginRuntime(plugins: [CasualPlugin(), FormalPlugin()])
+    ..init();
+  final session = await runtime.createSession();
+
+  final greeter = session.resolve<Greeter>(const ServiceId('greeter'));
+  print(greeter.greet('world')); // Good day, world.
+
+  await runtime.dispose();
+}
+```
+
+Output:
+
+```
+Good day, world.
+```
+
+Two plugins, one slot, one runtime, one winner. Now the parts.
+
+## What each piece is doing
+
+<Steps>
+
+1. **Define the contract.**
+
+   `Greeter` is the abstract type that the host code asks for. Plugin Kit does NOT require interfaces, but they pay
+    off the moment more than one implementation is in play.
+
+   ```dart
+   abstract class Greeter {
+     String greet(String name);
+   }
+   ```
+
+2. **Define the implementations.**
+
+   `CasualGreeter` and `FormalGreeter` are regular Dart classes. The runtime never inspects them. How they are
+    constructed, mocked, or tested is entirely up to you.
+
+3. **Define the plugins.**
+
+   A plugin has a unique `PluginId` and a `register` hook. The id has to be unique across the runtime; the register
+    hook is where the plugin contributes things to the session.
+
+   ```dart
+   class CasualPlugin extends SessionPlugin {
+     @override
+     PluginId get pluginId => const PluginId('casual');
+     // ...
+   }
+   ```
+
+   We extend `SessionPlugin` because this feature lives inside a session rather than at the application level.
+   The other scope, `GlobalPlugin`, is for behavior shared across every session. More on the split in
+   [Plugins](/concepts/plugins/).
+
+4. **Register competing services.**
+
+   Both plugins register a `Greeter` for the same slot, identified by `const ServiceId('greeter')`. `FormalPlugin`
+   registers with `priority: 100`. `CasualPlugin` takes the default. When the host resolves
+   `Greeter`, it gets the higher priority.
+
+   The `ScopedServiceRegistry` already knows which plugin is doing the registering, so you only supply the
+   `ServiceId` handle and the instance.
+
+   ```dart
+   registry.registerSingleton<Greeter>(
+     const ServiceId('greeter'),
+     FormalGreeter(),
+     priority: 100,
+   );
+   ```
+
+5. **Start the runtime.**
+
+   `PluginRuntime` is the long-lived host for all your plugins. `init()` prepares the global scope. After that,
+   it is ready to spawn sessions.
+
+   ```dart
+   final runtime = PluginRuntime(plugins: [CasualPlugin(), FormalPlugin()])
+     ..init();
+   ```
+
+6. **Open a session.**
+
+   A session is an isolated execution scope with its own registry, event bus, and context.
+   You can open as many as you want, and each one runs its session plugins independently of the others.
+
+   ```dart
+   final session = await runtime.createSession();
+   ```
+
+7. **Resolve and use.**
+
+   Ask for the service by its slot id. The session returns the winning implementation, which
+   is `FormalGreeter` in this case. The call site never knows there was a competition.
+
+   ```dart
+   final greeter = session.resolve<Greeter>(const ServiceId('greeter'));
+   print(greeter.greet('world')); // Good day, world.
+   ```
+
+8. **Shut it down.**
+
+   Dispose the runtime when you are done. Every attached plugin gets a chance to detach
+   and clean up before the lights go out.
+
+   ```dart
+   await runtime.dispose();
+   ```
+
+</Steps>
+
+## Try changing things
+
+The library only earns its weight when things change. Three quick experiments to convince yourself that something real is happening:
+
+- **Drop `FormalPlugin`** from the runtime's plugin list and re-run. Output flips to `Hello, world.` The host code did not change.
+- **Lower `FormalPlugin`'s priority below the default** (try `priority: 0`) and re-run. Output flips back to `Hello, world.` Same plugins, different winner.
+- **Soft-disable `FormalPlugin` via config.** Pass `RuntimeSettings` to the runtime and mark the formal plugin disabled.
+ Both plugins still ship, both classes still exist, but the disabled one never wins:
+
+  ```dart
+  final runtime = PluginRuntime(
+    plugins: [CasualPlugin(), FormalPlugin()],
+  )..init(
+      // Can be user-driven via json config, a settings UI, or any other config system you build on top. Hard-coded here for demo purposes.
+      settings: const RuntimeSettings(
+        plugins: {
+          PluginId('formal'): PluginConfig(enabled: false),
+        },
+      ),
+    );
+  ```
+
+  Output flips to `Hello, world.` This is the move a settings UI makes when a user turns a feature off: same build, same code path,
+  different runtime answer. Settings can also be updated live mid-session, and the runtime will reconcile the registry around the change.
+
+That swap, where the winner changes and the call site does not, is the bet the rest of the library makes. A model selector that
+follows the live winner, a settings dialog that reorders priorities, a session that loads a tenant-specific 
+plugin set: all the same move at different scales.
+
+If you want users to drive that swap themselves, [Plugin Kit Dialog](/guides/plugin-kit-dialog/) is a drop-in three-tab
+customization UI that exposes plugin enablement, service config, and the priority registry directly. The same `RuntimeSettings` you
+constructed by hand above is what the dialog produces and saves.
+
+## What you just built
+
+A feature has an identity (`formal`), a slot it claims (`greeter`), and a priority that says how seriously it wants to win.
+The runtime owns the lifecycle. The host code asks the session, not a concrete class. The casual implementation is still
+registered and still reachable as a fallback via `resolveAfter`; it just lost the active slot.
+
+Everything else in Plugin Kit layers on top of this: events flying between plugins, settings flipping things live,
+session-scoped state that cleans itself up, capabilities that let you discover what a service can do without building
+it. Same vocabulary, applied in different directions.
+
+## Where to go from here
+
+<CardGrid>
+  <LinkCard
+    title="The mental model, in one sitting"
+    description="Plugins, services, events, sessions. Four primitives and how they fit together."
+    href="/concepts/plugins/"
+  />
+  <LinkCard
+    title="Richer plugin services"
+    description="StatefulPluginService, automatic subscription tracking, typed config."
+    href="/concepts/plugin-services/"
+  />
+  <LinkCard
+    title="Configure and reconcile at runtime"
+    description="Enable, disable, raise priorities, inject settings, all live, no restart."
+    href="/guides/settings/"
+  />
+  <LinkCard
+    title="Capabilities"
+    description="Discover what a service can do without building it. Great for dynamic UI."
+    href="/concepts/capabilities/"
+  />
+</CardGrid>

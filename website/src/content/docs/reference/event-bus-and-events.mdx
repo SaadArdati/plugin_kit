@@ -1,0 +1,345 @@
+---
+title: Event Bus & Events
+description: Reference for EventBus, EventEnvelope, request/response, identifier scoping, and the subscription helpers that ride on plugins, services, and sessions.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page is the lookup reference for the public event types in `plugin_kit`. It assumes you already understand the model from the concept pages and want to confirm a signature, a return type, or a default value.
+
+The bus is exported from the package barrel via `src/event_bus.dart`, alongside the convenience extensions in `src/extensions.dart`.
+
+## `EventBus`
+
+```dart
+class EventBus {
+  EventBus();
+
+  bool get isDisposed;
+  void dispose();
+}
+```
+
+Construct with the zero-argument constructor when you need a standalone bus (tests, custom hosts). In application code you almost never instantiate one yourself: each `PluginRuntime` owns one global bus and each `PluginSession` owns its own session bus. See [Runtime](/concepts/runtime/) and [Sessions](/concepts/sessions/) for who creates which.
+
+`dispose()` clears every event handler, request handler, and `bind` callback, then flips `isDisposed` to `true`. The runtime calls it when a session ends or when the runtime itself is shut down. Calling it yourself on a runtime-owned bus is almost always a bug.
+
+## `EventEnvelope<T>`
+
+Every handler receives an envelope, not a raw payload. `emit` and `emitInternal` also return one.
+
+```dart
+class EventEnvelope<T> {
+  EventEnvelope({required T event, required String? identifier});
+
+  T event;                  // mutable; downstream handlers see writes
+  final String? identifier; // the emit-time scope, if any
+  bool get stopped;
+  void stop(T value);
+}
+```
+
+- `event` is mutable. Mutating it in a handler is how you transform the payload for the rest of the cascade.
+- `identifier` is whatever was passed to `emit` (or `request`). It is read-only after construction.
+- `stop(value)` halts the cascade, sets `event` to `value`, and flips `stopped` to `true`. Subsequent handlers in the priority chain do not run.
+- `stopped` is the boolean the emitter checks on the returned envelope to see whether someone short-circuited the chain.
+
+`InternalPluginEventResponse<T>` is a private subtype the bus wraps internal events in. It is exported from the barrel but you do not construct it; it exists so `bind` callbacks can be filtered out by type.
+
+## `on` and `bind`
+
+### `on<T>` and `onSync<T>`
+
+```dart
+StreamSubscription on<T>(
+  EventHandler<T> handler, {
+  int priority = 0,
+  String? identifier,
+});
+
+StreamSubscription onSync<T>(
+  SyncEventHandler<T> handler, {
+  int priority = 0,
+  String? identifier,
+});
+```
+
+`EventHandler<T>` is `FutureOr<void> Function(EventEnvelope<T>)`. `SyncEventHandler<T>` is the strictly-synchronous variant, `void Function(EventEnvelope<T>)`. Use `onSync` when the handler will be invoked through `emitSync` and async would be a bug.
+
+Default priority is `0`. Lower runs first, mirroring the pipeline metaphor. Registry priority is the opposite (higher wins); the rationale is in the concept doc.
+
+The returned `StreamSubscription` is a stub that supports `cancel()` and nothing else. `onData`, `onDone`, `onError`, `pause`, `resume`, and `asFuture` all throw `UnsupportedError`. There is no underlying stream, only a cancellation token shaped like one.
+
+### `bind`
+
+```dart
+void Function() bind(EventBindingCallback callback);
+```
+
+`EventBindingCallback` is `void Function(EventEnvelope<dynamic>)`. The callback fires for every non-internal event, before typed handlers run. It cannot stop the cascade. Use it for tracing, analytics, or debug logging.
+
+The return value is the unbind function. Call it to remove the callback.
+
+```dart
+final unbind = bus.bind((envelope) {
+  log.debug('event ${envelope.event.runtimeType}');
+});
+// ... later
+unbind();
+```
+
+Internal events emitted via `emitInternal` skip `bind` callbacks entirely.
+
+### `hasRequestHandler`
+
+```dart
+bool hasRequestHandler<Request, Response>({String? identifier});
+```
+
+Reports whether at least one handler is registered for the `(Request, Response)` type pair. With `identifier`, only identifier-scoped handlers count. Useful for capability probes (does *anyone* in this scope answer this question yet) without paying for an exception.
+
+## `emit` and `emitInternal`
+
+```dart
+Future<EventEnvelope<T>> emit<T>({
+  required T event,
+  String? identifier,
+  bool internal = false,
+});
+
+EventEnvelope<T> emitSync<T>({
+  required T event,
+  String? identifier,
+  bool internal = false,
+});
+
+Future<EventEnvelope<T>> emitInternal<T>({
+  required T event,
+  String? identifier,
+});
+```
+
+`emit` wraps `event` in an `EventEnvelope<T>`, runs `bind` callbacks (when not internal), then walks the priority-merged handler chain. The cascade stops when a handler calls `envelope.stop(value)`. The returned envelope carries the final state; check `stopped` if you need to know whether someone short-circuited.
+
+`emitSync` has the same dispatch semantics but throws `StateError` if any handler returns a `Future`. Use it for lifecycle events where async would be a correctness bug.
+
+`emitInternal` is a thin wrapper that calls `emit` with `internal: true`. The only doc-visible difference: `bind` callbacks do not see internal events. Most application code will never call it; it is for system-level signals you want typed handlers to react to without cluttering analytics taps.
+
+The `internal` parameter on `emit` itself is rarely used directly; prefer `emitInternal` so the intent reads at the call site.
+
+## Request/response
+
+The same bus also does typed RPC. The dispatch model mirrors `emit`: general handlers are merged with identifier-scoped handlers into one ascending-priority sequence. Each handler is invoked in turn. The first handler to return a non-null `Response` wins; returning `null` concedes to the next handler.
+
+For non-nullable `Response`, the first handler that runs wins by definition (it cannot return null). The cascade behavior matters most when `Response` is nullable, which is the usual shape.
+
+### Async
+
+```dart
+StreamSubscription onRequest<Request, Response>(
+  RequestHandler<Request, Response> handler, {
+  int priority = 0,
+  String? identifier,
+});
+
+Future<Response> request<Request, Response>(
+  Request request, {
+  String? identifier,
+});
+
+Future<Response?> maybeRequest<Request, Response>(
+  Request request, {
+  String? identifier,
+});
+```
+
+`RequestHandler<Request, Response>` is `FutureOr<Response> Function(EventEnvelope<Request>)`. The handler reads `envelope.event` to get the request payload.
+
+`request` throws `RequestUnavailableException` (which `implements Exception`) when no handler is registered for the `(Request, Response)` pair, or when every registered handler conceded and `Response` is non-nullable. The error message names the type pair. `maybeRequest` catches `RequestUnavailableException` and returns `null`; any *other* exception thrown by a handler still propagates, which is what most call sites actually want.
+
+### Sync
+
+```dart
+StreamSubscription onRequestSync<Request, Response>(
+  SyncRequestHandler<Request, Response> handler, {
+  int priority = 0,
+  String? identifier,
+});
+
+Response requestSync<Request, Response>(
+  Request request, {
+  String? identifier,
+});
+
+Response? maybeRequestSync<Request, Response>(
+  Request request, {
+  String? identifier,
+});
+```
+
+`SyncRequestHandler<Request, Response>` is `Response Function(EventEnvelope<Request>)`. Handlers registered via `onRequestSync` are stored in the same buckets as async ones; the sync wrapper exists to refuse `Future` returns at the call boundary.
+
+`requestSync` throws `StateError` if any invoked handler returns a `Future`. Same throw conditions as `request` for missing or fully-conceding handlers — both surface as `RequestUnavailableException`. `maybeRequestSync` catches `RequestUnavailableException` and returns `null` on availability failure; any *other* exception thrown by a handler (including the `StateError` on a Future-returning sync handler) propagates, matching the async `maybeRequest` contract.
+
+## Identifier scoping
+
+Both `emit` and `request` accept an optional `String? identifier`. So do `on`, `onRequest`, and the sync variants. The dispatch rules:
+
+| Emit identifier | Subscriber identifier | Handler runs? |
+|---|---|---|
+| `null` | `null` | yes |
+| `null` | `'foo'` | no |
+| `'foo'` | `null` | yes |
+| `'foo'` | `'foo'` | yes |
+| `'foo'` | `'bar'` | no |
+
+When the emit identifier is non-null, general (`null`-identifier) handlers and handlers scoped to that exact identifier are merged into a single priority-ordered sequence. Handlers scoped to any other identifier never see the event.
+
+The same table applies to request handlers.
+
+Identifiers are how one bus multiplexes across logical targets (tools, agents, panels, departments) without forcing a separate bus per target. They have no implicit hierarchy: `foo` and `foo.bar` are unrelated strings as far as the bus is concerned.
+
+## Helpers on `Plugin`, `StatefulPluginService`, and `PluginSession`
+
+The bus is reachable directly on every context, but the convenience extensions in `src/extensions.dart` exist so plugin code never has to manage subscription fields by hand.
+
+### `PluginHelper` extension on `Plugin`
+
+```dart
+extension PluginHelper on Plugin {
+  StreamSubscription on<E>(
+    PluginContext context,
+    EventHandler<E> handler, {
+    int priority = 0,
+    String? identifier,
+  });
+  StreamSubscription onRequest<Request, Response>(
+    PluginContext context,
+    RequestHandler<Request, Response> handler, {
+    int priority = 0,
+    String? identifier,
+  });
+  StreamSubscription onRequestSync<Request, Response>(
+    PluginContext context,
+    SyncRequestHandler<Request, Response> handler, {
+    int priority = 0,
+    String? identifier,
+  });
+  void Function() bind(PluginContext context, EventBindingCallback callback);
+  Future<EventEnvelope<T>> emit<T>(
+    PluginContext context,
+    T event, {
+    String? identifier,
+  });
+}
+```
+
+Every helper takes the [`PluginContext`](/reference/plugins-and-lifecycle/) as its first argument because the same plugin instance is shared across sessions — there is no safe "current context" to read from a field. Inside `Plugin.attach` / `Plugin.detach` the `context` parameter is right there; pass it along.
+
+Each subscription helper registers on `context.bus` and bookkeeps the returned `StreamSubscription` into a per-context bucket. The framework cancels each context's bucket when that context detaches, so concurrent sessions of the same plugin do not trample each other's teardown.
+
+### `StatefulPluginService` bus methods
+
+`StatefulPluginService` exposes the same shape via the `StatefulPluginServiceHelper` extension. The service holds its own `context` reference (bound by the framework before `attach()` runs), so these helpers do NOT take a `PluginContext` parameter:
+
+```dart
+StreamSubscription on<E>(EventHandler<E> handler, {int priority = 0, String? identifier});
+StreamSubscription onRequest<Request, Response>(
+  RequestHandler<Request, Response> handler, {
+  int priority = 0,
+  String? identifier,
+});
+StreamSubscription onRequestSync<Request, Response>(
+  SyncRequestHandler<Request, Response> handler, {
+  int priority = 0,
+  String? identifier,
+});
+void Function() bind(EventBindingCallback callback);
+Future<EventEnvelope<T>> emit<T>(T event, {String? identifier});
+```
+
+Subscriptions are appended to `StatefulPluginService.activeSubscriptions` and cancelled on `detach`. `emit` throws `StateError` if called outside the attach/detach window.
+
+The full service reference, including `attach`/`detach` ordering and `injectSettings`, lives on the [Service Registry & Capabilities](/reference/service-registry-and-capabilities/) page.
+
+### `SessionHelper` extension on `PluginSession`
+
+```dart
+extension SessionHelper on PluginSession {
+  Future<EventEnvelope<T>> emit<T>(T event, {String? identifier});
+  Future<EventEnvelope<T>> emitInternal<T>(T event, {String? identifier});
+
+  StreamSubscription on<T>(
+    EventHandler<T> handler, {
+    int priority = 0,
+    String? identifier,
+  });
+  StreamSubscription onRequest<Request, Response>(
+    RequestHandler<Request, Response> handler, {
+    int priority = 0,
+    String? identifier,
+  });
+  StreamSubscription onRequestSync<Request, Response>(
+    SyncRequestHandler<Request, Response> handler, {
+    int priority = 0,
+    String? identifier,
+  });
+
+  Future<Response> request<Request, Response>(Request request, {String? identifier});
+  Future<Response?> maybeRequest<Request, Response>(Request request, {String? identifier});
+  Response requestSync<Request, Response>(Request request, {String? identifier});
+  Response? maybeRequestSync<Request, Response>(Request request, {String? identifier});
+}
+```
+
+The session helpers do not auto-track subscriptions: a `PluginSession` is the lifetime that owns the bus, so when the session ends the bus is disposed and every handler goes with it. Use these from host code that is driving a session from the outside.
+
+## Cross-scope routing
+
+The runtime keeps the global bus and each session bus isolated. Cross-scope emission is always explicit:
+
+| From | To | API |
+|---|---|---|
+| Global plugin | Global plugins | `context.bus.emit(...)` |
+| Session plugin | Same-session plugins | `context.bus.emit(...)` |
+| Session plugin | Global scope | `context.globalBus.emit(...)` |
+| Global plugin | Every active session | `context.sessions.emit<T>(event)` |
+
+`SessionPluginContext.globalBus` is the same `EventBus` instance owned by the runtime. Reading it is fine; disposing it is not.
+
+`context.sessions.emit<T>(...)` is provided by the `SessionBroadcast` extension on `List<PluginSession>`:
+
+```dart
+extension SessionBroadcast on List<PluginSession> {
+  Future<void> emit<T>(T event, {String? identifier});
+}
+```
+
+It awaits each session's emit in sequence. A handler that throws on one session aborts the broadcast for the rest; if you need fan-out with isolation, iterate and `try`/`catch` per session yourself.
+
+The full cross-scope story, including why isolation defaults are intentional, is on [Sessions](/concepts/sessions/).
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Event Bus (concept)"
+    description="The model: priority direction, the envelope, internal events, the cross-scope APIs."
+    href="/concepts/event-bus/"
+  />
+  <LinkCard
+    title="Events (from inside plugins)"
+    description="Designing event types, picking between emit and request, common shapes."
+    href="/concepts/events/"
+  />
+  <LinkCard
+    title="Runtime"
+    description="Where the global bus and session buses come from, and the cross-scope routing rules."
+    href="/concepts/sessions/"
+  />
+  <LinkCard
+    title="Service Registry & Capabilities"
+    description="StatefulPluginService, attach/detach ordering, and the registry side of the runtime."
+    href="/reference/service-registry-and-capabilities/"
+  />
+</CardGrid>

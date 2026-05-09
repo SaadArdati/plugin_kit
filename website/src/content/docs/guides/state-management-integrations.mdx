@@ -1,0 +1,449 @@
+---
+title: State Management Integrations
+description: Wire plugin_kit into Bloc, Riverpod, ChangeNotifier+Provider, signals_flutter, MobX, GetIt, or plain setState. Each recipe is backed by a runnable widget test in the example workspace.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Plugin Kit is library-agnostic about state management, but the bus, registry, and session lifecycle overlap with what most state libraries do. You can wire it through whatever your app already uses, or lean on the bus directly when an extra layer would only forward events. This page shows the wire-up between a `PluginSession` and seven common state holders, with the same chat protocol used in every example so you can read the differences side by side and pick the cost you actually want to pay.
+
+<Aside type="tip" title="Source of citation">
+Every recipe on this page is implemented in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden). Sixteen tests in that package compile, run, and assert the recipes against a real `PluginRuntimeManager`, including the two `flutter_plugin_kit` variants shown inline below. If a recipe here drifts from what actually works, the test in that package fails on the next commit.
+</Aside>
+
+<Aside type="note" title="The flutter_plugin_kit variant">
+Two of the recipes below — `StatefulWidget + setState` and `ChangeNotifier + provider` — drop most of the bookkeeping (subscription field, `_disposed` flag, manual `cancel()` in `dispose`) once you pull in [`flutter_plugin_kit`](/guides/flutter-plugin-kit/). Line counts come out roughly similar; what shrinks is the cognitive load: the package ships a `PluginSessionStateListener` mixin that owns the subscription lifecycle for `State<W>`, plus a `PluginEventNotifier<E>` that already *is* a `ChangeNotifier` exposing the latest event as `.value`. Each affected recipe shows the package variant inline. The remaining recipes (Bloc, Riverpod, signals, MobX, GetIt) keep their library-native shape — `flutter_plugin_kit` does not displace state libraries, it just removes the bookkeeping layer for hosts that *are* a `State` or a `ChangeNotifier`.
+</Aside>
+
+## The shape every recipe shares
+
+A state holder bridge has the same three duties no matter which library you pick.
+
+1. Subscribe to the relevant fact event on the session bus (`ChatMessagesChanged` in these recipes), store the resulting `StreamSubscription` in a field, and update the holder's state inside the handler.
+2. Translate UI intents into bus events with `session.emit(SomeIntent(...))`.
+3. Cancel the subscription in whatever disposal hook the library provides — `Cubit.close`, `ChangeNotifier.dispose`, `ref.onDispose`, `State.dispose`, etc.
+
+The bridge does NOT cache resolved services and does NOT subscribe inside `build`. Both decisions matter and are explained below.
+
+## Subscription ownership
+
+`session.on(...)` is a thin pass-through to `EventBus.on`. The framework does NOT auto-cancel a subscription registered this way. That auto-tracking exists only on `Plugin.on(context, ...)` and `StatefulPluginService.on(...)`, which the framework cancels in `_runDetach` and `_unbindContext` respectively.
+
+A state holder lives outside the plugin lifecycle, so it owns its subscription's lifetime. Forget to cancel and the handler keeps firing on the session bus until the bus itself is disposed. Cancel after the holder is dead and the holder may try to write to torn-down state.
+
+The pattern in every recipe below is the same: store the subscription in a final field, cancel in the disposal hook, and guard the handler body so a fire that races the cancel is harmless.
+
+## Post-dispose guards
+
+Cancelling a subscription does not break out of an in-progress dispatch. `EventBus.emit` snapshots its handler list before iterating; a handler removed mid-cascade still runs once if the cascade had already started.
+
+Each recipe guards against this by checking the holder's "is closed" flag before mutating state:
+
+- `Cubit` checks `isClosed`.
+- `State` checks `mounted`.
+- `ChangeNotifier`, signals, MobX bridges flip a local `_disposed` flag in `dispose()` before cancelling.
+
+Without the guard, a late fire that calls `notifyListeners` or `emit` on a dead holder throws.
+
+## A shared chat protocol
+
+Every recipe below uses the same plugin-side protocol so the differences are entirely about state-holder shape.
+
+```dart
+class ChatMessage {
+  final String author;
+  final String text;
+}
+
+class SendMessageRequested {
+  final String text;
+}
+
+class ChatMessagesChanged {
+  final List<ChatMessage> messages;
+}
+```
+
+The plugin's `ChatService` listens for `SendMessageRequested`, appends the user line and an `'echo: ' + text` bot line to its own list, and emits `ChatMessagesChanged` with the full snapshot. See [`chat_service.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/chat/chat_service.dart) for the actual code.
+
+## Recipe: StatefulWidget + setState
+
+The reference shape with no library at all. The widget owns the subscription. `mounted` guards every continuation.
+
+```dart
+class SetStateChatScreen extends StatefulWidget {
+  const SetStateChatScreen({super.key, required this.session});
+  final PluginSession session;
+
+  @override
+  State<SetStateChatScreen> createState() => _SetStateChatScreenState();
+}
+
+class _SetStateChatScreenState extends State<SetStateChatScreen> {
+  StreamSubscription<void>? _subscription;
+  List<ChatMessage> _messages = const <ChatMessage>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _subscription = widget.session.on<ChatMessagesChanged>((envelope) {
+      if (!mounted) return;
+      setState(() => _messages = envelope.event.messages);
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _onSubmit(String text) =>
+      widget.session.emit(SendMessageRequested(text)).then((_) {});
+
+  @override
+  Widget build(BuildContext context) {
+    return ChatView(title: 'setState', messages: _messages, onSend: _onSubmit);
+  }
+}
+```
+
+Source: [`set_state_chat_screen.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/set_state_chat_screen.dart).
+
+### With flutter_plugin_kit
+
+If `flutter_plugin_kit` is in your pubspec, the same screen is the mixin call plus a `setState` inside the handler. The mixin owns the subscription field, the cancel-on-dispose, and the re-attach across session swaps. `listen` is callable from `initState` directly — no `_wired` flag, no `didChangeDependencies` deferral.
+
+```dart
+class _SetStateChatScreenState extends State<SetStateChatScreen>
+    with PluginSessionStateListener<SetStateChatScreen> {
+  @override
+  PluginSession? get session => widget.session;
+
+  List<ChatMessage> _messages = const <ChatMessage>[];
+
+  @override
+  void initState() {
+    super.initState();
+    listen<ChatMessagesChanged>((event) {
+      if (!mounted) return;
+      setState(() => _messages = event.messages);
+    });
+  }
+
+  Future<void> _onSubmit(String text) =>
+      widget.session.emit(SendMessageRequested(text)).then((_) {});
+
+  @override
+  Widget build(BuildContext context) =>
+      ChatView(title: 'setState', messages: _messages, onSend: _onSubmit);
+}
+```
+
+If the session lives in an ambient `PluginSessionScope` instead of a `widget.session` parameter, drop the `session` override entirely — the mixin reads the scope by default.
+
+## Recipe: ChangeNotifier + provider
+
+A `ChangeNotifier` subclass holds a `List<ChatMessage>` and calls `notifyListeners` whenever the bus delivers a new snapshot. The `_disposed` flag is the post-dispose guard described above.
+
+```dart
+class ChatChangeNotifier extends ChangeNotifier {
+  ChatChangeNotifier(this._session) {
+    _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
+  }
+
+  final PluginSession _session;
+  late final StreamSubscription<void> _subscription;
+  bool _disposed = false;
+
+  List<ChatMessage> _messages = const <ChatMessage>[];
+  List<ChatMessage> get messages => _messages;
+
+  Future<void> send(String text) =>
+      _session.emit(SendMessageRequested(text)).then((_) {});
+
+  void _onMessagesChanged(EventEnvelope<ChatMessagesChanged> envelope) {
+    if (_disposed) return;
+    _messages = envelope.event.messages;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _subscription.cancel();
+    super.dispose();
+  }
+}
+```
+
+Wrap with `ChangeNotifierProvider` and read in widgets through `context.watch<ChatChangeNotifier>()` as usual. Source: [`change_notifier_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/change_notifier_chat.dart).
+
+<Aside type="caution" title="The handler signature is `EventEnvelope<T>`, not `T`">
+`session.on<T>` calls back with `EventEnvelope<T>`, not the payload directly. The payload is at `envelope.event`. A handler written as `(event) { messages = event.messages; }` does not compile because `EventEnvelope` has no `.messages` getter. Always destructure: `(envelope) { messages = envelope.event.messages; }`.
+</Aside>
+
+### With flutter_plugin_kit
+
+If you only need "the latest event of type `T`," `flutter_plugin_kit` ships `PluginEventNotifier<E>` — a `ChangeNotifier` / `ValueListenable<E?>` that already does the subscribe / store-latest / cancel-on-dispose dance. There is no custom subclass to write.
+
+```dart
+ChangeNotifierProvider(
+  create: (context) => PluginEventNotifier<ChatMessagesChanged>(
+    PluginSessionScope.of(context),
+  ),
+  child: const ChatBody(),
+);
+
+// In ChatBody:
+final messages = context
+        .watch<PluginEventNotifier<ChatMessagesChanged>>()
+        .value
+        ?.messages
+    ?? const <ChatMessage>[];
+```
+
+For the same shape as a `ValueListenable`, swap `ChangeNotifierProvider` for `ValueListenableProvider` or pass it to a `ValueListenableBuilder<ChatMessagesChanged?>` directly. The `_messages` list, the `_disposed` flag, and the `notifyListeners` call all disappear because the foundation type does the work.
+
+The hand-written `ChangeNotifier` subclass above stays the right shape when you have multiple events to fold into one state, custom derived state, or behavior the `latest E` shape doesn't capture.
+
+## Recipe: flutter_bloc
+
+A Cubit subscribes in its constructor and guards both the bus handler and the explicit `await` in `send` with `isClosed`.
+
+```dart
+class ChatBlocState {
+  const ChatBlocState({this.messages = const [], this.sending = false});
+  final List<ChatMessage> messages;
+  final bool sending;
+
+  ChatBlocState copyWith({List<ChatMessage>? messages, bool? sending}) =>
+      ChatBlocState(
+        messages: messages ?? this.messages,
+        sending: sending ?? this.sending,
+      );
+
+  // == and hashCode over messages (ListEquality) and sending.
+}
+
+class ChatCubit extends Cubit<ChatBlocState> {
+  ChatCubit(this._session) : super(const ChatBlocState()) {
+    _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
+  }
+
+  final PluginSession _session;
+  late final StreamSubscription<void> _subscription;
+
+  Future<void> send(String text) async {
+    if (isClosed) return;
+    emit(state.copyWith(sending: true));
+    await _session.emit(SendMessageRequested(text));
+    if (isClosed) return;
+    emit(state.copyWith(sending: false));
+  }
+
+  void _onMessagesChanged(EventEnvelope<ChatMessagesChanged> envelope) {
+    if (isClosed) return;
+    emit(state.copyWith(messages: envelope.event.messages));
+  }
+
+  @override
+  Future<void> close() async {
+    await _subscription.cancel();
+    return super.close();
+  }
+}
+```
+
+`ChatBlocState` implements value equality so `BlocBuilder` does not rebuild when an identical snapshot is re-emitted. Source: [`bloc_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/bloc_chat.dart).
+
+<Aside type="note" title="The Cubit-as-bridge is the most redundant of these recipes">
+Read the body of `_onMessagesChanged`: it takes a bus event and re-emits it as widget state. That is exactly what a `setState` call inside a `StatefulWidget` listener would do off the same `session.on<ChatMessagesChanged>` subscription. Keep the Cubit if you already have one and value the `state.copyWith` ergonomics or `BlocBuilder`'s rebuild filtering — those are real wins. If you don't, the bus is already a state-update channel and the Cubit is one bridge too many.
+</Aside>
+
+## Recipe: Riverpod
+
+The recommended shape uses a `Provider<PluginSession>` that the host overrides at app boot, plus an `AsyncNotifier` that subscribes inside `build` and registers `ref.onDispose` after wiring the subscription.
+
+```dart
+final sessionProvider = Provider<PluginSession>((ref) {
+  throw UnimplementedError(
+    'Override sessionProvider with the application session at app boot.',
+  );
+});
+
+final chatNotifierProvider =
+    AsyncNotifierProvider<ChatNotifier, List<ChatMessage>>(ChatNotifier.new);
+
+class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
+  StreamSubscription<void>? _subscription;
+
+  @override
+  Future<List<ChatMessage>> build() async {
+    final session = ref.watch(sessionProvider);
+    _subscription = session.on<ChatMessagesChanged>(_onMessagesChanged);
+    ref.onDispose(_cancel);
+    return const <ChatMessage>[];
+  }
+
+  void _onMessagesChanged(EventEnvelope<ChatMessagesChanged> envelope) {
+    state = AsyncData(envelope.event.messages);
+  }
+
+  Future<void> _cancel() async {
+    await _subscription?.cancel();
+    _subscription = null;
+  }
+
+  Future<void> send(String text) async {
+    final session = ref.read(sessionProvider);
+    await session.emit(SendMessageRequested(text));
+  }
+}
+```
+
+At app boot:
+
+```dart
+ProviderScope(
+  overrides: [sessionProvider.overrideWithValue(holder.session)],
+  child: MyApp(),
+)
+```
+
+Source: [`riverpod_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/riverpod_chat.dart).
+
+<Aside type="caution" title="Do not create the session inside a FutureProvider">
+A `FutureProvider` that calls `manager.createSession()` inside its build leaks the previous session when the provider invalidates, because `ref.onDispose` is the only thing that would dispose it. Either register `ref.onDispose(() => session.dispose())` inside that provider, or do what the recipe above does and inject an already-built session via override. The override pattern is cleaner: it keeps session lifetime visible at the app boot site instead of buried in a Riverpod provider closure.
+</Aside>
+
+## Recipe: signals_flutter
+
+A `Signal` holds the snapshot. The bus handler writes to `signal.value`. The `Watch` builder rebuilds when the signal is read inside it.
+
+```dart
+class SignalsChatBridge {
+  SignalsChatBridge(this._session) {
+    _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
+  }
+
+  final PluginSession _session;
+  late final StreamSubscription<void> _subscription;
+  bool _disposed = false;
+
+  final Signal<List<ChatMessage>> messages = signal(const <ChatMessage>[]);
+
+  Future<void> send(String text) =>
+      _session.emit(SendMessageRequested(text)).then((_) {});
+
+  void _onMessagesChanged(EventEnvelope<ChatMessagesChanged> envelope) {
+    if (_disposed) return;
+    messages.value = envelope.event.messages;
+  }
+
+  void dispose() {
+    _disposed = true;
+    _subscription.cancel();
+  }
+}
+```
+
+Render with `Watch((context) => ChatView(messages: bridge.messages.value, ...))`. Source: [`signals_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/signals_chat.dart).
+
+## Recipe: MobX
+
+Mirror the signals shape with `Observable` plus `runInAction`. No code generation needed.
+
+```dart
+class MobxChatBridge {
+  MobxChatBridge(this._session) {
+    _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
+  }
+
+  final PluginSession _session;
+  late final StreamSubscription<void> _subscription;
+  bool _disposed = false;
+
+  final Observable<List<ChatMessage>> messages =
+      Observable<List<ChatMessage>>(const <ChatMessage>[]);
+
+  Future<void> send(String text) =>
+      _session.emit(SendMessageRequested(text)).then((_) {});
+
+  void _onMessagesChanged(EventEnvelope<ChatMessagesChanged> envelope) {
+    if (_disposed) return;
+    runInAction(() => messages.value = envelope.event.messages);
+  }
+
+  void dispose() {
+    _disposed = true;
+    _subscription.cancel();
+  }
+}
+```
+
+Render with `Observer(builder: (context) => ChatView(messages: bridge.messages.value, ...))`. Source: [`mobx_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/mobx_chat.dart).
+
+## Recipe: GetIt
+
+GetIt is a service locator, not a state library. The host registers the active `PluginSession` at app boot; the screen looks it up by type. The State class then mirrors the setState recipe.
+
+```dart
+// At app boot:
+final locator = GetIt.asNewInstance();
+locator.registerSingleton<PluginSession>(holder.session);
+
+// In the screen:
+class _GetItChatScreenState extends State<GetItChatScreen> {
+  late final _session = widget.locator.get<PluginSession>();
+  StreamSubscription<void>? _subscription;
+  List<ChatMessage> _messages = const <ChatMessage>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _subscription = _session.on<ChatMessagesChanged>((envelope) {
+      if (!mounted) return;
+      setState(() => _messages = envelope.event.messages);
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  // ...
+}
+```
+
+Source: [`get_it_chat_screen.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/get_it_chat_screen.dart).
+
+## Things every recipe avoids
+
+These come up often in early drafts. Each is a real failure mode, not a stylistic preference.
+
+- **Caching `final svc = session.resolve<T>(...)` in a state holder.** A higher-priority registrant or a settings-driven priority change will not be visible to the cached reference. Resolve at point of use unless the resolved object is genuinely owned by the state holder.
+- **Subscribing in `build`.** Every rebuild registers a new handler and nothing cancels them. Subscribe in the holder's constructor or in Riverpod's `build` (which IS a constructor-equivalent that runs once per holder lifetime).
+- **Putting the manager inside an `InheritedWidget`.** The manager outlives the widget tree (route changes, hot restart, deep nav). Hold it outside the tree (top-level final, GetIt singleton, Riverpod Provider with single-shot create) and expose the session into the tree.
+- **Calling both `session.dispose()` and `manager.dispose()`.** `manager.dispose()` already iterates and disposes live sessions. Calling both races on stateful service detach. One disposal call: the manager.
+- **Treating the handler parameter as the payload.** `session.on<T>` calls back with `EventEnvelope<T>`. The payload is at `envelope.event`.
+
+## Lifecycle hazards worth knowing
+
+These show up rarely but bite hard.
+
+- **Settings reconciliation does not dispose the session.** `updateSessionSettings` mutates the registry in place and runs detach/attach for plugins whose enablement changed. The session bus, registry, and context object are the same instances afterward. Existing subscriptions on the session bus survive.
+- **Disabling a plugin removes its event handlers.** A consumer's `session.emit(SomeIntent())` reaches no handler if the plugin that owned the `on<SomeIntent>` was just disabled. No error: the cascade simply has no handlers to run.
+- **Toggling plugins back-to-back without serialization is racy.** Two concurrent `updateSessionSettings` calls read and mutate `session._enabledPluginIds` between awaits and can converge on incoherent state (a plugin that should be off ends up re-attached). Tail-chain toggle handlers via `_pending = _pending.then(...)`.
+- **Hot-swap by priority works through resolve, not through events.** Disabling a higher-priority registrant for a slot makes the lower-priority one win on the next `session.resolve<T>(...)`. If your code holds the resolved instance in a field, it does not see the swap. Resolve at point of use.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard title="Migrating a Flutter App" description="Pick the first seam, fit Plugin Kit alongside an existing app." href="/guides/migrating-flutter-app/" />
+  <LinkCard title="Flutter Integration" description="The widget-side mechanics: where the runtime lives, how plugin-provided UI gets resolved." href="/guides/flutter-integration/" />
+  <LinkCard title="Settings & Overrides" description="How runtime settings flow into updateSessionSettings." href="/guides/settings/" />
+  <LinkCard title="Sessions" description="The lifetime contract every recipe is wired against." href="/concepts/sessions/" />
+</CardGrid>

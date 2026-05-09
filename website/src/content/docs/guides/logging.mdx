@@ -1,0 +1,103 @@
+---
+title: Logging
+description: How Plugin Kit uses package:logging, which events are logged, and how to listen.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Plugin Kit logs through Dart's standard [`package:logging`](https://pub.dev/packages/logging). By default, nothing is printed. You decide where the output goes.
+
+This page covers what the runtime logs, at what level, and how to listen.
+
+This is an operations guide. Once plugins have lifecycle, settings, and
+runtime reconciliation, logs become the fastest way to answer "what did the
+runtime actually do?"
+
+## Loggers
+
+| Logger name | Covers |
+|---|---|
+| `plugin_kit.PluginRuntime` | runtime init/dispose, global plugin enable/disable, session creation, settings reconciliation, wildcard override resolution |
+| `plugin_kit.PluginSession` | session init and dispose |
+
+Both sit under `plugin_kit`, so you can subscribe to one specifically or to the whole library with a single listener.
+
+## Listen to everything
+
+```dart
+import 'package:logging/logging.dart';
+
+Logger('plugin_kit').onRecord.listen((record) {
+  print('${record.level.name}: ${record.loggerName}: ${record.message}');
+});
+```
+
+If your app already uses [`hyper_logger`](https://github.com/codelessly/hyper_logger), Plugin Kit records flow through its root subscription automatically. No extra setup.
+
+## Log levels
+
+| Level | What you will see |
+|---|---|
+| `info` | Lifecycle events: runtime initialized, session created, plugin enabled or disabled, settings updated |
+| `fine` | Diagnostics: which plugins are enabled, wildcard override resolutions |
+| `warning` | Partial failures: a lifecycle phase completed but some plugins threw |
+| `severe` | Individual plugin errors during attach, detach, or settings update, always with error and stack trace |
+
+Most production apps want `info` and above in normal operation. Turn on `fine` when debugging enablement or override behavior. `severe` is never optional signal.
+
+## Error handling
+
+Plugin Kit does not silently swallow errors.
+
+When a plugin throws during a lifecycle phase, the runtime:
+
+1. Logs the failure at `severe`, including the stack trace.
+2. Continues processing the remaining plugins in that phase.
+3. After the phase finishes, throws `PluginLifecycleException` with every collected failure.
+
+```dart
+try {
+  runtime.init();
+} on PluginLifecycleException catch (e) {
+  print('${e.failures.length} plugin(s) failed during ${e.phase}:');
+  for (final (pluginId, error, stackTrace) in e.failures) {
+    print('  $pluginId: $error');
+  }
+}
+```
+
+The exception carries:
+
+- `phase`: a string like `'attachGlobal'`, `'detachSession'`, `'updateSessionSettings'`
+- `failures`: a list of `(pluginId, error, stackTrace)` tuples
+
+The aggregation is deliberate. Fail-fast on the first exception would hide real problems: if plugin B and plugin C are both broken, you find out about B, fix it, and then discover C. Plugin Kit surfaces the whole batch at once.
+
+<Aside type="note" title="The bus does not aggregate">
+`PluginLifecycleException` is about plugin lifecycle (register, attach, detach, onPluginSettingsChanged). It is not how the event bus reports errors. If a handler throws during `emit` or `request`, the caller sees the exception directly. The bus never swallows handler exceptions. See [Event Bus](/concepts/event-bus/).
+</Aside>
+
+## Making the logs useful
+
+A few things to set up once, then forget about.
+
+**Forward to your existing pipeline.** Do not write a custom subscription if your app already has a logging setup. Pipe `Logger.root.onRecord` (or `Logger('plugin_kit').onRecord`) into whatever that pipeline is.
+
+**Fine-grained control during debugging.**
+
+```dart
+Logger('plugin_kit.PluginRuntime').level = Level.FINE;
+Logger('plugin_kit.PluginSession').level = Level.FINE;
+```
+
+Raise a specific logger without turning on every library in your app.
+
+**Always handle `PluginLifecycleException`.** Uncaught, it aborts your init or session creation. In production, catch it at the runtime boundary and decide whether to continue with a partial runtime or fail the whole process. Both are defensible. Silently ignoring is not.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard title="Runtime" description="The lifecycle phases that generate these log records." href="/concepts/runtime/" />
+  <LinkCard title="Testing" description="How to assert on PluginLifecycleException in tests." href="/guides/testing/" />
+  <LinkCard title="Event Bus" description="Why handler exceptions surface instead of being swallowed." href="/concepts/event-bus/" />
+</CardGrid>

@@ -1,0 +1,126 @@
+---
+title: The model_embassy tour
+description: Six scenarios that teach model provider routing through agents, passports, and the visa office. Priority cascades, event mutation, settings injection, and capability competition for the LLM use case.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+`example/model_embassy/` is a tutorial that teaches Plugin Kit through a model-routing metaphor. An agent presents a `ModelPassport` (model family, requirements). The embassy registers one `VisaOffice` per provider. The first office that can honour the passport issues a `ModelVisa` carrying a ready-to-use client. Offices that cannot serve the request return `null` so the next candidate gets a turn.
+
+If [the villain_lair examples](/tutorials/villain-lair/) cover the runtime concept by concept, this one is a focused study of a single shape: priority-based provider routing for an LLM-style application.
+
+## Run the scenarios
+
+```bash
+cd example/model_embassy
+dart pub get
+dart run bin/01_passports_and_visas.dart
+```
+
+Replace the filename to run any other scenario. Each file is self-contained: every type the scenario uses is either defined inline or imported from the shared `lib/`.
+
+## The six scenarios
+
+### 01. Passports and visas ([`bin/01_passports_and_visas.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/model_embassy/bin/01_passports_and_visas.dart))
+
+The smallest version of the metaphor. One agent presents an Anthropic passport, one visa office is registered, the office issues a visa, and the agent uses the returned client.
+
+```dart
+final passport = ModelPassport(family: 'anthropic', id: 'claude-sonnet');
+
+final visa = await session.request<AgentBoardingCall, ModelVisa?>(
+  AgentBoardingCall(passport: passport),
+);
+
+await visa!.client.complete('Hello!');
+```
+
+Concepts: [Service Registry](/concepts/service-registry/), [Event Bus](/concepts/event-bus/#request-and-response).
+
+### 02. The visa office ([`bin/02_the_visa_office.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/model_embassy/bin/02_the_visa_office.dart))
+
+A `VisaOffice` is a `StatefulPluginService`. It attaches on session start and listens for `AgentBoardingCall` requests. Each request: check the passport's model family against the office's supported families. Match claims by building a client; no match returns `null` so the next office can try.
+
+The scenario uses `VerboseVisaOffice`, which narrates each decision so the claim/concede flow is visible. Main presents one recognised passport and one unknown passport to show both branches.
+
+Concepts: [Plugin Services](/concepts/plugin-services/), [Event Patterns](/concepts/events/#requests-and-responses-from-a-plugin).
+
+### 03. Competing providers ([`bin/03_competing_providers.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/model_embassy/bin/03_competing_providers.dart))
+
+Multiple visa offices, one per model family, each at a different priority. An `AgentBoardingCall` propagates through the offices in priority order until one claims it. If all concede, the request goes unanswered.
+
+The scenario registers three providers:
+
+- Anthropic (priority 100): serves the `anthropic` family
+- OpenAI (priority 80): serves the `openai` family
+- Ollama (priority 50): serves `meta`, `mistral`, and `ollama`
+
+Concepts: [Service Registry](/concepts/service-registry/#priority), [Event Patterns](/concepts/events/#requests-and-responses-from-a-plugin).
+
+### 04. Model routing ([`bin/04_model_routing.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/model_embassy/bin/04_model_routing.dart))
+
+Event mutation in action. A router plugin subscribes to `PrepareResponseEvent` at priority 0 and rewrites `event.passport` based on prompt length. Later handlers (and the caller that emitted the event) see the mutated passport. The visa office processes the boarding call without knowing routing happened.
+
+Short prompts (under 100 chars) get rewritten to a lightweight Haiku model. Long prompts keep their originally requested Sonnet. This is the pre-commit interception pattern applied to a routing decision.
+
+Concepts: [Event Patterns](/concepts/events/#the-pre-commit-interception-pattern).
+
+### 05. Embassy configuration ([`bin/05_embassy_configuration.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/model_embassy/bin/05_embassy_configuration.dart))
+
+`ServiceSettings` plus `ConfigNode` inject per-session configuration into a `StatefulPluginService`. Three sessions share one runtime and one registered visa office, but each reads different `api_key`, `base_url`, and `default_model` values from the settings it was created with.
+
+```dart
+// Session A: production credentials (scoped key).
+Pin('visa_office_plugin', ['visa_office']): ServiceSettings(
+  config: {'api_key': prodKey, 'base_url': 'https://api.prod...'},
+),
+
+// Session C: wildcard key targets whichever plugin owns the slot.
+Pin.wildcard(['visa_office']): ServiceSettings(
+  config: {'api_key': stagingKey},
+),
+```
+
+Concepts: [Configuration](/concepts/configuration/), [Settings & Overrides](/guides/settings/).
+
+### 06. Full boarding process ([`bin/06_the_full_boarding_process.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/model_embassy/bin/06_the_full_boarding_process.dart))
+
+The capstone. All three provider plugins register in one runtime. Three agents with distinct capability requirements each present a passport; the priority cascade (Anthropic 100, OpenAI 80, Ollama 50) routes each to the first office that can serve it. The returned visa carries a ready-to-use client.
+
+If you are wiring multi-provider LLM routing in your own app, this scenario is the closest thing the docs have to a working template.
+
+Concepts: every concept page that touches priority, request/response, or settings injection.
+
+## Reading paths
+
+| If you are... | Read |
+|---|---|
+| New to provider-routing | 01, 03 |
+| Designing a `StatefulPluginService` for routing | 02, 04 |
+| Building a multi-tenant runtime | 05 |
+| Looking for the working template | 06 |
+
+## Where to next
+
+<CardGrid>
+  <LinkCard
+    title="The villain_lair examples"
+    description="Broader walk through every concept in fifteen scenarios. Read this if you want depth across the whole runtime."
+    href="/tutorials/villain-lair/"
+  />
+  <LinkCard
+    title="Service Registry"
+    description="The model behind priority cascades and `resolveAfter` fallbacks."
+    href="/concepts/service-registry/"
+  />
+  <LinkCard
+    title="Plugin Services"
+    description="The `StatefulPluginService` lifecycle that visa offices ride."
+    href="/concepts/plugin-services/"
+  />
+  <LinkCard
+    title="Read the runnable code"
+    description="Every scenario above is at example/model_embassy/bin/. Each file is roughly 100 to 200 lines of runnable Dart."
+    href="https://github.com/SaadArdati/plugin_kit/tree/main/example/model_embassy"
+  />
+</CardGrid>

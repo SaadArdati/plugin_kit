@@ -1,0 +1,24 @@
+name: code_editor
+description: >
+  A modular code editor plugin system demonstrating plugin_kit
+  with real document transformations.
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+dependencies:
+  plugin_kit: ^1.0.0
+  flutter_plugin_kit: ^0.1.0
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  golden_toolkit: ^0.15.0
+
+flutter:
+  uses-material-design: true

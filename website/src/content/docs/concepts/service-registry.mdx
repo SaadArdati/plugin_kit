@@ -1,0 +1,249 @@
+---
+title: Service Registry
+description: Priority-based dependency injection, settings injection, and capabilities.
+---
+
+import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+The `ServiceRegistry` lets multiple plugins compete for the same slot. Plugins register services 
+under a `ServiceId`. When someone asks for that id, the highest-priority registration wins. The loser
+stays reachable if the winner wants to defer to it.
+
+Most of the interesting behavior in Plugin Kit follows from that shape: override without patching,
+wrap without subclassing, discover without instantiating.
+
+## Mental model: slots
+
+Think of the registry as a table of slots.
+
+- A slot has a `ServiceId` and a type.
+- One or more plugins can register that slot.
+- The highest-priority registration wins resolution.
+- The winner can still delegate to the next registration with `resolveAfter`.
+
+A slot is not a class. It is a contract the registry recognizes, and multiple implementations can satisfy it.
+
+## Three registration modes
+
+| Method | Behavior | Use when |
+|---|---|---|
+| `registerFactory` | creates a fresh instance on every resolve | service is cheap and stateless |
+| `registerLazySingleton` | creates on first resolve, then caches | setup is expensive but shared state is fine |
+| `registerSingleton` | stores a prebuilt instance | you already have it, or want eager creation |
+
+```dart
+@override
+void register(ScopedServiceRegistry registry) {
+  registry.registerFactory<QueryBuilder>(
+    const ServiceId('query_builder'),
+    QueryBuilder.new,
+  );
+
+  registry.registerLazySingleton<Database>(
+    const ServiceId('main_db'),
+    () => Database.connect(),
+  );
+
+  registry.registerSingleton<AppConfig>(
+    const ServiceId('config'),
+    AppConfig.load(),
+  );
+}
+```
+
+<Aside type="caution" title="Stateful services cannot be factories">
+`StatefulPluginService`s must be singletons or lazy singletons. Factory registration is
+rejected outright because the runtime cannot manage the lifecycle of instances it never gets to see again.
+</Aside>
+
+If the same plugin registers the same slot twice, the second call replaces the first. That is not duplication, it is overwrite.
+
+## Resolution
+
+Resolve from a `PluginContext`, a `PluginSession`, or the registry directly. They all forward to the same underlying lookup.
+
+```dart
+final db = context.resolve<Database>(const ServiceId('main_db'));
+final maybeLogger = context.maybeResolve<Logger>(const ServiceId('logger'));
+```
+
+| Method | Behavior |
+|---|---|
+| `resolve<T>(serviceId)` | return the winning registration, throw if none |
+| `maybeResolve<T>(serviceId)` | return the winner or `null` |
+| `resolveAfter<T>(pluginId, serviceId)` | skip one registration and return the next |
+| `resolveRaw<T>(serviceId)` | return the wrapper, do not instantiate |
+
+## Priority
+
+If multiple plugins register the same `serviceId`, the registry sorts them in descending priority order. Higher number wins. The default is `50`.
+
+```dart
+// plugin: core
+registry.registerSingleton<Formatter>(
+  const ServiceId('code_formatter'),
+  DefaultFormatter(),
+  priority: 50,
+);
+
+// plugin: my_better_formatter
+registry.registerSingleton<Formatter>(
+  const ServiceId('code_formatter'),
+  PrettierFormatter(),
+  priority: 100,
+);
+```
+
+`resolve(const ServiceId('code_formatter'))` now returns `PrettierFormatter`. `DefaultFormatter` is still in the registry. It is just not the winner.
+
+Priority can also be overridden from outside by `RuntimeSettings.services`. The override is applied at registration time, which
+means runtime settings can hand a slot to a different plugin without anyone changing source code.
+
+![Plugin Kit Dialog Advanced tab showing competing service registrations with priority order and the current winner highlighted](/images/dialog/advanced_tab_dark.png)
+
+*The Advanced tab makes the competition visible. Every slot, every registrant, every priority, with the
+current winner picked out. This is the same data the runtime uses to resolve.*
+
+## Delegation with `resolveAfter`
+
+`resolveAfter` is what turns "override" into "layer." A plugin that wins a slot can still ask for the previous implementation and defer to it selectively.
+
+Say your plugin provides a smart formatter for `.dart` files, but the user just opened a `.txt` file that the previous formatter already handled well.
+
+```dart
+Future<void> formatFile(File file) async {
+  if (file.extension == '.dart') {
+    await myDartFormatter.format(file);
+    return;
+  }
+
+  final fallback = context.resolveAfter<Formatter>(
+    pluginId: pluginId, // My current dart formatter plugin id.
+    serviceId: const ServiceId('code_formatter'),
+  );
+  await fallback.format(file);
+}
+```
+
+The wrapper plugin wins the slot globally but quietly defers to the original implementation for anything it does not want to touch.
+This is the clean way to extend behavior without forking the plugin you are extending.
+
+<Aside type="note" title="If you're using `resolveAfter` a lot">
+If you find yourself calling `resolveAfter` repeatedly to get the next implementation, that is a code smell. It means you are
+trying to build a chain of responsibility, which the system has more elegant solutions for. Consider refactoring your plugin to
+depend on event-driven decision points instead of trying to wrap an entire service end-to-end.
+
+See [Events](/concepts/events/).
+</Aside>
+
+## Namespaces
+
+For related families of slots, the registry supports namespaces. Under the hood, a namespace is just a prefix: `namespace.serviceId`.
+The registry itself only knows about `ServiceId`; `Namespace` is a tiny helper for composing dotted ids.
+
+```dart
+static const panel = Namespace('panel');
+
+// Build the namespaced ServiceId via call() shorthand and pass it to the
+// regular register / resolve methods.
+registry.registerSingleton<PanelFactory>(
+  panel('console'), // ServiceId('panel.console')
+  ConsolePanelFactory(),
+);
+
+final factory = context.resolve<PanelFactory>(panel('console'));
+```
+
+Namespaces are only useful for semantic grouping. Entirely stylistic. You can also register `const ServiceId('panel.console')` directly as a flat id and nothing breaks.
+
+## Settings injection
+
+If the resolved instance extends `PluginService`, the registry injects its settings automatically during resolution. The service reads
+them through a typed `config` wrapper instead of parsing raw maps.
+
+```dart
+class AnthropicService extends PluginService {
+  String get apiKey => config.getString('api_key') ?? '';
+  double get temperature => config.getDouble('temperature') ?? 0.7;
+}
+```
+
+For singletons and lazy singletons, the registry hashes the effective settings and only re-injects when they actually change.
+Reading from `config` repeatedly does not trigger re-parsing.
+
+The registry also stamps two identity fields on every resolved `PluginService`: `pluginId` (which plugin owns the registration) and `serviceId` (the full registry key).
+These are only authoritative after resolution through the registry, so do not rely on them inside the constructor of your PluginService class.
+
+<Aside type="note" title="How wildcard overrides land">
+Settings support wildcard service ids like `*:formatter` that apply to whoever wins that slot. The rule to remember: the winner is decided first, 
+then wildcard settings are materialized onto the winner, then normal resolution and injection runs with the winner's effective settings.
+Wildcard settings are not "always beaten by plugin-specific settings." They are applied to the winner before the plugin's own injection happens.
+</Aside>
+
+## Raw wrappers
+
+The registry stores `RegistrationWrapper`s, not service instances directly. `resolveRaw` gives you the wrapper without instantiating anything.
+
+```dart
+const tooling = Namespace('tooling');
+final wrapper = session.registry.resolveRaw(tooling('formatter'));
+
+print(wrapper.pluginId);
+print(wrapper.priority);
+print(wrapper.capabilities);
+```
+
+That matters when you want discovery instead of execution. Maybe you are building a settings UI that lists every configurable service without paying the cost of building them all. Maybe you want to show the user which plugin currently wins a slot. `resolveRaw` is how you do that without side effects.
+
+## Capabilities
+
+Capabilities are metadata tags attached to the registration wrapper, not to the instance.
+This allows for introspection and discovery without instantiation. The registry does not care about the content of capabilities,
+only that they exist on the wrapper.
+
+```dart
+registry.registerSingleton<CodeLinter>(
+  const ServiceId('linter'),
+  CodeLinter(),
+  capabilities: {
+    SupportsLanguages(['dart', 'js']),
+    PartOfASuiteOfTools('super_suite'),
+    CanBeSlow(true, reason: 'network round-trip per call'),
+  },
+);
+```
+
+Capabilities answer questions you would otherwise have to build the service to ask: does this support Dart? Is this part of a suite?
+You can define your own capability types. The system does not care about the set of tags, only that they exist on the wrapper.
+
+Capabilities live on the slot registration, not inside the service instance, so you can inspect them without constructing anything.
+[Capabilities](/concepts/capabilities/) goes deeper.
+
+## One easy mistake
+
+Service priorities and event priorities run in opposite directions.
+
+- Registry: higher priority wins ("I win!")
+- Event bus: lower priority runs first ("I go first!")
+
+Remember that, and the rest of the system makes much more sense.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Plugin Services"
+    description="How to write services, stateful or not, that work well with the registry."
+    href="/concepts/plugin-services/"
+  />
+  <LinkCard
+    title="Capabilities"
+    description="Tag your registrations so other code can discover them without building them."
+    href="/concepts/capabilities/"
+  />
+  <LinkCard
+    title="Settings and Overrides"
+    description="Wildcard overrides, priority bumps, and live reconciliation."
+    href="/guides/settings/"
+  />
+</CardGrid>

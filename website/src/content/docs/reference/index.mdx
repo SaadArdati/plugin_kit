@@ -1,0 +1,53 @@
+---
+title: Reference
+description: Curated API reference, organized by intent.
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The reference section is for readers who already know what they want and need the precise shape of the API. It is organized by intent (plugins, the registry, the bus, settings, the dialog) rather than by file. Each page covers the public types in one area, the canonical signatures, and the common usage shapes.
+
+If you want the model behind the API, the [concepts](/concepts/plugins/) explain how the pieces fit together. If you want the recipe to do something specific, the [guides](/guides/) are how-tos. If you want "what is the signature of `registerLazySingleton` again," you are in the right place.
+
+## Pages
+
+<CardGrid>
+  <LinkCard
+    title="Plugins & Lifecycle"
+    description="`PluginId`, `Plugin`, `GlobalPlugin`, `SessionPlugin`, `FeatureFlag`, the context types, `PluginSession`, `PluginRuntime`, `PluginRuntimeManager`, `PluginLifecycleException`."
+    href="/reference/plugins-and-lifecycle/"
+  />
+  <LinkCard
+    title="Service Registry & Capabilities"
+    description="`ServiceId`, `Namespace`, `ServiceRegistry`, `ScopedServiceRegistry`, the three registration modes, `PluginService`, `StatefulPluginService`, `Capability`, `CapabilityLookup`."
+    href="/reference/service-registry-and-capabilities/"
+  />
+  <LinkCard
+    title="Event Bus & Events"
+    description="`EventBus`, `EventEnvelope`, the subscription and emission API, request/response, identifier scoping, the bus helpers on plugins and services."
+    href="/reference/event-bus-and-events/"
+  />
+  <LinkCard
+    title="Settings & Configuration"
+    description="`RuntimeSettings`, `PluginConfig`, `ServiceSettings`, JSON round-trip, `ConfigNode`, the typed accessors and coercion rules."
+    href="/reference/settings-and-configuration/"
+  />
+  <LinkCard
+    title="Dialog API"
+    description="`UiConfigurableCapability`, the `ConfigField` hierarchy, `showPluginKitDialog`, `PluginKitDialog`, `PluginKitDialogController`, `PluginKitVisualsPlugin`, theming, custom renderers."
+    href="/reference/dialog-api/"
+  />
+  <LinkCard
+    title="Architecture"
+    description="Contributor-facing design rationale: type hierarchy, lifecycle phases, priority resolution, event dispatch, cross-scope routing, key decisions."
+    href="/reference/architecture/"
+  />
+</CardGrid>
+
+## How this differs from auto-generated dartdoc
+
+Each Plugin Kit package will publish auto-generated dartdoc once it ships on pub.dev. That reference is comprehensive: every public symbol, every parameter, every link in the source. It is also organized the way the source is, which is rarely the way you think about the library.
+
+The pages here are curated. They cover the public surface but group related types together, show the canonical usage shape inline, and skip private helpers. When a method has three signatures and two of them are rarely the right call, this reference says so. Auto-generated docs cannot do that.
+
+The two will coexist. When dartdoc lands, each curated page will link to the relevant pub.dev section.

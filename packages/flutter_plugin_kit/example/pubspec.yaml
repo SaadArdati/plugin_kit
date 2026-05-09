@@ -1,0 +1,23 @@
+name: flutter_plugin_kit_example
+description: A small live demo of every reading path in flutter_plugin_kit — context.watchEvent, the SessionListener mixin, and PluginEventNotifier through a ValueListenableBuilder.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_kit: ^1.0.0
+  flutter_plugin_kit: ^0.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

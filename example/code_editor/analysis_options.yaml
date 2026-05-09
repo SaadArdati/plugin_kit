@@ -1,0 +1,8 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # Numbered bin/ files (01_*.dart, 02_*.dart, ...) encode tutorial order.
+    file_names: false
+    # Tutorial demos print to stdout — that's the whole point of the examples.
+    avoid_print: false

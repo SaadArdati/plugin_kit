@@ -1,0 +1,305 @@
+---
+title: Plugin Kit Dialog
+description: A drop-in Flutter customization surface for any PluginRuntime. Three tabs, zero settings-screen-per-plugin work.
+---
+
+import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+Plugin Kit Dialog is a Flutter dialog that inspects and edits any [`PluginRuntime`](/concepts/runtime/) at runtime. Drop it in once and your users get a three-tab UI for toggling plugins, editing service config, and inspecting the registry. You write zero settings-screens-per-plugin code.
+
+The dialog is wholly dogfooded: it builds itself out of `plugin_kit` plugins, so every tab, header action, and field renderer is a real plugin you can shadow or replace from your host app.
+
+## Install
+
+```yaml
+dependencies:
+  plugin_kit: ^1.0.0
+  plugin_kit_dialog: ^0.1.0
+```
+
+`plugin_kit` carries the dart-only declaration types ([`UiConfigurableCapability`](#declaring-configurable-services), `ConfigField`, etc.). `plugin_kit_dialog` adds the Flutter UI on top.
+
+## Quick start
+
+```dart
+import 'package:plugin_kit/plugin_kit.dart';
+import 'package:plugin_kit_dialog/plugin_kit_dialog.dart';
+
+final next = await showPluginKitDialog(
+  context: context,
+  runtime: myRuntime,
+  initialSettings: currentSettings,
+  onSave: (settings) async {
+    await persistSettings(settings); // write to disk, push to runtime, etc.
+  },
+);
+
+if (next != null) {
+  // User saved. `next` is the merged RuntimeSettings.
+}
+```
+
+That is it. If your plugins already attach `UiConfigurableCapability`, the Services tab populates itself.
+
+`onSave` is awaited before the dialog closes, so you can persist (write to disk, push to a server, call `manager.updateSettings(...)`) without racing the dismissal.
+
+## What the three tabs do
+
+### Plugins tab
+
+Enable and disable plugins live. Stable plugins toggle freely; experimental plugins are flagged; plugins declaring `FeatureFlag.locked` cannot be turned off and the runtime logs a configuration error if their dependencies disappear.
+
+![Plugin Kit Dialog Plugins tab showing a grid of registered plugins with enable/disable toggles, stable/experimental tiers, and per-plugin icons and colors](/images/dialog/plugins_tab_dark.png)
+
+*Each tile is one plugin. Decorated tiles get their icons, labels, and accent colors from `PluginKitVisualsPlugin`, a single host-app plugin that maps visuals across the plugin, namespace, and service axes.*
+
+### Services tab
+
+Every service that ships a `UiConfigurableCapability` becomes an editable card. Text, numbers, dropdowns, switches, multiline, password, grouped, or custom fields are all supported.
+
+![Plugin Kit Dialog Services tab showing expanded service cards grouped by namespace, with capability chips and configuration fields](/images/dialog/services_tab_dark.png)
+
+*Cards cluster by namespace (`agent.*`, `mcp.*`, `retry.*`). Capability chips on the right of each card show the winning plugin and its effective priority.*
+
+### Advanced tab
+
+A registry inspector with priority chains, winners, shadowed contenders, and a JSON view of the working draft. This is the "what is the runtime actually going to do" view.
+
+![Plugin Kit Dialog Advanced tab showing the service registry inspector with namespaces, competing registrations, priority badges, and the current winner picked out](/images/dialog/advanced_tab_dark.png)
+
+*Each row is a slot. Chips on the right show registrations in priority order, with the current winner picked out and any meta entries (visuals contributions, wildcard fallbacks) marked. The JSON preview shows the diff against the baseline; overrides matching the baseline are pruned.*
+
+## Declaring configurable services
+
+Configurability is opt-in per registration. Attach a `UiConfigurableCapability` next to any service:
+
+```dart
+// In your plugin's register(). This code can live in a Dart-only package.
+const agent = Namespace('agent');
+
+registry.registerSingleton<MyService>(
+  agent('temperature'),                  // ServiceId('agent.temperature')
+  MyService(),
+  capabilities: const {
+    UiConfigurableCapability(
+      label: 'Temperature',
+      description: 'Controls randomness in responses.',
+      fields: [
+        NumberConfigField(
+          key: 'temperature',
+          label: 'Temperature',
+          min: 0,
+          max: 2,
+          step: 0.1,
+          defaultValue: 1.0,
+        ),
+      ],
+    ),
+  },
+);
+```
+
+Saved values flow through `RuntimeSettings.services[Pin('main_agent', ['agent', 'temperature'])].config` (or, if you prefer the dotted shorthand, `pluginId.namespace('agent').service('temperature')`). From there, [Configuration](/concepts/configuration/) covers how the service reads them via `config.getDouble('temperature')` and similar typed accessors.
+
+### Built-in field types
+
+All field types live in `plugin_kit` (Dart-only):
+
+| Field | Renders as |
+|---|---|
+| `TextConfigField` | Single-line `TextField`. |
+| `MultilineConfigField` | Multiline editor with optional moustache-tag chips. |
+| `PasswordConfigField` | Obscured input with show/hide toggle. |
+| `NumberConfigField` | Slider when both `min` and `max` are set; numeric `TextField` otherwise. `style: NumberFieldStyle.textInput` forces text mode. `isInteger: true` stores `int` and snaps to whole numbers. |
+| `DropdownConfigField<T>` | Typed dropdown over `List<DropdownOption<T>>`. |
+| `BoolConfigField` | Switch with label and helper text. |
+| `GroupConfigField` | Indented sub-section grouping nested fields under a heading. |
+| `ExtensionConfigField` | Escape hatch for custom Flutter renderers. See [Custom field renderers](#custom-field-renderers) below. |
+
+Each field carries `key`, `label`, `helperText`, and `defaultValue`. Dotted keys (`provider.api_key`) write to nested maps automatically.
+
+## Visuals: icons, colors, labels
+
+Visuals are a Flutter-only concern, so the canonical attachment path is a single locked `GlobalPlugin` that carries host-app overrides. Three independent maps cover the three things the dialog renders: plugin tiles, namespace section headers, and individual service cards.
+
+```dart
+runtime
+  ..addPlugins([...myPlugins])
+  ..addPlugin(PluginKitVisualsPlugin(
+    pluginVisuals: {
+      const PluginId('main_agent'): const PluginKitVisual(
+        label: 'Main Agent',
+        description: 'The brain. Drives chat, tools, and routing.',
+        icon: Icon(Icons.psychology),
+        color: Color(0xFF7C5CFF),
+      ),
+    },
+    namespaceVisuals: {
+      const Namespace('agent'): const PluginKitVisual(
+        label: 'Agent',
+        icon: Icon(Icons.smart_toy),
+        color: Color(0xFF7C5CFF),
+      ),
+    },
+    serviceVisuals: {
+      const Namespace('agent')('temperature'):
+          const PluginKitVisual(
+        label: 'Temperature',
+        icon: Icon(Icons.thermostat),
+        color: Color(0xFFFF9500),
+      ),
+    },
+  ));
+```
+
+Because the visuals plugin lives in your host app (which has Flutter), Dart-only plugins still get rich visuals without importing Flutter. The decoration is keyed by `PluginId`, `Namespace`, or `ServiceId`, so the host owns the map and the plugin source code stays portable.
+
+The plugin registers at priority `100`, above the default registry priority of `50`, so host overrides beat anything a Flutter plugin self-attaches from its own `register()`. Unknown keys (a plugin or service that does not currently exist) are accepted silently; this lets you keep visuals for plugins that may be enabled later. When no visual is found, cards fall back to a generic gear icon and the theme's primary color.
+
+## Custom field renderers
+
+Need a color picker, file selector, or any other widget? Declare an `ExtensionConfigField` from anywhere (no Flutter dependency at the field site):
+
+```dart
+// In your dart-only plugin.
+const ExtensionConfigField(
+  key: 'theme.accent',
+  label: 'Accent color',
+  rendererKey: 'color_picker',
+  args: {'allow_alpha': false},
+)
+```
+
+Register a Flutter-side renderer for that key from your host app:
+
+```dart
+class ColorPickerRenderer
+    implements ConfigFieldRenderer<ExtensionConfigField> {
+  const ColorPickerRenderer();
+
+  @override
+  Widget build(context, field, handle, resolveRenderer) {
+    final allowAlpha = field.args['allow_alpha'] as bool? ?? false;
+    return ColorPicker(
+      value: handle.value as int? ?? 0xFF000000,
+      onChanged: (next) => handle.value = next,
+      allowAlpha: allowAlpha,
+    );
+  }
+}
+
+class ColorPickerRendererPlugin extends GlobalPlugin {
+  @override
+  PluginId get pluginId => const PluginId('color_picker_renderer');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerFactory<ConfigFieldRenderer>(
+      FieldRenderersPlugin.namespace('color_picker'),
+      ColorPickerRenderer.new,
+    );
+  }
+}
+```
+
+If a renderer key is unknown when the dialog tries to resolve it, an inline placeholder card surfaces the missing key. The dialog never throws at paint time.
+
+## Theming
+
+Pass a `PluginKitDialogTheme` to override accents, surfaces, and badges:
+
+```dart
+showPluginKitDialog(
+  context: context,
+  runtime: myRuntime,
+  initialSettings: settings,
+  onSave: persist,
+  theme: PluginKitDialogTheme.dark().copyWith(
+    stableAccent: Colors.greenAccent,
+    experimentalAccent: Colors.deepOrange,
+  ),
+);
+```
+
+Or wrap your app with `buildPluginKitDialogDarkTheme()` / `buildPluginKitDialogLightTheme()` to adopt the full Material 3 `ThemeData`.
+
+## Why dart-only declarations matter
+
+The capability and field types live in `plugin_kit`, not in this package. That means a non-Flutter package (server-side service, CLI, shared `common/` library) can declare configurable services without taking a Flutter dependency. The Flutter UI layers on top through:
+
+- `PluginKitVisualsPlugin` (Flutter, host-app side) for icons, labels, and colors across the plugin, namespace, and service axes
+- `ExtensionConfigField` plus a registered Flutter renderer for custom widgets
+
+That keeps your shared plugin packages portable. The host app owns the Flutter-only glue.
+
+## Saving and dirty state
+
+The dialog is non-destructive. Edits accumulate in a working draft; nothing reaches the runtime until the user hits **Save**. `onSave` receives the merged `RuntimeSettings`; persist it however you like. Cancel discards the draft, with a confirm prompt if it is dirty.
+
+Overrides matching the active baseline are pruned automatically, so the resulting `RuntimeSettings` stays minimal. Two users with different starting points can save the same diff.
+
+<Aside type="note" title="Reconciling vs persisting">
+`onSave` runs before the dialog closes. If you only persist (write to disk), the runtime stays on its old settings until something calls `manager.updateSettings(...)`. If you want the runtime to converge live as the user clicks Save, call `await manager.updateSettings(settings)` from `onSave`. See [Settings & Overrides](/guides/settings/) for the reconciliation model.
+</Aside>
+
+## Example app
+
+A runnable demo with 20 competing plugins (priority towers on `agent.model`, `agent.system_message`, `retry.policy`, `search.provider`, plus locked and experimental tiers) plus one `PluginKitVisualsPlugin` decorating every plugin, namespace, and service (21 total runtime plugins) lives at [`example/plugin_kit_dialog_demo`](https://github.com/SaadArdati/plugin_kit/tree/main/example/plugin_kit_dialog_demo). Run it with `flutter run` from that directory.
+
+The screenshots above are golden-tested against that demo, so what you see here is exactly what the demo renders.
+
+## Public API
+
+```dart
+import 'package:plugin_kit_dialog/plugin_kit_dialog.dart';
+
+// Entry points
+showPluginKitDialog(...);            // Future<RuntimeSettings?>
+PluginKitDialog(...);                // raw widget (custom hosting)
+PluginKitDialogBody(...);            // tab body (custom chrome)
+PluginKitDialogController(...);      // ChangeNotifier-backed draft
+
+// Visuals
+PluginKitVisualsPlugin({pluginVisuals, namespaceVisuals, serviceVisuals});
+PluginKitVisual(label, description, icon, color);
+
+// Theme
+buildPluginKitDialogDarkTheme();
+buildPluginKitDialogLightTheme();
+PluginKitDialogTheme;                // ThemeExtension
+```
+
+Declarative types come from `plugin_kit`:
+
+```dart
+import 'package:plugin_kit/plugin_kit.dart';
+
+UiConfigurableCapability(label, fields, description);
+TextConfigField, MultilineConfigField, PasswordConfigField,
+NumberConfigField (NumberFieldStyle, isInteger),
+DropdownConfigField<T>, DropdownOption<T>,
+BoolConfigField, GroupConfigField,
+ExtensionConfigField (rendererKey, args),
+ConfigField                          // sealed base
+ConfigFieldHandle                    // value/reset handle for renderers
+```
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Capabilities"
+    description="What `UiConfigurableCapability` is, how the dialog reads it without instantiating services, and how to define your own."
+    href="/concepts/capabilities/"
+  />
+  <LinkCard
+    title="Configuration"
+    description="Once the dialog saves a `config` map, this is how the receiving service reads it through `ConfigNode`."
+    href="/concepts/configuration/"
+  />
+  <LinkCard
+    title="Settings & Overrides"
+    description="The model behind the JSON view in the Advanced tab. Wildcard overrides, priority overrides, live reconciliation."
+    href="/guides/settings/"
+  />
+</CardGrid>

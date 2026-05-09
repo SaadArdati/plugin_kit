@@ -1,0 +1,295 @@
+---
+title: Event Patterns
+description: Idiomatic patterns for using the event bus from inside plugin code. Designing event types, the pre-commit interception pattern, common pitfalls.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page is the patterns side of the event bus: what to reach for from inside plugin code, and how
+to shape an event type.
+
+The model itself (envelope, priority direction, identifier scoping, cross-scope routing,
+request/response dispatch) lives one page over in [Event Bus](/concepts/event-bus/).
+Read that first if you want the mechanics. This page assumes you already have them.
+
+## What events buy you in a real app
+
+Events are how Plugin Kit graduates from "service registry with nicer manners" to "a runtime the product can feel."
+
+- A send button can emit one draft action, and plugins can inspect it, enrich it, block it,
+or stream progress back into the same message bubble.
+- A feature can ask "who can answer this?" through a typed request instead of resolving
+a concrete service and hoping it is ready.
+- A shell can emit a collection event like `CollectPanels` or `CollectToolbarItems`, and
+enabled plugins can append to the result in order.
+- A widget can stay dumb while plugins add richer behavior around it: context gathering, routing,
+logging, analytics, moderation, fallback, or whatever your app needs next year.
+
+The idea is to separate your application from plugins even further. Your pretty abstraction layer is great with registry.resolve(),
+but what if your app didn't even need to know about the registry and the services at all? What if the app just emitted events blindly 
+and let plugins do the rest internally?
+
+Other reasons you will want to reach for events: inter-plugin communication without direct dependency.
+
+That is the vision for an event-driven plugin architecture, and it is what Plugin Kit supports.
+
+## Designing an event type
+
+Events are just Dart types.
+
+```dart
+class UserMessageReceived {
+  final String sessionId;
+  final String text;
+  const UserMessageReceived({required this.sessionId, required this.text});
+}
+```
+
+Two conventions that pay off over time:
+
+- **Keep normal events immutable.** For facts, commands, and requests, make the fields `final` and create a new object when you need a variant.
+- **Name the verb deliberately.** Past tense for things that already happened (`UserMessageReceived`, `DocumentSaved`, `PaymentRejected`).
+Imperative for request types (`SendNotification`, `WaitForAssistant`). The full naming guide lives in [Naming Conventions](/guides/naming-conventions/).
+
+The main exception is a deliberate pre-commit draft object emitted so handlers can rewrite it before some outside effect happens.
+The "pre-commit interception" section below covers when that exception is right and how to name it.
+
+## Subscribing from a service
+
+Inside a `StatefulPluginService.attach()`, use the service helpers instead of reaching into
+ `context.bus`. They track subscriptions for you and cancel them on `detach` automatically.
+
+```dart
+class ChatLogger extends StatefulPluginService {
+  @override
+  void attach() {
+    on<UserMessageReceived>((e) {
+      log('chat', '${e.event.sessionId}: ${e.event.text}');
+    });
+
+    on<OutgoingReply>((e) {
+      if (e.event.isDraft) {
+        e.stop(const ReplyDiscarded());
+      }
+    });
+  }
+}
+```
+
+The three tracked subscription helpers:
+
+| Helper | For |
+|---|---|
+| `on<T>()` | event handlers; observe, mutate, or stop the cascade |
+| `onRequest<Req, Res>()` | async typed request handlers |
+| `onRequestSync<Req, Res>()` | synchronous typed request handlers |
+
+Every `on` handler receives an `EventEnvelope<T>`. What the handler *does* with it decides the style:
+
+- Observe: read `e.event`, do side effects (log, count, update UI), return. The cascade keeps going.
+- Participate: mutate `e.event` in place so downstream handlers see the change, or call
+`e.stop(value)` to halt the cascade and pin the final result.
+
+There is no separate API to opt into participation; the capability is always there in the envelope.
+If a handler does not need to mutate or stop, it simply does not.
+
+## Subscribing from a plugin (escape hatch, not the recommended path)
+
+You can subscribe directly from `SessionPlugin.attach(...)`. After importing `plugin_kit`, `Plugin` itself
+gains the same auto-tracking helpers stateful services use: `on<T>()`, `onRequest<Req, Res>()`,
+`onRequestSync<Req, Res>()`, and `bind()`. Subscriptions go into `activeSubscriptions` and bindings
+into `activeBindings`, all torn down automatically when the plugin detaches. `Plugin.attach` and
+`Plugin.detach` are pure user hooks: no `super` call is needed. The framework runs orchestration
+(stateful service attach/detach, subscription cleanup) around your hook.
+
+Plugin helpers take `context` as the first positional argument, since plugins are shared across sessions.
+
+```dart
+@override
+void attach(SessionPluginContext context) {
+  on<UserMessageReceived>(context, (e) {
+  });
+}
+```
+
+Reach for `context.bus.on(...)` only when you genuinely need to manage a subscription's lifetime
+by hand: the bus call returns a `StreamSubscription` you have to cancel yourself, and is not tracked.
+
+<Aside type="caution" title="Behavior on the plugin gives up composition">
+A handler attached on the plugin is bound to that plugin's enabled state, full stop. It cannot be
+overridden by a higher-priority replacement, disabled independently of its siblings, or tuned via
+`RuntimeSettings.services` the way a service can. Those mechanics only apply to things that live in the
+service registry. If you want behavior to be replaceable, settings-tunable, or hot-swappable, put it in
+a `StatefulPluginService`.
+
+Plugin-level subscriptions are appropriate for trivial wiring (one debug log, a tracing tap, a small
+bridge between two services the same plugin owns). For anything you want to be a real seam, write a
+service. If a plugin's `attach` starts accumulating handlers, that is a smell: extract a service.
+</Aside>
+
+## Fire and await
+
+From inside a stateful service, `emit(...)` is the short form. It sends the event on the session
+bus and completes when all handlers have run.
+
+```dart
+await emit(UserMessageReceived(
+  sessionId: currentSession,
+  text: 'Hello',
+));
+```
+
+This is the right form for facts and one-way notifications. Most events you emit will look like this.
+
+## The pre-commit interception pattern
+
+`context.bus.emit<T>(...)` returns an `EventEnvelope<T>`. You use this form when you want
+to let other plugins interfere with the event before you commit to it.
+
+You emit what you intend to do. Handlers get a chance to rewrite the payload,
+enrich it, redact it, or veto the whole thing. You read the envelope back and act on whatever
+the chain produced. It is how you give plugins a seat at the table without calling them by name.
+
+This is also the main exception to the immutability rule above: the payload is
+intentionally a draft object that handlers are allowed to edit in place.
+
+```dart
+class DraftOutgoingMessage {
+  String text;
+  final Map<String, String> metadata;
+
+  DraftOutgoingMessage(this.text) : metadata = {};
+}
+
+// A plugin that expands typed macros like /shrug before the message goes out.
+class MacroExpander extends StatefulPluginService {
+  static const _macros = {
+    '/shrug': r'¯\_(ツ)_/¯',
+    '/tableflip': '(╯°□°)╯︵ ┻━┻',
+  };
+
+  @override
+  void attach() {
+    on<DraftOutgoingMessage>((e) {
+      final msg = e.event;
+      _macros.forEach((macro, replacement) {
+        msg.text = msg.text.replaceAll(macro, replacement);
+      });
+      msg.metadata['macros_expanded'] = 'true';
+    });
+  }
+}
+
+// The emitter acts on whatever the chain produced.
+final envelope = await context.bus.emit<DraftOutgoingMessage>(
+  event: DraftOutgoingMessage(userInput),
+);
+
+if (envelope.stopped) {
+  // A handler vetoed or replaced the message entirely.
+  return;
+}
+
+await sendToServer(envelope.event); // the transformed payload
+```
+
+A handler can do two things to the payload:
+
+- **Mutate the draft in place.** Append context, redact PII, rewrite URLs, translate text.
+Return without calling `stop` and later handlers plus the emitter see the mutation. The cascade keeps running.
+- **Replace or veto by calling `e.stop(value)`.** Ends the cascade right there, pins
+`e.event` to `value`, and flips `e.stopped` to `true`. No more handlers run.
+
+Whichever path the handler takes, the envelope the emitter gets back is always the *after* view.
+`envelope.event` is the final payload. `envelope.stopped` tells you whether the cascade was cut short.
+`envelope.identifier` carries through whatever identifier the event was emitted under.
+
+The pre-commit interception pattern is a contract between emitter and handlers: the emitter
+promises to honor whatever the chain produced, so plugins can change or block the event
+before it lands without the emitter having to call them by name.
+
+## Requests and responses, from a plugin
+
+The bus also does typed request/response. The mechanics are covered in
+[Event Bus](/concepts/event-bus/#request-and-response); here is the shape inside plugin code.
+
+```dart
+class FindOpenPort {
+  const FindOpenPort();
+}
+
+class PortAllocator extends StatefulPluginService {
+  final _ports = <int>{};
+
+  @override
+  void attach() {
+    onRequest<FindOpenPort, int?>((e) async {
+      for (var port = 8000; port < 9000; port++) {
+        if (_ports.add(port)) return port;
+      }
+      return null; // concede; let the next handler try
+    });
+  }
+}
+```
+
+Callers ask through the bus:
+
+```dart
+final port = await context.bus.request<FindOpenPort, int?>(
+  const FindOpenPort(),
+);
+```
+
+The two patterns worth remembering when designing a request type:
+
+- **Make `Response` nullable.** `return null` means "I concede; let the next handler try."
+That is how a chain of handlers falls through until one provides an answer.
+A non-nullable response forces every handler to win or throw.
+- **Match `request` to `maybeRequest` based on caller expectations.**
+`request` throws when nothing answers; `maybeRequest` returns `null`.
+Pick the one that matches what the call site actually wants to do on a missed handler.
+
+## Common pitfalls
+
+- **Reading the envelope as if it were the payload.** The callback gets `EventEnvelope<T>`, so
+the payload lives at `e.event`, not `e`. Accessing fields directly on the callback argument will not compile.
+- **Forgetting the `context` argument on `Plugin` helpers.** `Plugin.on`, `onRequest`, `bind`, and
+`emit` take `context` as the first positional arg (`on<E>(context, (e) => ...)`). Inside a
+`StatefulPluginService` the helpers read `this.context` instead, so the same call is
+`on<E>((e) => ...)`. Mixing the two shapes is the easy mistake.
+- **Non-nullable `Response` types.** Request chains depend on `null` meaning "concede." If every handler must
+return a value, you forfeit the fall-through pattern.
+- **Leaning on `context.bus.on` inside a plugin or stateful service.** You lose auto-tracking.
+Use the `on(...)` / `onRequest(...)` / `onRequestSync(...)` helpers; both `Plugin`
+and `StatefulPluginService` expose them after importing `plugin_kit`.
+- **Putting real behavior in `Plugin.attach`.** It works and the cleanup story is fine,
+but a handler attached on the plugin is bound to the plugin's enabled state and cannot
+be overridden, prioritized, or tuned via `RuntimeSettings.services`. Only services live in the
+registry, and only services participate in priority/override. Use plugin-level subscriptions for
+trivial wiring; put anything you'd want to be replaceable in a `StatefulPluginService`.
+
+## Where to go next
+
+<CardGrid>
+  <LinkCard
+    title="Event Bus"
+    description="The model: priority direction, the envelope, request dispatch, identifier scoping, cross-scope routing, errors."
+    href="/concepts/event-bus/"
+  />
+  <LinkCard
+    title="Plugin Services"
+    description="Where the tracked subscription helpers actually come from."
+    href="/concepts/plugin-services/"
+  />
+  <LinkCard
+    title="Naming Conventions"
+    description="The full guide to event type naming (past-tense vs imperative vs draft) and why."
+    href="/guides/naming-conventions/"
+  />
+  <LinkCard
+    title="Sessions"
+    description="Global bus, session buses, and cross-scope broadcasting."
+    href="/concepts/sessions/"
+  />
+</CardGrid>

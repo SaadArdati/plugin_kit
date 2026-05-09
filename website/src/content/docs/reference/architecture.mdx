@@ -1,0 +1,239 @@
+---
+title: Architecture
+description: Internal design, type hierarchies, and key decisions for contributors and curious developers.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page is for contributors and for people who want to know why Plugin Kit is
+shaped the way it is. If you just want to use the library, the concept pages
+are the better starting point.
+
+Most of the internal machinery exists to hold three tensions at the same time:
+
+- more than one feature can compete for the same slot
+- more than one session can be alive without leaking state
+- plugins can coordinate without holding references to each other
+
+If a type here looks a little more ceremonial than a plain DI container or a
+plain event bus would need, that is usually why.
+
+## Type hierarchy
+
+Plugin Kit has five main type families.
+
+| Family | Root type | What it is |
+|---|---|---|
+| Plugins | `Plugin` | Lifecycle-aware feature units. Split into `GlobalPlugin<G>` and `SessionPlugin<S>`. |
+| Contexts | `PluginContext` | Bundle of registry + bus + extras handed to plugins at attach. `GlobalPluginContext` and `SessionPluginContext` add scope-specific fields. |
+| Services | `PluginService` | Registry-resident services with injected settings. `StatefulPluginService<Ctx>` adds session lifecycle and subscription tracking. |
+| Registry wrappers | `RegistrationWrapper<T>` | How the registry stores registrations. Three concrete subclasses: `FactoryWrapper`, `LazySingletonWrapper`, `SingletonWrapper`. |
+| Capabilities | `Capability` | Metadata tags attached to wrappers, not to instances. |
+
+Plus two orchestration types.
+
+| Type | Role |
+|---|---|
+| `PluginRuntime<G, S>` | The lifecycle engine. Owns the global scope. Creates and reconciles sessions. |
+| `PluginRuntimeManager<G, S>` | Convenience wrapper: stores current settings, streams updates, applies reconciliation across the runtime and all sessions. |
+
+## Registration, attachment, disposal
+
+Plugins progress through their lifecycle in a fixed order. Within a scope, every enabled plugin finishes each phase before any plugin starts the next.
+
+**Register phase**
+
+For each enabled plugin in the scope:
+
+1. The runtime calls `plugin.register(registry.scopedFor(pluginId))`.
+2. The scoped registry stamps `pluginId` onto every registration automatically.
+3. The plugin contributes services. No event subscriptions yet.
+
+**Build phase**
+
+After all registrations are in, the runtime:
+
+1. Applies wildcard and per-plugin overrides from `RuntimeSettings`.
+2. Builds the scope context (global or session).
+
+**Attach phase**
+
+For each enabled plugin in the scope:
+
+1. The runtime binds the context, then calls the user's `plugin.attach(context)` hook.
+2. The runtime iterates `StatefulPluginService`s owned by the plugin, binds each one's context, and calls their `attach()` hook.
+3. Plugins subscribe to events, kick off background work, resolve other services.
+
+**Detach phase**
+
+Mirror of attach, in reverse:
+
+1. The user's `plugin.detach(context)` hook runs.
+2. The runtime detaches owned `StatefulPluginService`s (calling each one's `detach()` hook), cancels their tracked subscriptions, and clears bound contexts.
+
+The practical rule: "I need information from another plugin" belongs in `attach`, not `register`. At register time, peers may not have registered yet.
+
+```text
+  enabled                                   running
+  ─────►   register   ─►  build  ─►  attach  ─────►   onPluginSettingsChanged
+                                                       (re-read config; no
+                                                        re-attach)
+
+  disabled
+  ──────►  detach  ─►  unregister  ─►  gone
+```
+
+If you remember nothing else: `register` collects, the build phase resolves the world, `attach` activates, `detach` unwinds. Everything else is timing.
+
+## Priority resolution
+
+The registry stores registrations in a sorted list keyed by `serviceId`. The sort is descending by priority, with `defaultPriority = 50`.
+
+| Operation | Behavior |
+|---|---|
+| Insert | Registrations slot into the list by priority. Ties preserve insertion order. |
+| Resolve | Return the first entry (highest priority wins). |
+| Resolve after | Walk past any registration from the caller's `pluginId`, return the next one. |
+
+Overrides from `RuntimeSettings` are applied at registration time. When settings hand a plugin an effective priority of 200, the wrapper is inserted into the sorted list at that priority, not at whatever the plugin's `register` call originally requested.
+
+### Resolve flow
+
+```
+  resolve<T>(ServiceId('agent.model'))
+        │
+        ▼
+  ┌──────────────────────────────────────┐
+  │ slot 'agent.model' (priority desc.)  │
+  ├──────────────────────────────────────┤
+  │ enterprise_chat | priority 120  ◄────┼── winner
+  │ chat_manager    | priority 100       │
+  │ legacy_anthropic| priority  50       │
+  └──────────────────────────────────────┘
+        │
+        ▼
+  build (or reuse cached) instance
+  inject latest settings if PluginService
+        │
+        ▼
+  return T
+```
+
+`resolveAfter` enters the same list at the entry following the caller's `pluginId` and walks the tail. `resolveRaw` returns the wrapper without instantiating; useful for capability inspection.
+
+<Aside type="note" title="Why priorities go in two different directions">
+Service priorities are descending (higher wins). Event priorities are ascending (lower runs first). The reason is that the registry is a competition (who answers this call?) and the bus is a pipeline (who gets to handle this first?). Pipelines want lower numbers to run earlier; competitions want higher numbers to win. Unifying the two would make one of them feel unnatural.
+</Aside>
+
+## Event dispatch
+
+`EventBus.emit<T>(event: ...)` does roughly this:
+
+1. Build an `EventEnvelope<T>` around the payload.
+2. Notify every `bind` observer.
+3. Merge general handlers with identifier-scoped handlers (if an identifier was provided). Sort ascending by priority.
+4. For each handler, await its execution. Handlers can mutate the payload or call `envelope.stop(...)` to halt propagation.
+5. Return the envelope to the emitter.
+
+Request dispatch is the same shape, except handlers return a value. The first handler whose return value is non-null wins, and the rest are skipped.
+
+The bus does not swallow handler exceptions. If a handler throws, the caller sees the exception. That is a deliberate design choice: silent failure in event pipelines is significantly harder to debug than a visible crash.
+
+### Dispatch flow
+
+```
+  emit<T>(event, identifier?)
+        │
+        ▼
+  EventEnvelope<T> built
+        │
+        ▼
+  bind callbacks (skipped if internal)
+        │
+        ▼
+  merged general + identifier handlers, ascending priority
+        │
+        ▼  for each handler:
+   observe → mutate → optionally stop()
+        │
+        ▼
+  envelope returned
+   .event    = final (possibly mutated) payload
+   .stopped  = whether the cascade short-circuited
+```
+
+## Cross-scope event routing
+
+The global bus and each session bus are separate `EventBus` instances with no implicit forwarding between them. All cross-scope communication is explicit.
+
+- **Global → sessions**: the `SessionBroadcast` extension on `GlobalPluginContext.sessions` offers `sessions.emit<T>(event)`. It iterates every active `PluginSession` and emits on that session's bus, so every subscribed session plugin receives the event. Handlers on the global bus are not invoked.
+- **Session → global**: a session plugin emits on `context.globalBus`. Only handlers on the global bus run.
+- **Intra-scope**: `context.bus.emit(...)` stays within the scope it was emitted from (global bus if called from a global plugin, session bus if from a session plugin).
+
+| To reach              | From a global plugin            | From a session plugin              |
+|-----------------------|---------------------------------|------------------------------------|
+| Global handlers       | `context.bus.emit(...)`         | `context.globalBus.emit(...)`      |
+| Same-session handlers | (not applicable)                | `context.bus.emit(...)`            |
+| Every active session  | `context.sessions.emit<T>(...)` | (route via global, then broadcast) |
+
+An earlier version of the runtime auto-forwarded global events into every session via a `bind` callback, but that made cross-scope routing hard to audit and made `sessions.emit` redundant. The current design keeps the two scopes isolated and makes every cross-scope emit a deliberate call.
+
+## Session isolation
+
+Each `PluginSession` is genuinely isolated.
+
+- Its `ServiceRegistry` is a separate instance.
+- Its `EventBus` is a separate instance.
+- Its `SessionPluginContext` is a separate instance.
+- Its enabled-plugin set is independent of other sessions.
+
+Two sessions sharing the same global runtime can have different settings snapshots, different enabled plugins, and different winning implementations for the same slot. They share a global registry (for cross-session shared services) and a global bus (for explicit cross-scope emits), but their session registries and session buses are completely independent.
+
+## Reconciliation
+
+Global and session reconciliation run the same lifecycle on a toggle.
+
+- **Disable** → `plugin.detach(context)`, then unregister the plugin's services.
+- **Enable** → `plugin.register(scopedRegistry)`, then `plugin.attach(context)`.
+- **Survivor** → every still-enabled plugin receives `onPluginSettingsChanged(oldContext, newContext)`.
+
+Direct subscriptions from `attach` tear down on disable without additional plumbing. `Plugin.attach` and `Plugin.detach` are pure user hooks; the runtime drives owned-service attach/detach and tracked-subscription cleanup around them, so plugins do not call `super.attach` or `super.detach`. `StatefulPluginService` is still the right home for long-lived session state because its subscription tracking makes cleanup trivially correct, but it is not a workaround for an asymmetry. The two scopes behave the same.
+
+An earlier version of the runtime ran session reconciliation at service granularity, skipping the plugin's own `attach` and `detach` on toggle. That shipped with a subtle footgun: direct bus subscriptions from `attach` leaked on disable. The current design resolves both scopes symmetrically through the plugin's own lifecycle methods.
+
+## Key design decisions
+
+**Domain-agnostic core.** The runtime knows nothing about Flutter, servers, editors, agents, or any specific UI framework. Client code extends `PluginContext`, `Plugin`, and `PluginService` to model domain concepts.
+
+**Competing implementations are a first-class idea.** Most DI containers treat override as a special case. Plugin Kit treats it as the normal case. That is why priority is on the registration, not on the slot.
+
+**Metadata without instantiation.** Capabilities live on registration wrappers, so host code can discover what a service claims to support without paying construction cost. This is how dynamic settings UIs, extension manifests, and slot inspectors stay fast.
+
+**Settings as reconciliation input, not instruction.** Handing the runtime a new `RuntimeSettings` is a statement of intent ("this is the world as it should be"), not a script. The runtime figures out what has to attach, detach, or reconfigure to converge on the new state. Plugin authors write lifecycle hooks; they do not write "on settings change" handlers for every configurable knob.
+
+**Errors surface.** The bus does not swallow handler exceptions. The runtime's lifecycle phases aggregate failures and throw `PluginLifecycleException`, naming the phase that failed. Silent failure in a plugin system is a debugging nightmare a year later.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Plugins"
+    description="The lifecycle and contract this page formalizes."
+    href="/concepts/plugins/"
+  />
+  <LinkCard
+    title="Service Registry"
+    description="User-facing view of the registration and resolution machinery."
+    href="/concepts/service-registry/"
+  />
+  <LinkCard
+    title="Event Bus"
+    description="User-facing view of the event dispatch model."
+    href="/concepts/event-bus/"
+  />
+  <LinkCard
+    title="Runtime"
+    description="User-facing view of the lifecycle engine."
+    href="/concepts/runtime/"
+  />
+</CardGrid>

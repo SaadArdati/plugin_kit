@@ -1,0 +1,346 @@
+---
+title: flutter_plugin_kit
+description: Optional Flutter ergonomics on top of plugin_kit. Scope widgets, a State mixin that auto-cancels bus subscriptions, a ChangeNotifier adapter, and BuildContext.watchEvent / readEvent.
+---
+
+import { Aside, Card, CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`flutter_plugin_kit` is the optional Flutter companion to [`plugin_kit`](https://github.com/SaadArdati/plugin_kit/tree/main/packages/plugin_kit). It packages the moves a Flutter shell makes around a `PluginRuntime` — carrying it through the tree, subscribing to session events from a `State`, exposing the latest event to a state-management library — into a small set of types you opt into where they pay for themselves.
+
+It pulls in only `flutter` and `plugin_kit`. Everything it exposes implements standard Flutter shapes (`InheritedWidget`, `ChangeNotifier`, `ValueListenable`, `Stream`), so it drops into `provider`, `flutter_bloc`, `riverpod`, signals, MobX, etc. as ordinary values. It does not replace your state library.
+
+<Aside type="tip" title="When to use it vs the raw runtime">
+The raw `plugin_kit` setup ([Flutter Integration](/guides/flutter-integration/)) is what you reach for when the shell already owns its own `PluginRuntimeManager` field, its own `_createSession` flow, and its own `setState` triggers. `flutter_plugin_kit` is what you reach for when that boilerplate is paying no rent — you want a scope widget that constructs and disposes the manager for you, a mixin that handles bus subscriptions, and one `BuildContext.watchEvent<T>()` line where the manual subscription used to be.
+
+Both ship in this monorepo. Use whichever is cheaper for the shape of your app.
+</Aside>
+
+## Install
+
+```yaml
+dependencies:
+  plugin_kit: ^1.0.0
+  flutter_plugin_kit: ^0.1.0
+```
+
+## What's in the box
+
+- **`PluginRuntimeScope`** — `InheritedWidget` carrying a `PluginRuntimeManager`. Either pass an externally-owned manager via `.value`, or pass a list of plugins and let the scope construct, init, and dispose one for you.
+- **`PluginSessionScope`** — `InheritedWidget` carrying a `PluginSession`. Three modes: explicit session, runtime + auto-create session, or derive both from an ambient `PluginRuntimeScope`. Async session creation is handled with optional `loading` and `error` builders.
+- **`PluginSessionStateListener<W>`** — mixin on `State<W>`. `listen<E>(handler)` and `rebuildOn<E>([when])` register subscriptions that auto-cancel on dispose and re-attach automatically across session swaps. Both are callable from `initState`.
+- **`PluginEventNotifier<E>`** — `ChangeNotifier` / `ValueListenable<E?>`. Subscribes to a session and exposes the latest event of type `E` as `.value`. Drops into `ChangeNotifierProvider`, `ValueListenableProvider`, `ValueListenableBuilder`, and any other foundation-listenable consumer.
+- **`BuildContext.watchEvent<E>()` / `readEvent<E>()`** — extensions on `BuildContext`. `watchEvent` subscribes the calling element to rebuilds on the next `E`; `readEvent` returns the latest without subscribing.
+
+## Quick tour
+
+Two plugins, one screen. The scope owns the runtime and the session; the screen mixes in the listener and calls `listen` from `initState`.
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_plugin_kit/flutter_plugin_kit.dart';
+import 'package:plugin_kit/plugin_kit.dart';
+
+void main() {
+  runApp(
+    MaterialApp(
+      home: PluginRuntimeScope(
+        plugins: [ChatPlugin(), AssistantPlugin()],
+        child: const PluginSessionScope(
+          child: ChatScreen(),
+        ),
+      ),
+    ),
+  );
+}
+
+class ChatScreen extends StatefulWidget {
+  const ChatScreen({super.key});
+
+  @override
+  State<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen>
+    with PluginSessionStateListener<ChatScreen> {
+  String? _last;
+
+  @override
+  void initState() {
+    super.initState();
+    listen<ChatMessageReceived>((event) {
+      setState(() => _last = event.text);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Text(_last ?? 'idle');
+}
+```
+
+`PluginRuntimeScope` constructed and `init`-ed the manager; it disposes it when the scope leaves the tree. `PluginSessionScope` saw the ambient runtime, called `createSession`, and exposed the result. The mixin saw the session in `didChangeDependencies`, attached the `ChatMessageReceived` handler, and will cancel it on `dispose`.
+
+The `Builder`-only variant skips the `State` class entirely:
+
+```dart
+Builder(
+  builder: (context) {
+    final last = context.watchEvent<ChatMessageReceived>();
+    return Text(last?.text ?? 'idle');
+  },
+);
+```
+
+`watchEvent<E>` reads the ambient session from `PluginSessionScope` and subscribes the calling element to the next `E`. The element rebuilds whenever a new `E` lands, and the subscription is cleaned up when the element is unmounted.
+
+## Scope widgets
+
+### PluginRuntimeScope
+
+Two construction shapes. Pick by who owns the manager's lifetime.
+
+<Tabs>
+<TabItem label="Auto-create (scope owns)">
+
+```dart
+PluginRuntimeScope(
+  plugins: [ChatPlugin(), AssistantPlugin()],
+  initialSettings: const RuntimeSettings.empty(),
+  child: const ChatScreen(),
+);
+```
+
+The scope constructs a `PluginRuntimeManager` from the plugin list, calls `init`, holds the reference, and disposes it when the scope leaves the tree. Convenient for per-route runtimes whose lifetime really does match the widget that hosts them.
+
+</TabItem>
+<TabItem label="External (caller owns)">
+
+```dart
+final manager = PluginRuntimeManager(plugins: [...])..init();
+
+// Somewhere up the tree:
+PluginRuntimeScope.value(
+  runtime: manager,
+  child: const ChatScreen(),
+);
+
+// Caller disposes when truly done:
+await manager.dispose();
+```
+
+The scope holds a reference but does not own the manager's lifetime. Same contract as `Provider.value`: pass it in, take it out, the widget never disposes what it didn't construct.
+
+</TabItem>
+</Tabs>
+
+### PluginSessionScope
+
+Three modes. Pick by where the session comes from.
+
+<Tabs>
+<TabItem label="Ambient runtime (most common)">
+
+```dart
+PluginRuntimeScope(
+  plugins: [...],
+  child: PluginSessionScope(
+    loading: (context) => const Center(child: CircularProgressIndicator()),
+    child: const ChatScreen(),
+  ),
+);
+```
+
+No `runtime:` or `session:` argument. The scope reads the ambient `PluginRuntimeScope`, calls `createSession`, and exposes the result. While the create future is pending, the optional `loading` builder paints; on error, the optional `error` builder paints. The scope owns the session and disposes it on swap or unmount.
+
+</TabItem>
+<TabItem label="Runtime, auto-create session">
+
+```dart
+PluginSessionScope(
+  runtime: someManager,
+  child: const ChatScreen(),
+);
+```
+
+Like the ambient case, but with an explicit runtime. The scope still owns the created session.
+
+</TabItem>
+<TabItem label="External session">
+
+```dart
+PluginSessionScope(
+  session: existingSession,
+  child: const ChatScreen(),
+);
+```
+
+The scope just carries an externally-owned session. Caller manages its lifetime. Useful when the session lives in a service locator, a Riverpod provider, or any other long-lived holder.
+
+</TabItem>
+</Tabs>
+
+The scope reacts correctly when you swap arguments mid-tree: switching from auto-create to an explicit session, swapping the ambient runtime, or replacing one explicit session with another all trigger a clean dispose-and-recreate of any owned session, without leaking the previous one.
+
+## PluginSessionStateListener
+
+A mixin on `State<W>`. Two methods:
+
+- `listen<E>(void Function(E event) handler)` — register a handler for events of type `E`. Returns nothing; cancellation is automatic on `dispose`.
+- `rebuildOn<E>([bool Function(E event)? when])` — register a setState-trigger handler for events of type `E`, optionally filtered by `when`.
+
+Both are callable from `initState` (and any later lifecycle callback). Behind the scenes the mixin records each `listen` / `rebuildOn` call as a descriptor and attaches descriptors against the active session as soon as one becomes available — typically the next `didChangeDependencies` after `initState`. There is no `_wired` flag, no "subscribe in `didChangeDependencies` instead" caveat.
+
+```dart
+class _ChatScreenState extends State<ChatScreen>
+    with PluginSessionStateListener<ChatScreen> {
+  String? _last;
+
+  @override
+  void initState() {
+    super.initState();
+    listen<ChatMessageReceived>((event) {
+      if (!mounted) return;
+      setState(() => _last = event.text);
+    });
+    rebuildOn<TypingStarted>();
+    rebuildOn<MessageEdited>((e) => e.editedByCurrentUser);
+  }
+
+  @override
+  Widget build(BuildContext context) => /* ... */;
+}
+```
+
+The mixin defaults to reading the active session from the ambient `PluginSessionScope`. Override `PluginSession? get session` only when the session lives elsewhere — typically `=> widget.session` for a screen that takes one as a parameter.
+
+```dart
+class _PaneState extends State<Pane> with PluginSessionStateListener<Pane> {
+  @override
+  PluginSession? get session => widget.session;
+  // ...
+}
+```
+
+The mixin re-attaches descriptors automatically when the session changes — `PluginSessionScope` swap, `widget.session` swap, ambient `PluginRuntimeScope` swap. Each swap disposes the prior batch of subscriptions and re-attaches a fresh batch against the new session.
+
+## BuildContext extensions
+
+`watchEvent<E>` and `readEvent<E>` are the **recommended** path for reading events. If you have a `PluginSessionScope` ancestor, they cover ~90% of the "show the latest event of type E" use case in one line each, with no state holder to construct or dispose.
+
+```dart
+final last = context.watchEvent<ChatMessageReceived>();
+final maybe = context.readEvent<ChatMessageReceived>();
+```
+
+`watchEvent<E>` reads the ambient `PluginSessionScope`, subscribes the calling element to events of type `E`, and rebuilds the element when one arrives. Returns the latest `E?` (initially `null`). The subscription is cleaned up when the element is unmounted — no manual cancel.
+
+`readEvent<E>` reads the latest `E?` without subscribing. Useful inside event handlers, button callbacks, and other one-shot reads where you don't want a rebuild.
+
+## PluginEventNotifier
+
+`PluginEventNotifier<E>` is the **integration shim** for state-management libraries that consume a `ChangeNotifier` / `ValueListenable<E?>` rather than a `BuildContext`. Reach for it when:
+
+- Your `Provider`/`ChangeNotifierProvider` boundary needs a real `Listenable` to compose with `Listenable.merge`, signals, or other listenables.
+- You're writing a state holder (Cubit, controller, AsyncNotifier) that wants to expose "the latest event of type `E`" through its own surface, and the host doesn't have access to a `BuildContext`.
+- The session lives outside `PluginSessionScope` (e.g., in a service locator) and `watchEvent` can't find it.
+- You need `priority` or `identifier` on the subscription. `watchEvent` registers as a default-priority, no-identifier handler; `PluginEventNotifier`'s constructor forwards both to `EventBus.on` for callers who need scoped delivery or a non-default cascade position.
+
+```dart
+final notifier = PluginEventNotifier<ChatMessageReceived>(
+  session,
+  priority: 10,             // optional; defaults to 0
+  identifier: 'agent.main', // optional; defaults to no scoping
+);
+// notifier.value is null until the first event.
+// notifier.value updates and notifyListeners fires on each subsequent event.
+notifier.dispose(); // cancels the subscription.
+```
+
+It also implements `ValueListenable<E?>`, so `ValueListenableProvider`, `ValueListenableBuilder`, and `Listenable.merge` consume it without ceremony.
+
+## Integrating with state-management libraries
+
+`flutter_plugin_kit` does not depend on `provider`, `flutter_bloc`, or any other state library. It exposes standard Flutter shapes those libraries already consume.
+
+### provider
+
+`PluginEventNotifier<E>` is a `ChangeNotifier`, so it drops into `ChangeNotifierProvider` directly:
+
+```dart
+ChangeNotifierProvider(
+  create: (context) => PluginEventNotifier<ChatMessageReceived>(
+    PluginSessionScope.of(context),
+  ),
+  child: const ChatBody(),
+);
+
+// In ChatBody:
+final last = context.watch<PluginEventNotifier<ChatMessageReceived>>().value;
+```
+
+### flutter_bloc
+
+There's no shipped Cubit adapter — it's eight lines you write yourself, parameterised by whatever `Bloc` shape your app prefers:
+
+```dart
+class PluginEventCubit<E> extends Cubit<E?> {
+  PluginEventCubit(PluginSession session) : super(null) {
+    _sub = session.on<E>((envelope) {
+      if (!isClosed) emit(envelope.event);
+    });
+  }
+  late final StreamSubscription<void> _sub;
+
+  @override
+  Future<void> close() async {
+    _sub.cancel();
+    return super.close();
+  }
+}
+```
+
+### riverpod / signals / mobx
+
+Same shape. Subscribe in a notifier or store, expose the latest event, dispose cancels. Each library's recipe lives in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden) and is shown side-by-side in [State Management Integrations](/guides/state-management-integrations/).
+
+## Pure-Dart sibling
+
+If you have a host that is not a `State<W>` — a Cubit, a `ChangeNotifier`, a controller class — `plugin_kit` itself ships a `PluginSessionListener` mixin and a shared `EventBinding` descriptor type. Same declarative subscription shape, no Flutter dependency.
+
+```dart
+class ChatController with PluginSessionListener {
+  ChatController(this.session) {
+    attachSubscriptions();
+  }
+
+  @override
+  final PluginSession session;
+
+  @override
+  List<EventBinding> get subscriptions => [
+        EventBinding.on<ChatMessageReceived>(_onReceived),
+      ];
+
+  void _onReceived(ChatMessageReceived event) {
+    // ...
+  }
+
+  void dispose() => detachSubscriptions();
+}
+```
+
+`EventBinding.on<E>(handler)` is a static factory rather than a top-level function so it does not shadow the existing `PluginHelper.on<E>` extension method.
+
+## Lifecycle notes
+
+- **The runtime outlives the widget tree.** Hot restart, route stack resets, and deep navigation throw away widgets but not your `PluginRuntimeManager`. For long-lived runtimes, hold the manager outside the tree (top-level final, GetIt singleton, Riverpod provider with one-shot create) and pass it into `PluginRuntimeScope.value` / `PluginSessionScope(session: ...)`. The auto-create variants are convenient when the scope's lifetime really does match the runtime's, e.g. inside a per-route `StatefulWidget`.
+- **Disposal happens when the scope owns the resource.** A scope only owns what it constructed itself: a `plugins:`-form `PluginRuntimeScope` owns the manager, an ambient-or-runtime-form `PluginSessionScope` owns the session. The `.value` and explicit-session forms never dispose the resource on the caller's behalf.
+- **Async dispose errors are reported, not swallowed.** Both scopes wrap their owned `dispose()` calls so that any error a plugin raises during detach is routed through `FlutterError.reportError` instead of escaping as an uncaught zone error. In tests, the error surfaces via `tester.takeException()`.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard title="Flutter Integration" description="The raw setState recipe and where the runtime lives in a manual shell. Read this if you don't want the package." href="/guides/flutter-integration/" />
+  <LinkCard title="State Management Integrations" description="Library-by-library bridge code (Provider, Riverpod, BLoC, signals, MobX, GetIt, setState), with flutter_plugin_kit variants where they apply." href="/guides/state-management-integrations/" />
+  <LinkCard title="Sessions" description="The lifetime contract every scope/mixin is wired against." href="/concepts/sessions/" />
+  <LinkCard title="Plugin Kit Dialog" description="The other Flutter companion package: a drop-in customization UI." href="/guides/plugin-kit-dialog/" />
+</CardGrid>

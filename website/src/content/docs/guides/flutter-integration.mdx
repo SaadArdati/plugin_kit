@@ -1,0 +1,322 @@
+---
+title: Flutter Integration
+description: How Plugin Kit fits into a Flutter app's widget tree without picking your state management library.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Plugin Kit's core package is pure Dart — no `flutter` SDK dependency, no widget imports — so the same runtime drops into a CLI, a server, or a Flutter app unchanged. This page is about wiring that runtime into a widget tree, either directly or through whatever state library you already use.
+
+<Aside type="tip" title="This page vs. Migrating a Flutter App">
+**This page is the mechanics.** Where the runtime lives in a `StatefulWidget`, how widgets hear about plugin changes, how plugin-provided UI gets resolved. Use it when you are writing the widget-side bridge.
+
+**[Migrating a Flutter App](/guides/migrating-flutter-app/) is the strategy.** Picking seams, deciding between direct service access and event-driven integration, and fitting Plugin Kit beside an existing Provider / Riverpod / BLoC / GetIt app without rewriting it. Use it when you already have an app and need to figure out where Plugin Kit should touch it.
+
+They are meant to be read together. Most readers want the strategy page first, then come back here for the widget code.
+</Aside>
+
+The reference integration in this repo is [`example/code_editor/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/code_editor), a full Flutter app built entirely on `StatefulWidget` and `setState` with no DI or state-management package. Everything below mirrors that pattern.
+
+<Aside type="note" title="Manual or with flutter_plugin_kit">
+This page is the manual recipe — the shell owns the manager, the session, the subscriptions, and the disposal calls itself. It is the most explicit version of the integration and the path the reference example takes.
+
+For most apps, [`flutter_plugin_kit`](/guides/flutter-plugin-kit/) is cheaper. It ships an opt-in scope widget that constructs and disposes the manager for you, a `State` mixin that auto-cancels subscriptions, and `BuildContext.watchEvent<E>()` for one-line event reads. It pulls in only `flutter` and `plugin_kit`, and exposes standard `ChangeNotifier` / `ValueListenable` shapes that drop into Provider, Riverpod, BLoC, and signals as ordinary values.
+
+Read this page if you want the explicit recipe (or are migrating an app that already has its own shell). Read the [flutter_plugin_kit guide](/guides/flutter-plugin-kit/) if you want the boilerplate gone. Both packages are in the same monorepo and stay compatible release-to-release.
+</Aside>
+
+## The mental model
+
+Plugin Kit can sit alongside your state management or carry a fair amount of state-management work itself. The bus, registry, and session lifecycle overlap with what most state libraries do, so the choice is about how much overlap you want to pay for, not about which tool is allowed to do which job.
+
+| Tool | Good at |
+|---|---|
+| `Provider` / `Riverpod` / `BLoC` / `GetIt` | exposing values to widgets, scheduling rebuilds, mature widget integrations |
+| Plugin Kit | lifecycle-aware feature composition, replaceable services, isolated sessions, runtime configuration, and — incidentally — a typed event bus that can drive `setState` directly |
+
+If you keep both, the usual split is: state management exposes values to widgets, Plugin Kit decides which features exist and how they participate, and a small bridge connects the two. If you drop the state library, the session bus drives `setState` straight from the shell. The reference example takes that path.
+
+For plugin-provided UI, that bridge often resolves widget factories from the
+registry. For app behavior, prefer event contracts: widgets and state holders
+emit typed events, plugins react, and the Flutter layer does not need to know
+which service did the work.
+
+The nicest Flutter surfaces for Plugin Kit are the ones users can see:
+
+- a model selector whose options follow enabled plugins
+- a customization dialog that edits runtime settings live
+- a chat timeline that grows richer blocks as plugins stream progress and results
+
+Those are all the same integration story. The widget tree provides the shell.
+The runtime decides which features participate.
+
+## The reference pattern
+
+The cleanest integration, used by the `code_editor` example, looks like this.
+
+1. A stateful shell widget holds a `PluginRuntimeManager` and the current `PluginSession` as fields.
+2. The shell subscribes to session-bus events it cares about and calls `setState` in those handlers.
+3. Plugins contribute widgets to the shell by registering factories in the registry.
+4. Plugins contribute descriptors (what should appear in the toolbar, panel list, status bar) by mutating collection events the shell emits.
+5. When the user toggles a feature, the shell calls `updateSessionSettings(...)` with serialization to prevent races.
+6. The shell's `dispose()` disposes the manager, which tears down sessions cleanly.
+
+No extra package. Just Flutter, with the shell owning every dispose call. (For a version that hides the bookkeeping behind a scope widget and a mixin, see [`flutter_plugin_kit`](/guides/flutter-plugin-kit/).)
+
+## A minimal editor shell
+
+```dart
+class _EditorScreenState extends State<_EditorScreen> {
+  late final PluginRuntimeManager _manager;
+  PluginSession? _session;
+
+  List<PanelDescriptor> _panels = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _manager = PluginRuntimeManager(
+      plugins: [TerminalPlugin(), MinimapPlugin()],
+    );
+    _manager.init();
+    _createSession();
+  }
+
+  Future<void> _createSession() async {
+    _session = await _manager.createSession();
+
+    _session!.on<UIRefreshRequest>((_) async {
+      if (!mounted) return;
+      await _collectPanels();
+    });
+
+    await _collectPanels();
+  }
+
+  Future<void> _collectPanels() async {
+    final collect = CollectPanels();
+    await _session!.emit(collect);
+
+    if (!mounted) return;
+    setState(() => _panels = collect.panels);
+  }
+
+  @override
+  void dispose() {
+    // manager.dispose() iterates and disposes active sessions. Do NOT call
+    // session.dispose() separately. Doing both races on stateful service
+    // detach and can throw ConcurrentModificationError.
+    _manager.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Row(
+        children: [
+          for (final panel in _panels) _resolvePanel(panel),
+        ],
+      ),
+    );
+  }
+
+  Widget _resolvePanel(PanelDescriptor panel) {
+    const ns = Namespace('panel');
+    final factory = _session?.context.maybeResolve<PanelWidgetFactory>(
+      ns(panel.id),
+    );
+    return factory?.build(context) ?? const SizedBox.shrink();
+  }
+}
+```
+
+That is the whole bridge. Session events trigger `setState`. Plugins contribute via the registry and via events. The widget tree never imports the `ServiceRegistry` or subscribes directly to plugin internals.
+
+## Plugins contributing widgets
+
+Widgets that plugins contribute live in the registry, behind an interface the shell knows about.
+
+Define an interface in the shell:
+
+```dart
+abstract class PanelWidgetFactory {
+  Widget build(BuildContext context);
+}
+```
+
+Implement it in the plugin. The factory typically extends `StatefulPluginService` so it inherits session lifecycle and automatic subscription tracking.
+
+```dart
+class TerminalPanelFactory extends StatefulPluginService
+    implements PanelWidgetFactory {
+  final List<String> _history = [];
+
+  @override
+  Widget build(BuildContext context) {
+    return TerminalWidget(history: List.of(_history), onCommand: _run);
+  }
+
+  Future<void> _run(String command) async {
+    _history.add(command);
+    await emit(const UIRefreshRequest());
+  }
+}
+
+class TerminalPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('terminal');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    const panel = Namespace('panel');
+    registry.registerSingleton<PanelWidgetFactory>(
+      panel('terminal'),                 // ServiceId('panel.terminal')
+      TerminalPanelFactory(),
+    );
+  }
+}
+```
+
+The factory keeps its own state (`_history`). To trigger a rebuild, it emits `UIRefreshRequest` on the session bus. The shell hears it, calls `setState`, and the widget's `build(context)` runs as part of that rebuild.
+
+Because the factory is a `StatefulPluginService`, the runtime manages its lifecycle automatically. It attaches when the plugin enables, detaches when the plugin disables, and its tracked subscriptions are cancelled without manual cleanup.
+
+## Plugins contributing descriptors
+
+For things like toolbar items, status bar entries, or panel lists, the shell emits a "collection" event. Plugins listen for it and append to the mutable list inside.
+
+```dart
+// In shell: define the event.
+class CollectPanels {
+  final List<PanelDescriptor> panels = [];
+}
+
+// In shell: emit, read result, setState.
+final collect = CollectPanels();
+await session.emit(collect);
+setState(() => _panels = collect.panels);
+
+// In plugin: subscribe and append.
+@override
+void attach(SessionPluginContext context) {
+  on<CollectPanels>(context, (e) {
+    e.event.panels.add(
+      PanelDescriptor(id: 'terminal', title: 'Terminal'),
+    );
+  });
+}
+```
+
+Because every enabled plugin's handler runs in priority order on the same mutable event object, one emit produces the final list in-place. No separate collect-then-fold step.
+
+## Toggling plugins at runtime
+
+When a user enables or disables a plugin mid-session, the shell calls `updateSessionSettings(...)` on the runtime.
+
+```dart
+Future<void> _setEnabled(PluginId pluginId, bool enabled) async {
+  final session = _session!;
+  final next = RuntimeSettings(
+    plugins: {
+      ...session.settings.plugins,
+      pluginId: PluginConfig(enabled: enabled),
+    },
+  );
+  await _manager.runtime.updateSessionSettings(
+    session,
+    newSettings: next,
+  );
+  await _collectPanels();
+}
+```
+
+<Aside type="caution" title="Serialize back-to-back toggles">
+`updateSessionSettings` is async. If the user toggles two plugins in quick succession, both handlers can start before the first finishes, and the second one will compute its `next` settings off a snapshot of `session.settings` that has not yet applied the first change. The second toggle silently drops.
+
+The `code_editor` example serializes with a tail-chained `Future`:
+
+```dart
+Future<void> _togglePending = Future.value();
+
+Future<void> _setEnabled(PluginId pluginId, bool enabled) async {
+  _togglePending = _togglePending.then((_) async {
+    // compute next settings from the session's current state,
+    // then updateSessionSettings, then refresh UI
+  });
+  await _togglePending;
+}
+```
+
+If you expose toggles to the user, do this or equivalent.
+</Aside>
+
+## Lifecycle gotchas
+
+**Dispose the manager, not individual sessions.** `PluginRuntimeManager.dispose()` iterates active sessions and disposes them. Calling `session.dispose()` and `manager.dispose()` separately races on stateful service detach and can throw `ConcurrentModificationError`. One call. The manager.
+
+**`register` and `attach` do not re-run on hot reload.** Plugins are constructed once, and hot reload does not re-run `main` or re-execute `initState`. If you change code inside a plugin's `register` or `attach`, use hot restart. Pure widget code inside factories still hot-reloads fine, because that code runs on rebuild.
+
+**Use `mounted` checks after async work.** Session event handlers are async. If a handler awaits something and then calls `setState`, check `mounted` first. The widget may have been disposed in the meantime.
+
+## If you already use Riverpod, Provider, or BLoC
+
+The shape of the integration above is the same. Hold the manager where your package expects long-lived services, and expose the current session (or services resolved from it) through whatever mechanism you already use.
+
+For the library-specific bridge code (Provider/`ChangeNotifier`, Riverpod
+`AsyncNotifier`, flutter_bloc Cubit, signals_flutter, MobX, GetIt) see
+[State Management Integrations](/guides/state-management-integrations/). Every
+recipe there is implemented in `example/state_garden/` and run by
+`flutter test`, so the citations are checked code rather than prose.
+
+<Aside type="note" title="Don't bind the manager's identity to widget rebuilds">
+Resist the urge to stuff `PluginRuntimeManager` into an `InheritedWidget` or a Provider that rebuilds the manager whenever the tree rebuilds. The runtime outlives the widget tree (hot restart, deep navigation, route stack resets all throw away widgets but not the manager). Hold it somewhere whose lifetime matches the runtime's: a top-level `final`, a GetIt singleton, a Riverpod provider with one-shot create, or — if the scope's lifetime really does match the runtime's — `flutter_plugin_kit`'s `PluginRuntimeScope`, which constructs the manager in `initState` and disposes it in `dispose` without rebuilding it.
+</Aside>
+
+## Testing Flutter widgets that use Plugin Kit
+
+Plugin Kit works with `flutter_test` like any other Dart dependency. The pattern:
+
+```dart
+testWidgets('editor shell renders registered panels', (tester) async {
+  final manager = PluginRuntimeManager(plugins: [TestPanelPlugin()]);
+  manager.init();
+
+  await tester.pumpWidget(MaterialApp(home: EditorShell(manager: manager)));
+  await tester.pumpAndSettle();
+
+  expect(find.text('Test Panel'), findsOneWidget);
+
+  await manager.dispose();
+});
+```
+
+For widgets that resolve services on build, register stubs or fakes in a test-only plugin. The registry does not distinguish "real" from "fake" implementations. Higher priority wins, same as production.
+
+```dart
+class FakeSearchPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('fake_search');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<SearchService>(
+      const ServiceId('search'),
+      FakeSearch(),
+      priority: 1000, // beat any other registrant
+    );
+  }
+}
+```
+
+See [Testing](/guides/testing/) for non-widget plugin tests.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard title="flutter_plugin_kit" description="Optional companion package that wraps the manual recipe above in a scope widget, a State mixin, and BuildContext extensions." href="/guides/flutter-plugin-kit/" />
+  <LinkCard title="Custom Contexts" description="Extend SessionPluginContext with Flutter-friendly fields like the current document." href="/concepts/custom-context/" />
+  <LinkCard title="Runtime" description="The lifecycle the shell's initState/dispose maps onto." href="/concepts/runtime/" />
+  <LinkCard title="Settings & Overrides" description="How settings flow from a toggle widget into updateSessionSettings." href="/guides/settings/" />
+  <LinkCard title="Testing" description="Plugin-level tests without widgets." href="/guides/testing/" />
+</CardGrid>

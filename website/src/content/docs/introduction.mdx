@@ -1,0 +1,96 @@
+---
+title: Introduction
+description: A ten-second tour of what Plugin Kit looks like in real work.
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Plugin Kit is a runtime for Dart apps that have grown into platforms. Features get real
+lifecycles. Services get replaceable, prioritized implementations. Sessions stay sealed.
+Events flow between parts of your app that have never been formally introduced.
+
+It has no opinion about what your app does. It does not know about Flutter, servers, agents, editors,
+or any particular settings backend. You build those on top. The runtime stays the same.
+
+For the design philosophy and three core values, [Why Plugin Kit?](/why-plugin-kit/) is the short read.
+
+## What it looks like in real work
+
+<CardGrid>
+  <Card title="The screen stops knowing who won">
+  A Flutter screen asks the session for "the current search implementation"
+  and gets the highest-priority one. No provider checks, no feature-flag
+  branches, no fallback wiring at the call site.
+  </Card>
+  <Card title="One send action becomes a pipeline">
+  The user hits send once. One plugin inspects the draft, another gathers
+  context, another routes the work, and the chat UI renders progress as
+  those phases happen. The button stays boring.
+  </Card>
+  <Card title="Live customization stops being scary">
+  A settings dialog enables plugins, raises priorities, and updates config
+  in the running session. The runtime detaches what lost, attaches what
+  won, and keeps the session coherent across the swap.
+  </Card>
+</CardGrid>
+
+![Plugin Kit Dialog showing the Plugins tab with toggleable enable/disable controls for each registered plugin](/images/dialog/plugins_tab_dark.png)
+
+*Plugin Kit Dialog, the customization surface that ships with the library. Toggling a plugin runs the full lifecycle. The runtime is fully introspectable.*
+
+## A small taste
+
+Two plugins claim the same `'greeter'` slot at different priorities; the runtime resolves to the winner. The full runnable program is in [Getting Started](/getting-started/).
+
+```dart
+class CasualPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('casual');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<Greeter>(const ServiceId('greeter'), CasualGreeter());
+  }
+}
+
+class FormalPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('formal');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<Greeter>(
+      const ServiceId('greeter'),
+      FormalGreeter(),
+      priority: 100, // wins
+    );
+  }
+}
+
+// session.resolve<Greeter>(const ServiceId('greeter')).greet('world')
+// → "Good day, world."
+```
+
+That move, features owning slots and slots resolving to the current winner, is the vocabulary the rest of the library is built on.
+
+## Where to next
+
+<CardGrid>
+  <LinkCard
+    title="Why Plugin Kit?"
+    description="The short read on the symptoms that motivate the library and the three values it is built around."
+    href="/why-plugin-kit/"
+  />
+  <LinkCard
+    title="Show me it running"
+    description="The minimum runnable example in eight steps, then layer features on one at a time."
+    href="/getting-started/"
+  />
+  <LinkCard
+    title="Show me the mental model"
+    description="Plugins, services, events, sessions. Four pieces, and everything else is composition."
+    href="/concepts/plugins/"
+  />
+</CardGrid>
+
+If you prefer reading code over docs, the [`example/`](https://github.com/SaadArdati/plugin_kit/tree/main/example) directory walks a miniature workflow built out of plugins, one concept per file. Many readers go straight there.

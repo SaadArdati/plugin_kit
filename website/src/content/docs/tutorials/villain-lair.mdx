@@ -1,0 +1,146 @@
+---
+title: The villain_lair examples
+description: Fifteen runnable Dart scenarios in example/villain_lair/, each isolating one piece of the runtime. Use this page as an index, then read or modify the file that matches what you are trying to learn.
+---
+
+import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+`example/villain_lair/` is fifteen runnable Dart programs, one per file, each isolating one piece of the runtime. The cast (Dr. Nefarious, Gary, Janet, Mr. Whiskers, Doug) is window dressing that helps the file read; the substance is in the API calls and the plugin shapes.
+
+This page is not a tour. It is an index. Each scenario file is short enough (~100-200 lines) that reading it directly is faster than wrapping prose around it. Use the entries below to pick the right file.
+
+## Run a scenario
+
+```bash
+cd example/villain_lair
+dart pub get
+dart run bin/01_hello_lair.dart
+```
+
+Replace the filename to run any other. Each `main()` is at the bottom of the file, so they are also editable: change a priority, drop a plugin, swap an event payload, run again.
+
+## The scenarios
+
+### 01. Hello, Lair! ([`bin/01_hello_lair.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/01_hello_lair.dart))
+
+The smallest possible plugin: one `SessionPlugin`, one service, one session, one greeting. Read this first.
+
+Concepts: [Plugins](/concepts/plugins/), [Service Registry](/concepts/service-registry/), [Runtime](/concepts/runtime/).
+
+### 02. The Lair Intercom ([`bin/02_event_bus_basics.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/02_event_bus_basics.dart))
+
+Emitting events on a session bus, subscribing with the auto-tracking `on<T>()` helper on `Plugin`, and tapping every event for tracing with `bind()`.
+
+Concepts: [Event Bus](/concepts/event-bus/), [Event Patterns](/concepts/events/).
+
+### 03. Evil Supply Requisitions ([`bin/03_request_response.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/03_request_response.dart))
+
+Typed request/response. Multiple handlers can respond; the first non-null wins. Sync and async pairs both work; `maybeRequest` returns `null` instead of throwing.
+
+Concepts: [Event Bus](/concepts/event-bus/#request-and-response), [Event Patterns](/concepts/events/#requests-and-responses-from-a-plugin).
+
+### 04. The Minion Assignment Desk ([`bin/04_service_registry.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/04_service_registry.dart))
+
+The densest scenario. Three competing registrations at priorities 100, 50, and 10. Covers `registerSingleton`, `registerLazySingleton`, `registerFactory`, `resolve`, `maybeResolve`, `resolveAfter`, namespaces, and listing helpers in one file.
+
+Concepts: [Service Registry](/concepts/service-registry/).
+
+### 05. The Sentient Coffee Machine ([`bin/05_stateful_services.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/05_stateful_services.dart))
+
+`StatefulPluginService`. Subscriptions made in `attach` are cancelled on `detach` automatically. The scenario verifies cleanup by issuing a request after detach and watching it fail.
+
+Concepts: [Plugin Services](/concepts/plugin-services/).
+
+### 06. Priorities ([`bin/06_priorities.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/06_priorities.dart))
+
+The two priority systems run in opposite directions. Event bus priority is a pipeline (lower runs first). Registry priority is a competition (higher wins). One scenario shows both, including a priority-3 handler that stops the cascade with `envelope.stop()`.
+
+Concepts: [Event Bus](/concepts/event-bus/#priority-and-why-it-goes-the-way-it-does), [Service Registry](/concepts/service-registry/#priority).
+
+### 07. Session Management ([`bin/07_sessions.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/07_sessions.dart))
+
+Two sessions running in parallel never bleed state. Each gets its own service registry, its own bus, its own context. One disposes while the other keeps running.
+
+Concepts: [Sessions](/concepts/sessions/).
+
+### 08. Configuration & Settings ([`bin/08_config_and_settings.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/08_config_and_settings.dart))
+
+The full settings model in one file. `PluginConfig` for plugin-level enablement; `ServiceSettings` for service config and priority overrides; `ConfigNode` for typed reads with coercion; wildcard keys (`*:death_ray`) for current-winner targeting; JSON round-trip.
+
+Concepts: [Configuration](/concepts/configuration/), [Settings & Overrides](/guides/settings/).
+
+### 09. Global vs Session Plugins ([`bin/09_global_vs_session.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/09_global_vs_session.dart))
+
+`GlobalPlugin` attaches once at `runtime.init()` and lives until disposal. `SessionPlugin` attaches per session. Cross-scope communication is always explicit: `context.globalBus.emit()` for session-to-global, `runtime.sessions.emit()` for global-to-every-session.
+
+Concepts: [Plugins](/concepts/plugins/#pick-a-scope-first), [Sessions](/concepts/sessions/).
+
+### 10. Capabilities ([`bin/10_capabilities.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/10_capabilities.dart))
+
+Custom `Capability` subclasses attached at registration. Reading them does not instantiate the service: `resolveRaw()` returns the wrapper. Useful for UI listings, routing, feature detection.
+
+Concepts: [Capabilities](/concepts/capabilities/).
+
+### 11. Event Mutation ([`bin/11_event_mutation.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/11_event_mutation.dart))
+
+The three things an `on<T>` handler can do with an `EventEnvelope`: continue the cascade (optionally mutating), short-circuit with `envelope.stop(value)`, or mark stopped and keep doing side work. The cleanest distillation of the pre-commit interception pattern.
+
+Concepts: [Event Patterns](/concepts/events/#the-pre-commit-interception-pattern).
+
+### 12. Plugin Dependencies ([`bin/12_dependencies.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/12_dependencies.dart))
+
+`Plugin.dependencies` declares required plugin ids. The runtime disables a plugin transitively if a dependency is missing or itself disabled. `FeatureFlag.experimental` keeps a plugin off by default; `FeatureFlag.locked` keeps it on regardless.
+
+Concepts: [Plugins](/concepts/plugins/#declaring-dependencies).
+
+### 13. Settings Reconciliation ([`bin/13_settings_reconciliation.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/13_settings_reconciliation.dart))
+
+`PluginRuntimeManager` reconciling settings mid-session. Disabled plugins detach; survivors receive `onPluginSettingsChanged`. The contrast between full `updateSettings` (lifecycle-aware) and `updateSettingsSnapshot` (config-only) lands here.
+
+Concepts: [Runtime](/concepts/runtime/#settings-reconciliation), [Settings & Overrides](/guides/settings/).
+
+### 14. Identifier Scoping ([`bin/14_identifier_scoping.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/14_identifier_scoping.dart))
+
+One bus, many lanes. Handlers without an identifier see every event of that type; identifier-scoped handlers see only their lane's. The mechanism behind multiplexing one event type across tools, panels, or tenants.
+
+Concepts: [Event Bus](/concepts/event-bus/#identifier-scoping).
+
+### 15. The Grand Heist ([`bin/15_the_grand_heist.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/15_the_grand_heist.dart))
+
+The capstone. A full multi-plugin system in one file: a global coordinator, session plugins with declared dependencies, a `StatefulPluginService` tracking inventory, identifier-scoped request/response, event mutation for plan rewrites, settings injection, live reconciliation. Every API earlier scenarios introduced shows up here doing its job.
+
+Concepts: every concept page touches this one.
+
+## Reading paths
+
+| If you are... | Read |
+|---|---|
+| New to the library | 01, 02, 04, 05 |
+| Learning the event bus | 02, 03, 06, 11, 14 |
+| Wiring runtime customization | 08, 09, 13 |
+| Stress-testing the model | 12, 15 |
+
+## Where to next
+
+<CardGrid>
+  <LinkCard
+    title="Adding a Plugin"
+    description="The how-to guide. Take what scenarios 01 and 05 demonstrate and put it in your own app."
+    href="/guides/adding-a-plugin/"
+  />
+  <LinkCard
+    title="Concepts"
+    description="The mental model. Each scenario above links to the concept page that explains why the API behaves as it does."
+    href="/concepts/"
+  />
+  <LinkCard
+    title="API reference"
+    description="Lookup-shaped reference for the public types. Use it after a scenario introduces you to something."
+    href="/reference/"
+  />
+  <LinkCard
+    title="Read the source"
+    description="example/villain_lair/bin/. Fifteen self-contained Dart programs."
+    href="https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair"
+  />
+</CardGrid>

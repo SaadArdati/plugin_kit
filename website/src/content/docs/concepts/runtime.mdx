@@ -1,0 +1,153 @@
+---
+title: Runtime
+description: The lifecycle engine, the manager wrapper, settings reconciliation, and enablement precedence.
+---
+
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+The `PluginRuntime` is the lifecycle engine. It owns the global scope, spawns sessions, and reconciles settings changes across both. Most apps reach it through `PluginRuntimeManager`, a thin wrapper that holds the current settings snapshot, exposes a change stream, and applies updates across the runtime and its active sessions in one call.
+
+This page covers the runtime and the manager. For session-specific concerns (isolation, cross-scope routing, per-session contexts), see [Sessions](/concepts/sessions/).
+
+## Runtime vs Manager
+
+| Type | Role |
+|---|---|
+| `PluginRuntime<G, S>` | Low-level engine: init, create sessions, update global or session settings, dispose. |
+| `PluginRuntimeManager<G, S>` | Convenience wrapper: holds the current settings snapshot, exposes `settingsStream`, applies updates to the runtime and every active session in one call. |
+
+```dart
+final manager = PluginRuntimeManager(plugins: [
+  CorePlugin(),
+  SqlLanguagePlugin(),
+  MarkdownLanguagePlugin(),
+]);
+
+manager.init(initialSettings: savedSettings);
+
+final session = await manager.createSession();
+```
+
+Use the manager unless you are writing a framework on top of Plugin Kit. The runtime is still reachable as `manager.runtime` if you need it.
+
+## What `init` does
+
+"Set up the world, then attach everything that was supposed to be on."
+
+When you call `runtime.init(...)`, this happens in order:
+
+<Steps>
+
+1. The global registry and global bus are created.
+2. Global service overrides from settings are parsed into `LocalPluginOverride`s.
+3. The runtime walks the plugin list and decides which global plugins are enabled.
+4. Each enabled global plugin runs `register` against a `ScopedServiceRegistry` that already knows its `pluginId`.
+5. The global context is built (default, or via your `globalContextFactory`).
+6. Wildcard winner-scoped overrides get materialized onto the winners.
+7. Each enabled global plugin runs `attach(context)` in registration order.
+
+</Steps>
+
+After that, the runtime is ready to spawn sessions. You can open one per user action, keep one long-lived session, or mix the two.
+
+```dart
+manager.init(
+  initialSettings: savedSettings,
+  defaultEnabledPluginIds: const {
+    PluginId('core'),
+    PluginId('search'),
+    PluginId('telemetry'),
+  },
+);
+```
+
+`defaultEnabledPluginIds` is the "if settings say nothing, turn these on" set. Omit it and unspecified stable plugins default to on, experimental ones default to off.
+
+## Settings reconciliation
+
+Users toggle features. Config values change. Priorities shift. You want the runtime to converge on the new state without writing hand-rolled teardown code each time. Reconciliation is the runtime's job.
+
+### Full reconciliation
+
+```dart
+// User turns off analytics in a settings screen
+final next = manager.settings.copyWith(
+  plugins: {
+    ...manager.settings.plugins,
+    const PluginId('analytics'): const PluginConfig(enabled: false),
+  },
+);
+
+await manager.updateSettings(next);
+```
+
+That reconciles the global scope, reconciles every active session, and publishes the new snapshot on `settingsStream`. If the `analytics` plugin was attached, it gets detached. If something was waiting on a capability that `analytics` provided, the ripples show up during this call.
+
+### Snapshot-only update
+
+```dart
+// Optimistic UI wants settingsStream to emit immediately
+manager.updateSettingsSnapshot(pendingSettings);
+
+// Later, if the user confirms, run the real reconciliation
+await manager.updateSettings(pendingSettings);
+```
+
+`updateSettingsSnapshot` replaces the stored settings and emits on the stream. It does not run reconciliation, and it does not inject new config into already-resolved services. Think of it as "tell listeners, leave the runtime alone."
+
+| Method | What it does |
+|---|---|
+| `updateSettings(...)` | Full reconciliation across runtime and sessions, plus stream emission. |
+| `updateSettingsSnapshot(...)` | Stream emission only; runtime is untouched. |
+
+`updateSettingsSnapshot` is for bookkeeping updates, preview states, optimistic UI, anything where you are confident the runtime does not need to converge. If the distinction feels unclear at a call site, reach for `updateSettings`. Reconciling more than you needed to is cheaper than skipping reconciliation you needed.
+
+## Enablement precedence
+
+When deciding which plugins are enabled for a given settings snapshot, the runtime applies these rules in order:
+
+<Steps>
+
+1. `FeatureFlag.locked` wins immediately. Nothing can disable a locked plugin.
+2. Explicit `RuntimeSettings.plugins[pluginId].enabled` is respected next.
+3. If the runtime was initialized with a `defaultEnabledPluginIds` set, unspecified plugins fall back to that.
+4. Otherwise the experimental heuristic: stable plugins default on, experimental plugins default off.
+
+</Steps>
+
+Dependency validation runs after that base pass. If a plugin depends on something disabled, it gets disabled too. The exception is locked plugins: they stay enabled and the runtime logs a configuration error for the missing dependency.
+
+## Reconciliation is symmetric across scopes
+
+Global and session scopes run the same lifecycle on a toggle.
+
+- **Disable** → `plugin.detach(context)` runs, then the plugin's services are unregistered.
+- **Enable** → `plugin.register(scopedRegistry)` runs, then `plugin.attach(context)`.
+- **Survivor** → every still-enabled plugin receives `onPluginSettingsChanged(oldContext, newContext)` so it can re-read its config and adjust without being re-attached.
+
+This page covers what the runtime does during reconciliation. The lifecycle hooks themselves are documented in [Plugins](/concepts/plugins/) and [Plugin Services](/concepts/plugin-services/). `attach` and `detach` are pure user hooks; the framework runs orchestration (stateful service attach, subscription cleanup) around them, so no `super` call is needed.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Sessions"
+    description="The other half: per-session isolation, cross-scope routing, and the explicit cross-bus APIs."
+    href="/concepts/sessions/"
+  />
+  <LinkCard
+    title="Plugins"
+    description="Where the lifecycle hooks reconciled here are actually defined."
+    href="/concepts/plugins/"
+  />
+  <LinkCard
+    title="Service Registry"
+    description="What global-scope and session-scope registries contain and how priority works."
+    href="/concepts/service-registry/"
+  />
+  <LinkCard
+    title="Settings & Overrides"
+    description="How settings structure their enablement and service overrides."
+    href="/guides/settings/"
+  />
+</CardGrid>

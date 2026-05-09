@@ -1,0 +1,241 @@
+---
+title: Settings & Overrides
+description: Runtime plugin configuration, service enablement, and wildcard overrides.
+---
+
+import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+`RuntimeSettings` is how the outside world tells the runtime what to do.
+
+It controls two different things:
+
+- which plugins are enabled
+- how specific service slots are configured or reprioritized
+
+Both are live-reconcilable. You can hand the runtime a new `RuntimeSettings` at any time and it will converge, attaching and detaching as needed.
+
+Read [Configuration](/concepts/configuration/) first if your question is "how does
+a service read its config?" Stay here if your question is "how does the host
+change what the runtime is doing?"
+
+This is the piece that makes a real customization surface believable.
+
+When a user opens a settings dialog, disables one feature, changes which
+implementation should win a slot, and saves, you do not want a scavenger hunt
+of manual teardown, rebuild, and stale singleton cleanup. You want one update
+call and a runtime that converges.
+
+## The shape
+
+```dart
+final settings = RuntimeSettings(
+  plugins: {
+    const PluginId('sql_language'): const PluginConfig(enabled: true),
+    const PluginId('experimental_router'): const PluginConfig(enabled: false),
+  },
+  services: {
+    const PluginId('linter_suite').service(const ServiceId('line_length_linter')):
+        ServiceSettings(
+          config: {'max_line_length': 120},
+        ),
+    PluginId.wildcard.service(const ServiceId('agent_service')): ServiceSettings(
+      priority: 200,
+      config: {'provider': 'openai'},
+    ),
+  },
+);
+```
+
+Two maps do the work.
+
+| Field | Key format | Purpose |
+|---|---|---|
+| `plugins` | `pluginId` | enable or disable whole plugins |
+| `services` | `pluginId:serviceId` or `*:serviceId` | override a specific service slot |
+
+## Plugin-level enablement
+
+Plugin enablement follows a fixed precedence.
+
+<Steps>
+
+1. `FeatureFlag.locked` wins immediately.
+2. Explicit `PluginConfig.enabled` is respected next.
+3. If the runtime was initialized with a `defaultEnabledPluginIds` set, unspecified plugins fall back to that.
+4. Otherwise the experimental heuristic kicks in: stable plugins on by default, experimental plugins off by default.
+
+</Steps>
+
+So:
+
+- Stable plugins are enabled by default.
+- Experimental plugins are disabled by default.
+- Explicit settings beat both defaults.
+- Locked plugins stay enabled regardless.
+
+Dependency validation runs after that base decision, and it is transitive.
+
+## `PluginConfig` has two fields, but mostly one matters today
+
+`PluginConfig` contains `enabled` and `config`. In the current runtime, `enabled` drives lifecycle. The arbitrary `config` map is preserved by the settings model but is not automatically injected into plugins.
+
+If you need plugin-wide configuration, read `PluginConfig.config` explicitly from your application layer, or (better) move the config onto a service that the plugin registers and let the registry do the injection.
+
+## Service keys
+
+Service override keys come in two forms.
+
+| Key | Meaning |
+|---|---|
+| `pluginId:serviceId` | target one plugin's registration for that slot |
+| `*:serviceId` | target the current winning registration for that slot |
+
+```dart
+'linter_suite:line_length_linter'  // specific plugin
+'*:agent_service'                  // whoever currently wins
+```
+
+The `*:` form is the wildcard, or "winner-scoped," override.
+
+## What `ServiceSettings` can change
+
+`ServiceSettings` has three knobs.
+
+| Field | Meaning |
+|---|---|
+| `config` | settings injected into `PluginService`s |
+| `priority` | effective priority override for the targeted registration |
+| `enabled` | on/off value carried in the settings model |
+
+The common runtime uses are:
+
+- plugin-level enablement through `PluginConfig`
+- service-level enablement through `ServiceSettings.enabled` (disabled registrations are skipped, and resolution falls through to the next-highest-priority enabled one)
+- service-level config injection through `ServiceSettings.config`
+- service-level competition changes through `ServiceSettings.priority`
+
+## Wildcard overrides
+
+Wildcard overrides are one of the more useful pieces of the system.
+
+If multiple plugins register the same slot, `*:serviceId` applies to whichever registration currently wins that slot.
+
+```dart
+final settings = RuntimeSettings(
+  services: {
+    PluginId.wildcard.service(const ServiceId('line_length_linter')):
+        ServiceSettings(
+          config: {'max_line_length': 120},
+        ),
+  },
+);
+```
+
+You can target a slot by role instead of by plugin id. That matters when:
+
+- the winning plugin may change at runtime
+- the host UI configures a slot generically
+- you want one setting to follow the winner
+
+<Aside type="note" title="Wildcard handling is not a simple layered merge">
+Do not picture it as "plugin-specific settings always sit on top of wildcard settings." What the runtime actually does is find the current winner, materialize the wildcard override onto that winner, and also keep a meta fallback entry for winner-scoped behavior like `resolveAfter(...)`.
+
+If you mix plugin-specific and wildcard overrides on the same slot, validate the behavior you actually want. The safe mental model is: `*:serviceId` means "apply this to whoever wins right now."
+</Aside>
+
+![Plugin Kit Dialog Advanced tab showing the service registry inspector with namespaces, competing registrations, priority order, and the current winner picked out for each slot](/images/dialog/advanced_tab_dark.png)
+
+*The Advanced tab is what these settings produce at runtime. Every slot, every registrant, every effective priority. The chip on the right of each row is the current winner for that slot.*
+
+## Applying settings
+
+There are three common paths.
+
+### 1. Initialize with settings
+
+```dart
+final runtime = PluginRuntime(
+  plugins: [SqlPlugin(), RouterPlugin()],
+)..init(settings: settings);
+```
+
+Or through the manager:
+
+```dart
+manager.init(initialSettings: settings);
+```
+
+### 2. Reconcile live settings
+
+```dart
+await manager.updateSettings(nextSettings);
+```
+
+This is the full lifecycle-aware path. It reconciles the global scope and every active session.
+
+This is the call behind things like:
+
+- a plugin customization dialog
+- a model/provider switcher
+- workspace-scoped feature toggles
+- "turn this experimental subsystem off right now" moments
+
+If the user should be able to feel the change immediately, this is usually the
+right path.
+
+### 3. Update the snapshot without lifecycle work
+
+```dart
+manager.updateSettingsSnapshot(nextSettings);
+```
+
+This updates the manager's stored settings and emits on `settingsStream`. It does not run reconciliation, and it does not inject new config into already-resolved services. Useful for optimistic UI, bookkeeping updates, and anything where you are confident the runtime does not need to converge. When unsure, reach for `updateSettings(...)` instead.
+
+## Low-level runtime APIs
+
+If you are not using the manager, the runtime exposes the two pieces separately:
+
+- `updateGlobalSettings(...)`
+- `updateSessionSettings(...)`
+
+That split is useful when your application wants finer control over which scope reconciles when.
+
+## Live-toggling session plugins
+
+Toggling a session plugin via `updateSettings` runs the full lifecycle, same as global: `detach` on disable, `register` + `attach` on enable. Direct subscriptions from your plugin's `attach` are torn down on disable automatically, as long as you used the tracked helpers (`on`, `onRequest`, `bind`) instead of reaching into `context.bus`. See [Runtime](/concepts/runtime/) for the exact sequence.
+
+## JSON support
+
+`RuntimeSettings`, `PluginConfig`, and `ServiceSettings` all round-trip through JSON.
+
+```dart
+final json = settings.toJson();
+final restored = RuntimeSettings.fromJson(json);
+```
+
+That makes the settings model usable for persisted user preferences, workspace settings, admin-defined defaults, or UI-driven editors.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Plugin Kit Dialog"
+    description="The drop-in customization UI that produces these `RuntimeSettings` for you. Three tabs, no per-plugin settings screens."
+    href="/guides/plugin-kit-dialog/"
+  />
+  <LinkCard
+    title="Runtime"
+    description="How reconciliation actually runs across global and session scopes."
+    href="/concepts/runtime/"
+  />
+  <LinkCard
+    title="Plugin Services"
+    description="StatefulPluginService is what makes live toggling clean."
+    href="/concepts/plugin-services/"
+  />
+  <LinkCard
+    title="Capabilities"
+    description="Capability tags for slot discovery without instantiation."
+    href="/concepts/capabilities/"
+  />
+</CardGrid>

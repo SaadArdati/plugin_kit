@@ -1,0 +1,23 @@
+name: plugin_kit_dialog
+description: Flutter dialog UI for inspecting and editing a plugin_kit PluginRuntime at runtime.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  collection: ^1.19.1
+  plugin_kit: ^1.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

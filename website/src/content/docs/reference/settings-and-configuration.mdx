@@ -1,0 +1,411 @@
+---
+title: Settings & Configuration
+description: Reference for RuntimeSettings, PluginConfig, ServiceSettings, and ConfigNode.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page is the API reference for the configuration model: the types the host
+hands to the runtime, and the typed reader services use to consume those values.
+The two halves pair tightly. Settings flow in from the host as `RuntimeSettings`,
+the registry routes the relevant slice to each service, and the service reads
+its slice through `ConfigNode`.
+
+For the conceptual treatment of `ConfigNode`, see [Configuration](/concepts/configuration/).
+For the workflow of applying settings live, see [Settings & Overrides](/guides/settings/).
+
+## The settings flow
+
+```
+host app
+   │  RuntimeSettings (plugins map + services map)
+   ▼
+PluginRuntime / PluginRuntimeManager
+   │  registry materializes overrides, picks the winner per slot
+   ▼
+ServiceRegistry.resolve<T>(serviceId)
+   │  injectSettings(map) on the resolved instance
+   ▼
+PluginService.config (ConfigNode)
+```
+
+The host owns a `RuntimeSettings` (empty, hand-built, loaded from JSON, or
+produced by [Plugin Kit Dialog](/guides/plugin-kit-dialog/)). The registry
+combines it with the priority chain to produce the effective configuration map
+for each resolved service. The service reads through `config`, a `ConfigNode`
+over the injected map. Defaults live in the service, not in the settings model.
+
+## `RuntimeSettings`
+
+Top-level container for plugin enablement and service overrides. Immutable,
+JSON-round-trippable, value-equal.
+
+```dart
+class RuntimeSettings {
+  final Map<PluginId, PluginConfig> plugins;
+  final Map<Pin, ServiceSettings> services;
+
+  const RuntimeSettings({
+    this.plugins = const {},
+    this.services = const {},
+  });
+
+  const RuntimeSettings.empty();
+}
+```
+
+### Fields and constructors
+
+| Field | Type | Notes |
+|---|---|---|
+| `plugins` | `Map<PluginId, PluginConfig>` | Keyed by `PluginId`, not raw `String`. Wrap literals as `const PluginId('foo')`. |
+| `services` | `Map<Pin, ServiceSettings>` | Keyed by `Pin`, an extension type wrapping the canonical `pluginId:serviceId` (or `*:serviceId`) wire string. See the [key formats](#service-key-formats) below. |
+
+Both key types are typed handles, not raw `String`s — a `Map<String, PluginConfig>` or `Map<String, ServiceSettings>` literal will not type-check against the corresponding field.
+
+Both constructors are `const`. The default constructor's parameters default
+to `const {}`. `RuntimeSettings.empty()` is the canonical "no overrides"
+starting point; prefer it over passing two empty maps explicitly.
+
+```dart
+const settings = RuntimeSettings.empty();
+```
+
+### Query helpers
+
+```dart
+bool isPluginEnabled(PluginId pluginId);
+bool isServiceEnabled(Pin scopedKey);
+Map<String, dynamic> getPluginConfig(PluginId pluginId);
+Map<String, dynamic> getServiceConfig(Pin scopedKey);
+```
+
+| Method | Returns | When the entry is missing |
+|---|---|---|
+| `isPluginEnabled` | `bool` | `true` (plugins default to enabled) |
+| `isServiceEnabled` | `bool` | `true` (services default to enabled) |
+| `getPluginConfig` | `Map<String, dynamic>` | `const {}` |
+| `getServiceConfig` | `Map<String, dynamic>` | `const {}` |
+
+`isPluginEnabled` reads only the explicit `PluginConfig.enabled` value. It
+does not consult feature flags or experimental defaults. For the
+fully-resolved enablement decision (locked plugins, experimental fallback,
+`defaultEnabledPluginIds`), use `PluginRuntime.isPluginEnabled`. See [Plugins
+& Lifecycle](/reference/plugins-and-lifecycle/).
+
+### `copyWith`
+
+```dart
+RuntimeSettings copyWith({
+  Map<PluginId, PluginConfig>? plugins,
+  Map<Pin, ServiceSettings>? services,
+});
+```
+
+Returns a copy with the given replacements. When a parameter is omitted, the
+result holds a shallow clone of the existing map (a fresh `Map` instance with
+the same entries), not the original reference, so mutating the copy's maps
+does not affect the original.
+
+### Service key formats
+
+`RuntimeSettings.services` keys are `Pin` values. Two forms cover every
+override:
+
+| Pin | Targets |
+|---|---|
+| `Pin('pluginId', ['service', 'segments'])` | A specific plugin's registration for that slot. |
+| `Pin.wildcard(['service', 'segments'])` | Whichever registration currently wins that slot. |
+
+The wire format (used by `Pin.wire` for JSON serialization) is
+`pluginId:serviceId` or `*:serviceId`. Both forms accept namespaced service
+ids (`agent.temperature`, `mcp.tool_provider`); the segments list is joined
+with dots into the wire `serviceId`.
+
+In Dart code, prefer the typed-chain helpers when you have the underlying
+`PluginId` / `Namespace` / `ServiceId` handles in scope:
+
+```dart
+const mainAgent = PluginId('main_agent');
+const agent = Namespace('agent');
+
+final settings = RuntimeSettings(
+  services: {
+    // Plugin-scoped: main_agent's agent.temperature service.
+    mainAgent.namespace('agent').service('temperature'):
+        const ServiceSettings(config: {'value': 0.7}),
+
+    // Equivalently, hand-built Pin:
+    Pin('main_agent', ['agent', 'temperature']):
+        const ServiceSettings(config: {'value': 0.7}),
+
+    // Wildcard: applies to whichever plugin wins agent.system_message.
+    Pin.wildcard(['agent', 'system_message']):
+        const ServiceSettings(config: {'value': 'Be concise.'}),
+  },
+);
+```
+
+The wildcard form is winner-scoped, not layered. The runtime resolves the
+current winner first, then materializes the wildcard override onto that
+winner. For the full reasoning and how `resolveAfter` interacts with wildcards,
+see [Settings & Overrides](/guides/settings/#wildcard-overrides).
+
+### Parsing wire keys
+
+When you receive an override key as a wire string (e.g., from JSON your
+own code is parsing), build a `Pin` via `Pin.fromWire`:
+
+```dart
+final pin = Pin.fromWire('main_agent:agent.temperature');
+// pin.pluginId  == PluginId('main_agent')
+// pin.serviceId == ServiceId('agent.temperature')
+// pin.wire      == 'main_agent:agent.temperature'
+```
+
+`Pin.fromWire` is a `const` constructor that accepts any string and stores
+it verbatim. Validation happens lazily on access: reading `pin.pluginId`
+or `pin.serviceId` throws `FormatException` if the wire string has no `:`
+separator (or its plugin half is empty). The error message names the
+offending key, which makes JSON-fed typos easy to spot.
+
+## `PluginConfig`
+
+Plugin-level enablement plus an arbitrary plugin-wide map.
+
+```dart
+class PluginConfig {
+  final bool enabled;
+  final Map<String, dynamic> config;
+
+  const PluginConfig({
+    this.enabled = true,
+    this.config = const {},
+  });
+}
+```
+
+### Fields
+
+| Field | Type | Default | Notes |
+|---|---|---|---|
+| `enabled` | `bool` | `true` | When `false`, `Plugin.register` is skipped and the plugin's services do not enter the session registry. |
+| `config` | `Map<String, dynamic>` | `const {}` | Plugin-wide values. Persisted in the settings model but **not** auto-injected into the plugin instance. |
+
+The asymmetry with `ServiceSettings.config` is deliberate. Service configs flow
+through the registry into `PluginService.injectSettings`. Plugin-level configs
+live alongside the model for the host's benefit (a place to stash API keys or
+global toggles spanning several services), but reaching them is the host's
+job. Read `PluginConfig.config` from the application layer, or push the value
+down onto a service the plugin registers and let the registry inject it.
+
+`copyWith({bool? enabled, Map<String, dynamic>? config})` follows standard
+semantics: omitted parameters fall back to the current value.
+
+## `ServiceSettings`
+
+Per-slot configuration. Three knobs.
+
+```dart
+class ServiceSettings {
+  final bool enabled;
+  final Map<String, dynamic> config;
+  final int? priority;
+
+  const ServiceSettings({
+    this.enabled = true,
+    this.config = const {},
+    this.priority,
+  });
+}
+```
+
+### Fields
+
+| Field | Type | Default | Notes |
+|---|---|---|---|
+| `enabled` | `bool` | `true` | When `false`, the registry emits a disable override for the slot. Resolution falls through to the next-highest-priority enabled registration. |
+| `config` | `Map<String, dynamic>` | `const {}` | Injected into `PluginService.injectSettings` on resolve. The service reads it via `config` (a `ConfigNode`). |
+| `priority` | `int?` | `null` | Optional override. Replaces the priority used at registration. `null` means "leave the registration default in place". |
+
+Higher priority wins resolution; the default registration priority is `50`.
+A `priority` override applies to the targeted registration, not the slot, so
+two competing plugins on the same slot can each carry independent overrides.
+
+`copyWith({bool? enabled, Map<String, dynamic>? config, int? priority})`
+follows standard semantics.
+
+<Aside type="caution" title="copyWith cannot clear priority">
+`copyWith(priority: null)` keeps the existing priority because the parameter
+is resolved with `??`. To clear an override, build a new `ServiceSettings`
+directly.
+</Aside>
+
+## JSON round-trip
+
+All three settings types ship `toJson()` returning `Map<String, dynamic>` and
+a matching `fromJson(Map<String, dynamic>)` factory. Round-tripping returns
+an equal value:
+
+```dart
+final restored = RuntimeSettings.fromJson(settings.toJson());
+assert(settings == restored);
+```
+
+The wire format mirrors the field shape:
+
+```json
+{
+  "plugins": {
+    "main_agent": {"enabled": true},
+    "experimental_router": {"enabled": false}
+  },
+  "services": {
+    "main_agent:agent.model": {
+      "config": {"provider": "anthropic", "model": "claude-sonnet-4-5-20250929"}
+    },
+    "*:agent.temperature": {
+      "config": {"value": 0.7},
+      "priority": 200
+    }
+  }
+}
+```
+
+A few details:
+
+- `RuntimeSettings.fromJson` rewraps each plugin key as `PluginId(k)`. The JSON
+  side stays plain strings; the in-memory side stays typed.
+- `ServiceSettings.toJson` omits `priority` when it is `null`.
+- `ServiceSettings.fromJson` reads `priority` through `(json['priority'] as
+  num?)?.toInt()`, so `200` and `200.0` both round-trip safely.
+- Missing `enabled` keys default to `true` in both `PluginConfig.fromJson` and
+  `ServiceSettings.fromJson`. Older payloads that omit the field still parse
+  as enabled.
+- Missing `config` maps default to `const {}`.
+
+All three types use deep collection equality for `==` and `hashCode`.
+
+## `ConfigNode`
+
+Typed read accessor over an injected settings map. The single `const`
+constructor takes a `Map<String, dynamic>`, but you usually do not construct
+one yourself: the registry passes a fresh `ConfigNode` to every resolved
+service through `injectSettings`, which assigns it to `PluginService.config`.
+Direct construction is fair game in tests and in code that handles settings
+payloads outside the runtime.
+
+### Typed getters
+
+| Method | Returns | Behavior |
+|---|---|---|
+| `get<T>(key)` | `T?` | Exact runtime-type match. No coercion. |
+| `getString(key)` | `String?` | Equivalent to `get<String>(key)`. |
+| `getInt(key)` | `int?` | Accepts `int`, any `num` (via `toInt()`, truncating doubles), and `String` (via `int.tryParse`). |
+| `getDouble(key)` | `double?` | Accepts `double`, any `num` (via `toDouble()`), and `String` (via `double.tryParse`). |
+| `getBool(key)` | `bool?` | Accepts `bool`, the strings `'true'` / `'false'` (case-insensitive), and `num` where `0` is `false` and any other value is `true`. |
+| `list<T>(key)` | `List<T>?` | Returns `value.cast<T>()` when the value is a `List` and the cast succeeds. Returns `null` on cast failure or non-list value. |
+| `map(key)` | `Map<String, dynamic>` | Non-nullable. Returns `const {}` when the key is missing, the value is not a map, or the cast fails. |
+| `raw(key)` | `dynamic` | Untyped passthrough. The value as stored. |
+| `has(key)` | `bool` | `true` only when the key exists **and** the value is non-null. |
+
+There is no `getMap` returning a nullable map, and no path-style traversal.
+The accessor is intentionally flat. To walk a nested map, read it with
+`map(key)` and index into the result.
+
+```dart
+final headers = config.map('headers');
+final timeoutMs = headers['timeout_ms'] as int?;
+```
+
+### Defaults and missing keys
+
+`ConfigNode` does not carry default values. The convention is to apply the
+default at the call site through `??`:
+
+```dart
+final temperature = config.getDouble('temperature') ?? 0.7;
+final tools = config.list<String>('tools') ?? const [];
+final provider = config.getString('provider') ?? 'openai';
+```
+
+`map(key)` is the only accessor that returns a non-null fallback. It returns
+`const {}` rather than null because the typical use is "read a sub-map and
+treat absence as empty," and the empty-map fallback removes a layer of
+nullability without taking ownership of defaults.
+
+### Coercion notes
+
+The coercion in `getInt`, `getDouble`, and `getBool` is forgiving at the edge
+so service code stays narrow when payloads arrive from JSON, env vars, or
+form submissions. When your code controls the shape of the value, pass the
+native type and stay out of the coercion path. A few sharp edges:
+
+- `getInt` truncates real-valued doubles. `getInt('x')` on `1.9` returns `1`.
+- `getDouble` does not consume `int` literals via `is double`; it falls
+  through to the `is num` branch and calls `toDouble()`. The result is the
+  same `double`, but the path through the function differs.
+- `getBool` matches `'true'` / `'false'` case-insensitively but accepts no
+  other string values. `'yes'`, `'1'`, and `'on'` all return `null`.
+
+### Inspecting the node
+
+```dart
+Iterable<String> get keys;
+bool get isEmpty;
+bool get isNotEmpty;
+```
+
+`keys` returns the underlying map's keys in insertion order. `isEmpty` and
+`isNotEmpty` mirror the map's own properties. Useful in tests, custom field
+renderers, and code forwarding a config slice elsewhere.
+
+### `ConfigNode` is read-only
+
+There are no setters. The class wraps a `Map<String, dynamic>` and only
+exposes read accessors. The registry replaces the entire `config` field on
+the service when settings change; it does not mutate the existing node.
+
+To react to changed settings, override `PluginService.injectSettings(...)`
+(and call `super.injectSettings(...)` first so the new map and `config` are
+in place before your override runs), or override
+`Plugin.onPluginSettingsChanged(...)` for plugin-wide reactions. Treating
+`config` as a snapshot for the current resolution is safe; holding a stale
+reference after a settings change returns old data but never panics.
+
+### `ConfigNode.hashSettings`
+
+```dart
+static String hashSettings(Map<String, dynamic> settings);
+```
+
+Stable hex-encoded hash over a settings map, computed via deep collection
+equality. The registry uses it to skip redundant `injectSettings` calls on
+singleton and lazy-singleton services when the new map is structurally equal
+to the previous one. Exposed so host code caching its own settings-keyed work
+can use the same hash the registry does.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Configuration"
+    description="The conceptual treatment of ConfigNode, with worked examples."
+    href="/concepts/configuration/"
+  />
+  <LinkCard
+    title="Settings and Overrides"
+    description="The how-to for applying RuntimeSettings to a live runtime."
+    href="/guides/settings/"
+  />
+  <LinkCard
+    title="Plugin Kit Dialog"
+    description="The drop-in customization UI that produces RuntimeSettings interactively."
+    href="/guides/plugin-kit-dialog/"
+  />
+  <LinkCard
+    title="Plugins & Lifecycle"
+    description="PluginRuntimeManager.updateSettings and the reconciliation phases that consume these types."
+    href="/reference/plugins-and-lifecycle/"
+  />
+</CardGrid>

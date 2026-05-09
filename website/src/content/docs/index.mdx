@@ -1,0 +1,117 @@
+---
+title: Plugin Kit
+description: A runtime for Dart and Flutter apps with real lifecycles, replaceable services, and isolated sessions.
+template: splash
+hero:
+  tagline: A plugin runtime for Dart and Flutter apps that have grown into platforms.
+  actions:
+    - text: Get Started
+      link: /getting-started/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/SaadArdati/plugin_kit
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Plugin Kit is the part of the application most teams build by accident. It packages real feature lifecycles,
+replaceable services, isolated sessions, and typed events into one runtime with explicit rules. You write plugins;
+it does the choreography.
+
+## What it unlocks
+
+<CardGrid stagger>
+	<Card title="Swap features, not screens" icon="random">
+		A model selector, search box, or editor tool targets a slot instead of a
+		concrete service. The UI stays put while plugins compete underneath it.
+		Override stops being a code smell.
+	</Card>
+	<Card title="Open two sessions safely" icon="approve-check-circle">
+		Two chats, documents, or workspaces get separate registries, buses, and
+		plugin state by default. No mystery leaks because one tab forgot to clean
+		up after itself.
+	</Card>
+	<Card title="Add a 'hooks' pipeline" icon="pencil">
+		Plugins inspect an outgoing action, inject context, enrich metadata, or
+		stop it entirely. The button that started it does not need to know who
+		helped or interfered.
+	</Card>
+	<Card title="Toggle features live" icon="setting">
+		A customization dialog enables, disables, and reprioritizes plugins at
+		runtime. The runtime detaches losers, attaches winners, and keeps the
+		session coherent across the swap.
+	</Card>
+</CardGrid>
+
+## Four primitives, composed
+
+<CardGrid>
+	<Card title="Plugins" icon="puzzle">
+		Lifecycle-aware feature units. Global or session scope, with `register`,
+		`attach`, `detach`, and live settings reconciliation as first-class hooks.
+	</Card>
+	<Card title="Services" icon="seti:db">
+		A priority-based registry where multiple plugins can claim the same slot.
+		Higher priority wins, the loser stays reachable as a fallback.
+	</Card>
+	<Card title="Events" icon="rocket">
+		A typed, priority-ordered bus for fire-and-forget and request/response.
+		Handlers run in order, so plugins can mutate, observe, or short-circuit.
+	</Card>
+	<Card title="Sessions" icon="document">
+		Isolated execution scopes. Each gets its own registry, bus, and context.
+		Open ten and close one without touching the others.
+	</Card>
+</CardGrid>
+
+## Where to start
+
+<CardGrid>
+	<LinkCard
+		title="Why Plugin Kit?"
+		description="The short read. The symptoms that motivate the library and the three values it is built around."
+		href="/why-plugin-kit/"
+	/>
+	<LinkCard
+		title="Show me it running"
+		description="Two plugins, one slot, the runtime picks the winner. Eight steps, full walkthrough."
+		href="/getting-started/"
+	/>
+	<LinkCard
+		title="Show me the mental model"
+		description="Plugins, services, events, sessions. Four pieces, and everything else is composition."
+		href="/concepts/plugins/"
+	/>
+	<LinkCard
+		title="Read code, not docs"
+		description="A miniature workflow built out of plugins, one concept per file. Many readers go here first."
+		href="https://github.com/SaadArdati/plugin_kit/tree/main/example"
+	/>
+</CardGrid>
+
+## Building on Flutter?
+
+<CardGrid>
+	<LinkCard
+		title="Flutter Integration"
+		description="The manual recipe. Where the runtime lives in a StatefulWidget, how widgets hear about plugin changes, how plugin-provided UI is resolved."
+		href="/guides/flutter-integration/"
+	/>
+	<LinkCard
+		title="flutter_plugin_kit"
+		description="Optional companion package. Scope widgets, a State mixin that auto-cancels bus subscriptions, BuildContext.watchEvent extensions."
+		href="/guides/flutter-plugin-kit/"
+	/>
+	<LinkCard
+		title="State Management Integrations"
+		description="ChangeNotifier, flutter_bloc Cubit, Riverpod AsyncNotifier, signals_flutter, MobX, GetIt, plain setState. Every recipe is verified by widget tests."
+		href="/guides/state-management-integrations/"
+	/>
+	<LinkCard
+		title="Plugin Kit Dialog"
+		description="A drop-in customization UI for any PluginRuntime. Three tabs, zero settings-screens-per-plugin code."
+		href="/guides/plugin-kit-dialog/"
+	/>
+</CardGrid>

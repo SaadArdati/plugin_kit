@@ -1,0 +1,112 @@
+---
+// Resolves `PUBVER_<package>` markers inside <code> blocks at runtime.
+// Shows a shimmering placeholder while fetching, falls back to "latest" after 5s.
+---
+
+<style>
+  .pub-version-shimmer {
+    display: inline-block;
+    width: 5em;
+    height: 1em;
+    vertical-align: -0.15em;
+    border-radius: 3px;
+    user-select: none;
+    background-image: linear-gradient(
+      90deg,
+      rgba(128, 128, 128, 0.15) 0%,
+      rgba(128, 128, 128, 0.4) 50%,
+      rgba(128, 128, 128, 0.15) 100%
+    );
+    background-size: 200% 100%;
+    animation: pub-version-shimmer 1.2s ease-in-out infinite;
+  }
+  @keyframes pub-version-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+</style>
+
+<script>
+  (function () {
+    const MARKER = /(\^?)PUBVER_([a-z0-9_]+)/g;
+    const slots = new Map<string, HTMLElement[]>();
+    const resolved = new Map<string, string>();
+    const copyTargets: { el: Element; original: string }[] = [];
+
+    const renderCopy = () => {
+      copyTargets.forEach(({ el, original }) => {
+        const next = original.replace(MARKER, (_, prefix, pkg) =>
+          prefix + (resolved.get(pkg) ?? 'latest'),
+        );
+        el.setAttribute('data-code', next);
+      });
+    };
+
+    document.querySelectorAll('[data-code]').forEach((el) => {
+      const original = el.getAttribute('data-code') ?? '';
+      if (original.includes('PUBVER_')) {
+        copyTargets.push({ el, original });
+      }
+    });
+    renderCopy();
+
+    document.querySelectorAll('code').forEach((code) => {
+      const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+      const targets: Text[] = [];
+      let node: Node | null;
+      while ((node = walker.nextNode())) {
+        if ((node as Text).nodeValue?.includes('PUBVER_')) {
+          targets.push(node as Text);
+        }
+      }
+      targets.forEach((textNode) => {
+        const text = textNode.nodeValue ?? '';
+        const frag = document.createDocumentFragment();
+        let last = 0;
+        let m: RegExpExecArray | null;
+        MARKER.lastIndex = 0;
+        while ((m = MARKER.exec(text)) !== null) {
+          if (m.index > last) {
+            frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+          }
+          const prefix = m[1];
+          const pkg = m[2];
+          const span = document.createElement('span');
+          span.className = 'pub-version pub-version-shimmer';
+          span.dataset.prefix = prefix;
+          frag.appendChild(span);
+          if (!slots.has(pkg)) slots.set(pkg, []);
+          slots.get(pkg)!.push(span);
+          last = m.index + m[0].length;
+        }
+        if (last < text.length) {
+          frag.appendChild(document.createTextNode(text.slice(last)));
+        }
+        textNode.replaceWith(frag);
+      });
+    });
+
+    slots.forEach(async (spans, pkg) => {
+      const settle = (value: string) => {
+        resolved.set(pkg, value);
+        spans.forEach((s) => {
+          s.textContent = (s.dataset.prefix ?? '') + value;
+          s.classList.remove('pub-version-shimmer');
+        });
+        renderCopy();
+      };
+      try {
+        const res = await fetch('https://pub.dev/api/packages/' + pkg, {
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const version = data?.latest?.version;
+        if (typeof version !== 'string') throw new Error('missing version');
+        settle(version);
+      } catch {
+        settle('latest');
+      }
+    });
+  })();
+</script>

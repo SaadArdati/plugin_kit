@@ -1,0 +1,79 @@
+---
+title: Guides
+description: Action-oriented walkthroughs for building, integrating, and operating Plugin Kit features.
+---
+
+import { Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+The guides are the "how do I build with this?" side of Plugin Kit.
+
+The [concepts](/concepts/plugins/) explain what the runtime is and how it thinks. The guides show the moves you make on top of that: write a plugin, wire it into Flutter, configure it, log it, test it.
+
+If you are looking for what `StatefulPluginService` or `Capability` or `ConfigNode` mean, you want concepts. If you are looking for how to add one to your app, you are in the right place.
+
+## The useful path
+
+<Steps>
+
+1. **Write one plugin.**
+
+   Start with [Adding a Plugin](/guides/adding-a-plugin/). It takes a feature and turns it into a plugin without drowning you in every advanced option.
+
+2. **Wire it into Flutter.**
+
+   Two pages, read together. [Migrating a Flutter App](/guides/migrating-flutter-app/) is the strategy: fitting Plugin Kit beside Provider, Riverpod, BLoC, GetIt, or existing managers without pretending to replace them. [Flutter Integration](/guides/flutter-integration/) is the concrete widget bridge: where the runtime lives, how widgets hear about plugin changes, and how plugin-provided UI is resolved.
+
+3. **Configure it at runtime.**
+
+   [Settings & Overrides](/guides/settings/) covers runtime enablement, priority overrides, wildcard overrides, and the live reconciliation that makes settings dialogs and customization panels feel responsive.
+
+4. **Operate it.**
+
+   [Logging](/guides/logging/) and [Testing](/guides/testing/) cover the boring production concerns that are only boring when they work.
+
+</Steps>
+
+## Start by what you are trying to do
+
+<CardGrid>
+  <LinkCard
+    title="I want to write a plugin"
+    description="Turn one feature into a thin plugin plus the services it owns."
+    href="/guides/adding-a-plugin/"
+  />
+  <LinkCard
+    title="I need the Flutter widget bridge"
+    description="Where the runtime lives in the widget tree, how widgets rebuild on plugin changes, and how plugin-provided UI is resolved."
+    href="/guides/flutter-integration/"
+  />
+  <LinkCard
+    title="I want the Flutter bridge with less boilerplate"
+    description="An optional companion package with a scope widget, a State mixin that auto-cancels bus subscriptions, a ChangeNotifier adapter, and BuildContext extensions."
+    href="/guides/flutter-plugin-kit/"
+  />
+  <LinkCard
+    title="I already have a Flutter app"
+    description="Fit Plugin Kit beside Provider, Riverpod, BLoC, GetIt, or existing managers: strategy and per-library examples."
+    href="/guides/migrating-flutter-app/"
+  />
+  <LinkCard
+    title="I want library-specific bridge code"
+    description="ChangeNotifier, flutter_bloc Cubit, Riverpod AsyncNotifier, signals_flutter, MobX, GetIt, and plain setState: every recipe is verified by widget tests."
+    href="/guides/state-management-integrations/"
+  />
+  <LinkCard
+    title="I need users to configure it"
+    description="Enablement, priority overrides, wildcard overrides, and live reconciliation."
+    href="/guides/settings/"
+  />
+  <LinkCard
+    title="I want a customization UI for free"
+    description="Mount Plugin Kit Dialog and your users get a three-tab UI that toggles plugins, edits service config, and inspects the registry."
+    href="/guides/plugin-kit-dialog/"
+  />
+  <LinkCard
+    title="I need to test it"
+    description="Three levels of test, from unit-isolated services up through full runtime reconciliation."
+    href="/guides/testing/"
+  />
+</CardGrid>

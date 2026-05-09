@@ -1,0 +1,6 @@
+include: package:lints/recommended.yaml
+
+linter:
+  rules:
+    # Numbered bin/ files (01_*.dart, 02_*.dart, ...) encode tutorial order.
+    file_names: false

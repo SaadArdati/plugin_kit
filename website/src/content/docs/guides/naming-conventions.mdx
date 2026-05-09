@@ -1,0 +1,346 @@
+---
+title: Naming Conventions
+description: How to name plugins, services, events, capabilities, and settings keys so the runtime stays readable as it grows.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Plugin Kit does not enforce names beyond uniqueness, but consistent naming is the difference between a runtime you can reason about and one you cannot. This page is the style guide the existing docs and demo follow.
+
+Deviating from these conventions is fine when you have a reason. The cost is mostly that consistency saves the next reader (often you, six months later) one lookup.
+
+## Plugin IDs
+
+### Anatomy
+
+A plugin id is a stable, lowercase, snake_case identifier for one feature. Wrap it in `const PluginId('...')` because `PluginId` is an extension type, and the const constructor gives you compile-time guarantees for switch statements and map keys.
+
+```dart
+class CorePlugin extends GlobalPlugin {
+  static const id = PluginId('core');
+
+  @override
+  PluginId get pluginId => id;
+}
+```
+
+A `static const id` field next to the class is the canonical pattern. Host code refers to `CorePlugin.id` instead of typing the string each time, which keeps the registry's plugin maps free of typos.
+
+Things that should be true of every plugin id:
+
+- **lowercase** with **underscores** for word separation
+- **stable**: treat it as a public identifier. Renaming breaks settings JSON, host code that addresses the plugin by id, and any persisted state
+- **unique** across the whole runtime (the runtime rejects duplicates regardless of scope)
+- **descriptive**: `memory_keeper`, not `mk`
+
+### Examples
+
+| Good | Why |
+|---|---|
+| `core` | One-word foundational plugin |
+| `chat_manager` | Two words, snake_case |
+| `legacy_anthropic` | Modifier plus scope |
+| `firebase_mcp` | Vendor plus capability |
+| `web_search_explorer` | Domain-shaped name |
+
+| Avoid | Why |
+|---|---|
+| `mk` | Unreadable abbreviation |
+| `MyPlugin` | PascalCase clashes with the class name itself |
+| `chatManager` | camelCase reads inconsistently next to the snake_case rest of the runtime |
+| `chat-manager` | Hyphens are not the convention; the entire codebase uses underscores |
+
+## Service IDs and namespaces
+
+Service ids are how plugins claim slots in the registry. Two shapes ship with the library: root and namespaced. The registry only knows about `ServiceId`; the difference between "root" and "namespaced" is just whether the dotted key has a prefix.
+
+### Anatomy: root services
+
+A root service id is a single snake_case string passed to a `const ServiceId('...')`.
+
+```dart
+registry.registerSingleton<Greeter>(
+  const ServiceId('greeter'),
+  CasualGreeter(),
+);
+```
+
+Use a root id when there is only one of the thing in the runtime, or when the slot's name already encodes its domain.
+
+### Anatomy: namespaced services
+
+Most services in a real app are namespaced. The format is `namespace.service_name`. Both halves are lowercase snake_case. The full slot key in the registry is the dotted form.
+
+The idiomatic way to produce one is to build it from a `Namespace`. The registry method itself is the same `registerSingleton` you use for root services; the namespace is just a way of composing the id.
+
+```dart
+const agent = Namespace('agent');
+
+registry.registerSingleton<ModelClient>(
+  agent('model'),                    // ServiceId('agent.model')
+  AnthropicClient(),
+);
+```
+
+That registration claims `agent.model`. Resolution and settings overrides both use the dotted form. `agent('model')` is a call-shorthand for `agent.service('model')`; reach for the explicit form when it reads better at the site.
+
+### Anatomy: namespaces
+
+A namespace is a lowercase single word that groups related services. Treat it as a public surface: the dialog renders namespace headers in the Services and Advanced tabs by their literal name.
+
+Namespaces the demo uses:
+
+| Namespace | What lives there |
+|---|---|
+| `agent` | Model, system message, temperature, anything LLM-shaped |
+| `mcp` | Model Context Protocol providers and transports |
+| `retry` | Retry policies, backoff strategies, circuit breakers |
+| `search` | Search providers (web, vector, hybrid) |
+| `system` | App-level singletons (info, environment, version) |
+| `panel` | Plugin-provided UI panels |
+
+### Examples
+
+| Good | Why |
+|---|---|
+| `'greeter'` | Root, single domain |
+| `'agent.model'` | Clear namespace and role |
+| `'agent.system_message'` | Snake_case after the dot |
+| `'mcp.firebase'` | Vendor under a domain namespace |
+| `'panel.terminal'` | UI namespace, terminal panel |
+
+| Avoid | Why |
+|---|---|
+| `'AgentModel'` | PascalCase reads as a class, not a slot |
+| `'agent-model'` | Dot, not hyphen |
+| `'agent.systemMessage'` | Mixed casing |
+| `'agent_model'` | Use a namespace, not a flat name with an underscore |
+
+<Aside type="note" title="Namespace vs root services">
+A flat `agent_model` and a namespaced `agent.model` are two different slot ids; the runtime treats them as unrelated. Pick a namespace early. Promoting a flat id to a namespaced one is a breaking change for any settings or call sites that already reference it.
+</Aside>
+
+## Event types
+
+Events are plain Dart classes. The class name carries most of the meaning; field naming is regular Dart.
+
+### Anatomy: facts (past tense)
+
+For events that announce something that already happened, use past tense. The emitter is reporting; subscribers react.
+
+```dart
+class UserLoggedIn {
+  final String userId;
+  const UserLoggedIn(this.userId);
+}
+
+class DocumentSaved {
+  final String documentId;
+  const DocumentSaved(this.documentId);
+}
+```
+
+Make these immutable: `const` constructors, `final` fields.
+
+### Anatomy: requests and commands (imperative)
+
+For events that carry a request, command, or instruction, use the imperative verb form. Subscribers do something with them, often answering through `request<Req, Res>`.
+
+```dart
+class SendNotification {
+  final String message;
+  const SendNotification(this.message);
+}
+
+class FindOpenPort {
+  const FindOpenPort();
+}
+```
+
+Imperative names pair naturally with `bus.request<SendNotification, bool>(...)`.
+
+### Anatomy: drafts (mutable, on purpose)
+
+The pre-commit interception pattern uses an event type whose payload is intentionally mutable so handlers can rewrite it before the cascade ends. Name them `DraftXxx` or `XxxDraft` so the mutability is obvious to anyone reading the type.
+
+```dart
+class DraftOutgoingMessage {
+  String text;
+  final Map<String, String> metadata;
+
+  DraftOutgoingMessage(this.text) : metadata = {};
+}
+```
+
+This is the only common shape where event payload fields are mutable. Every other event type stays immutable.
+
+### Examples
+
+| Good | Shape |
+|---|---|
+| `UserMessageReceived` | Past tense, fact |
+| `DocumentSaved` | Past tense, fact |
+| `SendNotification` | Imperative, command |
+| `FindOpenPort` | Imperative, request |
+| `DraftOutgoingMessage` | Draft, mutable |
+| `CollectPanels` | Imperative collection; handlers append |
+
+| Avoid | Why |
+|---|---|
+| `Notification` | Ambiguous; is it a fact or a command? |
+| `NotificationEvent` | The `Event` suffix adds nothing; the type is already on the bus |
+| `userMessageReceived` | Lowercase reads as a variable, not a type |
+
+## Capability types
+
+Capabilities are subclasses of `Capability`. The class name describes what fact the tag asserts about a registration.
+
+### Anatomy
+
+```dart
+class SupportsLanguages extends Capability {
+  final List<String> languages;
+  const SupportsLanguages(this.languages);
+}
+
+class IsSlowCapability extends Capability {
+  final bool isSlow;
+  const IsSlowCapability({this.isSlow = true});
+}
+```
+
+Capabilities should:
+
+- be `const`-constructable so registration sets stay literal
+- name the fact, not the question (`SupportsLanguages`, not `LanguageQuery`)
+- end with `Capability` only when the bare name would be ambiguous
+
+### Examples
+
+| Good | What it says |
+|---|---|
+| `UiConfigurableCapability` | Service is editable in the dialog |
+| `SupportsLanguages` | Service handles these language codes |
+| `IsSlowCapability` | Service has nontrivial latency |
+| `RequiresNetwork` | Service makes network calls |
+
+| Avoid | Why |
+|---|---|
+| `LanguageCapability` | Says nothing about the fact; reader has to read the fields |
+| `Slowness` | Reads as a quality, not a tag |
+| `CanBeSlow` | Subjunctive; `IsSlow` if it is currently slow |
+
+## Settings keys
+
+`RuntimeSettings` uses two key shapes that the dialog and the runtime both honor.
+
+### Anatomy: plugin-level keys
+
+`RuntimeSettings.plugins` is a `Map<PluginId, PluginConfig>`. The key is a `PluginId`, not a string.
+
+```dart
+const settings = RuntimeSettings(
+  plugins: {
+    PluginId('analytics'): PluginConfig(enabled: false),
+    PluginId('experimental_router'): PluginConfig(enabled: true),
+  },
+);
+```
+
+### Anatomy: service-level keys
+
+`RuntimeSettings.services` is a `Map<Pin, ServiceSettings>`. `Pin` is an extension type wrapping the canonical `pluginId:serviceId` (or `*:serviceId`) wire string. Two forms cover every override.
+
+| Form | Targets |
+|---|---|
+| `Pin('pluginId', ['service', 'segments'])` | One specific plugin's registration for that slot |
+| `Pin.wildcard(['service', 'segments'])` | The current winning registration for that slot, whoever owns it |
+
+In Dart code, prefer the typed-chain shorthand when you have the underlying handles in scope: `pluginId.service(serviceId)` or `pluginId.namespace('agent').service('model')`.
+
+```dart
+const linter = PluginId('linter_suite');
+
+final settings = RuntimeSettings(
+  services: {
+    // Plugin-scoped: one specific plugin's registration.
+    linter.service(const ServiceId('line_length_linter')):
+        const ServiceSettings(config: {'max_line_length': 120}),
+
+    // Equivalent hand-built Pin:
+    Pin('linter_suite', ['line_length_linter']):
+        const ServiceSettings(config: {'max_line_length': 120}),
+
+    // Wildcard: applies to whichever plugin wins agent.model.
+    Pin.wildcard(['agent', 'model']):
+        const ServiceSettings(priority: 200),
+  },
+);
+```
+
+The wire form (used for JSON serialization, accessible via `Pin.wire`) is `pluginId:serviceId` (or `*:serviceId` for wildcards). The `serviceId` half is the full slot key, including any namespace (`agent.model`, not just `model`).
+
+### Anatomy: nested config keys
+
+Inside `ServiceSettings.config`, dotted keys write to nested maps automatically. The dialog's `ConfigField.key` uses the same convention.
+
+```dart
+ServiceSettings(
+  config: {
+    'provider.api_key': '...',
+    'provider.region': 'us-east-1',
+    'sampling.temperature': 0.7,
+  },
+);
+```
+
+The runtime stores this as a nested `Map<String, dynamic>`. `ConfigNode` reads back through the flat `getString('provider.api_key')` form.
+
+### Examples
+
+| Pin (wire form) | Meaning |
+|---|---|
+| `Pin('analytics', ['tracker'])` (wire: `analytics:tracker`) | The `analytics` plugin's `tracker` registration |
+| `Pin.wildcard(['agent', 'model'])` (wire: `*:agent.model`) | Whoever currently wins the `agent.model` slot |
+| `Pin('core', ['system', 'info'])` (wire: `core:system.info`) | Core's `system.info` registration |
+
+## Variable names
+
+For hygiene, since these names appear repeatedly in the docs and example code:
+
+| Variable | Refers to |
+|---|---|
+| `manager` | A `PluginRuntimeManager` |
+| `runtime` | A `PluginRuntime`, often via `manager.runtime` |
+| `session` | A `PluginSession` |
+| `registry` | A `ServiceRegistry` or `ScopedServiceRegistry`, depending on context |
+| `bus` | An `EventBus`, usually `context.bus` |
+| `context` | A `PluginContext` (or one of the typed subclasses) |
+| `settings` | A `RuntimeSettings` |
+
+Following these consistently means a reader scanning code can guess types without inferring from method calls.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Adding a Plugin"
+    description="Where most of these names first get committed to."
+    href="/guides/adding-a-plugin/"
+  />
+  <LinkCard
+    title="Service Registry"
+    description="The model behind service ids, namespaces, and priority resolution."
+    href="/concepts/service-registry/"
+  />
+  <LinkCard
+    title="Event Patterns"
+    description="More on event type design and the patterns that motivate the past-tense vs imperative split."
+    href="/concepts/events/"
+  />
+  <LinkCard
+    title="Settings & Overrides"
+    description="Where the scoped key formats actually get applied to a running runtime."
+    href="/guides/settings/"
+  />
+</CardGrid>

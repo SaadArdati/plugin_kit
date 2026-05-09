@@ -1,0 +1,1052 @@
+import 'package:collection/collection.dart';
+import 'package:plugin_kit/plugin_kit.dart';
+
+/// Factory function that constructs a service instance.
+///
+/// Called on every [ServiceRegistry.resolve] for [FactoryWrapper]
+/// registrations, or once for [LazySingletonWrapper] registrations.
+typedef Factory<T> = T Function();
+
+/// A set of [Capability] tags attached to a service registration.
+///
+/// Capabilities enable metadata discovery without instantiating the service.
+/// Define custom [Capability] subclasses to describe whatever facts about a
+/// slot the host app cares about (supported formats, priority hints, audit
+/// flags, etc.) and read them via [RegistrationWrapper.capabilities] without
+/// ever calling [RegistrationWrapper.provide].
+typedef CapabilitySet = Set<Capability>;
+
+/// Sealed base class for service registration wrappers.
+///
+/// Every service registered in the [ServiceRegistry] is stored as a
+/// `RegistrationWrapper`. The sealed hierarchy defines three instantiation
+/// strategies: [FactoryWrapper] creates a new instance on every [provide],
+/// [LazySingletonWrapper] creates on first [provide] and caches thereafter,
+/// and [SingletonWrapper] holds a pre-created instance and always returns it.
+///
+/// Wrappers also carry [pluginId] (owner), [priority] (resolution order, with
+/// higher winning), and [capabilities] for discovery via custom [Capability]
+/// subclasses. Equality is based on [pluginId] and [priority].
+sealed class RegistrationWrapper<T extends Object> {
+  /// The plugin that owns this registration.
+  final PluginId pluginId;
+
+  /// Backing for [priority]. Library-private; mutated only via
+  /// [_setEffectivePriority] from [ServiceRegistry.updateSettings] (and
+  /// from registration-time stamping inside the same library). Public
+  /// callers see the read-only [priority] getter.
+  int _priority;
+
+  /// Resolution priority. Higher values win when multiple plugins register
+  /// the same service id. Default is [ServiceRegistry.defaultPriority].
+  ///
+  /// This is the *effective* priority used for sort and resolution. It is
+  /// equal to [basePriority] until a [LocalPluginOverride] with a
+  /// non-null [LocalPluginOverride.priority] is applied via
+  /// [ServiceRegistry.updateSettings]; it is reverted to [basePriority]
+  /// when that override goes away.
+  ///
+  /// Read-only at the public surface. The registry itself owns mutation.
+  int get priority => _priority;
+
+  /// The priority this wrapper was originally registered with — i.e.,
+  /// the value passed to `registerFactory` / `registerSingleton` /
+  /// `registerLazySingleton`. Independent of any override applied later.
+  final int basePriority;
+
+  /// Metadata capabilities attached to this registration.
+  final CapabilitySet capabilities;
+
+  RegistrationWrapper(
+    this.pluginId, {
+    int priority = ServiceRegistry.defaultPriority,
+    this.capabilities = const {},
+  }) : _priority = priority,
+       basePriority = priority;
+
+  /// Create or return the service instance.
+  T provide();
+
+  /// Deep-clone this wrapper for [ServiceRegistry.copy]. The clone shares
+  /// the underlying instance / factory / settings, but has independent
+  /// mutable [priority] storage so post-copy [_setEffectivePriority]
+  /// calls on the live registry do not leak into the snapshot.
+  RegistrationWrapper<T> _clone();
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other.runtimeType != runtimeType) return false;
+    return other is RegistrationWrapper &&
+        pluginId == other.pluginId &&
+        basePriority == other.basePriority;
+  }
+
+  @override
+  int get hashCode => Object.hash(pluginId, basePriority);
+
+  @override
+  String toString() =>
+      '$runtimeType(pluginId: $pluginId, priority: $priority, base: $basePriority)';
+}
+
+/// Library-private accessor for [RegistrationWrapper._priority]. Restricted
+/// to in-library callers (the registry's `updateSettings` and the
+/// register-time stamping calls).
+extension _WrapperMutation<T extends Object> on RegistrationWrapper<T> {
+  void _setEffectivePriority(int value) => _priority = value;
+}
+
+/// Registration wrapper that creates a new instance on every [provide] call.
+///
+/// Use for services that should not share state between consumers, or that
+/// are cheap to construct.
+final class FactoryWrapper<T extends Object> extends RegistrationWrapper<T> {
+  /// The factory function called on each [provide].
+  final Factory<T> factory;
+
+  /// Creates a factory wrapper for [pluginId] using [factory].
+  FactoryWrapper(
+    super.pluginId,
+    this.factory, {
+    super.priority,
+    super.capabilities,
+  });
+
+  @override
+  T provide() => factory();
+
+  @override
+  FactoryWrapper<T> _clone() {
+    final c = FactoryWrapper<T>(
+      pluginId,
+      factory,
+      priority: basePriority,
+      capabilities: capabilities,
+    );
+    c._setEffectivePriority(_priority);
+    return c;
+  }
+}
+
+/// Registration wrapper that creates the instance on first [provide] call
+/// and caches it for all subsequent calls.
+///
+/// Use for services that are expensive to construct but safe to share.
+final class LazySingletonWrapper<T extends Object>
+    extends RegistrationWrapper<T> {
+  /// The factory function called once on first [provide].
+  final Factory<T> factory;
+
+  late final T _instance = factory();
+
+  /// Creates a lazy singleton wrapper for [pluginId] using [factory].
+  LazySingletonWrapper(
+    super.pluginId,
+    this.factory, {
+    super.priority,
+    super.capabilities,
+  });
+
+  @override
+  T provide() => _instance;
+
+  @override
+  LazySingletonWrapper<T> _clone() {
+    final c = LazySingletonWrapper<T>(
+      pluginId,
+      factory,
+      priority: basePriority,
+      capabilities: capabilities,
+    );
+    c._setEffectivePriority(_priority);
+    return c;
+  }
+}
+
+/// Registration wrapper that holds a pre-created instance.
+///
+/// The [object] is provided at registration time and returned on every
+/// [provide] call. Use for services that must be created eagerly or that are
+/// provided from outside the plugin system.
+final class SingletonWrapper<T extends Object> extends RegistrationWrapper<T> {
+  /// The pre-created singleton instance.
+  final T object;
+
+  /// Creates a singleton wrapper for [pluginId] with [object].
+  SingletonWrapper(
+    super.pluginId,
+    this.object, {
+    super.priority,
+    super.capabilities,
+  });
+
+  @override
+  T provide() => object;
+
+  @override
+  SingletonWrapper<T> _clone() {
+    final c = SingletonWrapper<T>(
+      pluginId,
+      object,
+      priority: basePriority,
+      capabilities: capabilities,
+    );
+    c._setEffectivePriority(_priority);
+    return c;
+  }
+}
+
+/// Dependency injection container for plugin services.
+///
+/// `ServiceRegistry` is the central service locator in the plugin system.
+/// Plugins register their services during the `register*` lifecycle phase,
+/// and other plugins (or the runtime) resolve them by service id.
+///
+/// ## Registration
+///
+/// Services are registered with one of three strategies:
+/// - [registerFactory]: New instance on every resolve.
+/// - [registerLazySingleton]: Created once on first resolve, cached after.
+/// - [registerSingleton]: Eagerly-created instance, always reused.
+///
+/// Each registration carries a [pluginId] (owner), `serviceId` (slot),
+/// [priority] (resolution order), and optional [CapabilitySet] (metadata).
+///
+/// Namespacing is a property of the [ServiceId] itself, not of the registry
+/// API: build a namespaced id with `Namespace.call(...)` (`ns('id')`),
+/// [Namespace.service], or [ServiceId.namespaced] and pass it to the regular
+/// `register*` and `resolve*` methods.
+///
+/// ## Resolution
+///
+/// Resolution selects the highest-priority registration for a given service
+/// id. The candidate list is pre-sorted by priority (descending); the first
+/// enabled entry wins. [RegistrationWrapper.provide] then creates or returns
+/// the instance. If the instance is a [PluginService], scoped settings from
+/// [overrides] are injected via [PluginService.injectSettings].
+///
+/// Resolution methods:
+/// - [resolve]: Returns the winner or throws [StateError].
+/// - [maybeResolve]: Returns the winner or `null`.
+/// - [resolveAfter]: Chain-of-responsibility, skipping past a specific plugin.
+/// - [resolveRaw]: Returns the [RegistrationWrapper] itself, no instantiation.
+///
+/// ## Settings injection
+///
+/// When resolving a [PluginService], the registry checks [overrides] for
+/// matching [LocalPluginOverride] entries (by service id and plugin id, with
+/// fallback to [PluginId.winnerScoped] for wildcard overrides). Matching settings are
+/// injected via [PluginService.injectSettings]. For singleton/lazy services,
+/// a hash comparison avoids redundant updates.
+///
+/// ## Override system
+///
+/// [overrides] is a list of [LocalPluginOverride] entries that can disable a
+/// service (`enabled: false`), change its priority, or inject settings.
+/// Overrides are parsed from [RuntimeSettings.services] by the
+/// [PluginRuntime] during session preparation.
+///
+/// ```dart
+/// final registry = ServiceRegistry();
+///
+/// registry.registerFactory<MyService>(
+///   pluginId: const PluginId('my_plugin'),
+///   serviceId: const ServiceId('my_service'),
+///   create: () => MyServiceImpl(),
+///   priority: 100,
+/// );
+///
+/// final service = registry.resolve<MyService>(const ServiceId('my_service'));
+/// ```
+class ServiceRegistry {
+  /// Default resolution priority used by every registration method when
+  /// `priority` is not supplied. Higher values win; 50 sits in the middle of
+  /// the range so later plugins can boost or lower relative to it.
+  static const int defaultPriority = 50;
+
+  /// Active overrides for settings injection, priority changes, and disabling.
+  ///
+  /// Updated by [updateSettings] when [RuntimeSettings] change. Access via
+  /// [overrides] (read-only view) or modify via [updateSettings].
+  List<LocalPluginOverride> _overrides;
+
+  /// Internal storage: service id -> sorted list of registrations. Each list
+  /// is sorted by priority (descending); the first enabled entry is the
+  /// winner returned by [resolve].
+  final Map<ServiceId, List<RegistrationWrapper>> _registry;
+
+  /// Read-only view of the current overrides.
+  List<LocalPluginOverride> get overrides => List.unmodifiable(_overrides);
+
+  /// Sorted list of registrations for [serviceId], or `null` when none exist.
+  ///
+  /// Read access without instantiation or settings injection. Useful for
+  /// inspecting all registrants for a slot, not just the winner.
+  List<RegistrationWrapper>? getRegistrations(ServiceId serviceId) {
+    final list = _registry[serviceId];
+    if (list == null) return null;
+    return List.unmodifiable(list);
+  }
+
+  /// Registrations for [serviceId] filtered to wrappers of type [T].
+  List<RegistrationWrapper<T>>? getRegistrationsOfType<T extends Object>(
+    ServiceId serviceId,
+  ) {
+    final list = _registry[serviceId];
+    if (list == null) return null;
+    return List.unmodifiable(list.whereType<RegistrationWrapper<T>>());
+  }
+
+  /// Creates a registry with optional initial [overrides].
+  ServiceRegistry({List<LocalPluginOverride> overrides = const []})
+    : _overrides = overrides,
+      _registry = {};
+
+  /// Creates an empty registry with no overrides.
+  ServiceRegistry.empty() : _overrides = [], _registry = {};
+
+  ServiceRegistry._from({
+    required Map<ServiceId, List<RegistrationWrapper>> registry,
+    required List<LocalPluginOverride> overrides,
+  }) : _registry = registry,
+       _overrides = overrides;
+
+  /// Creates a shallow copy of this registry.
+  ///
+  /// The registration lists are copied (not the wrappers themselves), and
+  /// overrides are copied by value. Used by [PluginContext.copyWith] to
+  /// snapshot the registry state.
+  /// Snapshot the current registry state.
+  ///
+  /// Both the per-service lists AND the wrappers themselves are cloned,
+  /// so `priority` mutations applied by [updateSettings] on the live
+  /// registry afterwards do NOT leak into the snapshot. This isolation
+  /// is what makes `oldContext` (passed to
+  /// [Plugin.onPluginSettingsChanged]) compare reliably against
+  /// `newContext`: each context owns its own wrapper instances.
+  ServiceRegistry copy() => ServiceRegistry._from(
+    registry: {
+      for (final entry in _registry.entries)
+        entry.key: [for (final wrapper in entry.value) wrapper._clone()],
+    },
+    overrides: [..._overrides],
+  );
+
+  /// Replace the current overrides and re-sort all registration lists.
+  ///
+  /// Called by the [PluginRuntime] after parsing new [RuntimeSettings].
+  /// Plugin-specific priority overrides are applied retroactively: every
+  /// existing wrapper has its effective [RegistrationWrapper.priority]
+  /// recomputed from the new overrides (falling back to
+  /// [RegistrationWrapper.basePriority] when no priority override applies).
+  /// Lists are then re-sorted, so live-winner ordering reflects the new
+  /// settings before this call returns.
+  ///
+  /// Wildcard (`*`) priority overrides are forwarded to whichever plugin
+  /// currently wins the slot at the time the override resolves. The
+  /// [PluginRuntime] computes those forwarded priority overrides via
+  /// `_resolveAndApplyWildcards` and feeds them in alongside the
+  /// plugin-specific overrides; this method then restamps the winning
+  /// wrapper's effective `priority` and re-sorts. The forwarding is
+  /// winner-scoped, not layered: only the current winner's wrapper sees a
+  /// wildcard priority bump on each settings update.
+  void updateSettings({required List<LocalPluginOverride> overrides}) {
+    _overrides = overrides;
+    for (final entry in _registry.entries) {
+      final serviceId = entry.key;
+      final list = entry.value;
+      for (final wrapper in list) {
+        wrapper._setEffectivePriority(
+          _effectivePriorityFor(serviceId, wrapper),
+        );
+      }
+      list.sort((a, b) => b.priority.compareTo(a.priority));
+    }
+  }
+
+  /// Compute the effective priority for [wrapper] under [serviceId] given
+  /// the current [_overrides]. Used by both [updateSettings] (to restamp
+  /// existing wrappers) and the registration paths (to seed a new wrapper
+  /// with the priority that current settings dictate).
+  ///
+  /// Plugin-specific priority overrides win; otherwise falls back to
+  /// [RegistrationWrapper.basePriority].
+  int _effectivePriorityFor(ServiceId serviceId, RegistrationWrapper wrapper) {
+    for (final o in _overrides) {
+      if (o.serviceId == serviceId &&
+          o.plugin == wrapper.pluginId &&
+          o.priority != null) {
+        return o.priority!;
+      }
+    }
+    return wrapper.basePriority;
+  }
+
+  /// Returns the [LocalPluginOverride] to use for injecting settings into
+  /// the service registered by [wrapper] for [serviceId].
+  ///
+  /// Prefers a plugin-specific override, then falls back to a winner-scoped
+  /// ([PluginId.winnerScoped]) override.
+  LocalPluginOverride? _overrideForInjection(
+    ServiceId serviceId,
+    RegistrationWrapper wrapper,
+  ) {
+    final pluginOverride = _overrides
+        .where((o) => o.serviceId == serviceId && o.plugin == wrapper.pluginId)
+        .firstOrNull;
+    if (pluginOverride != null) return pluginOverride;
+    return _overrides
+        .where(
+          (o) => o.serviceId == serviceId && o.plugin == PluginId.winnerScoped,
+        )
+        .firstOrNull;
+  }
+
+  /// Whether [wrapper] is marked disabled by an active override.
+  ///
+  /// Resolution methods skip disabled wrappers and fall through to the
+  /// next-highest-priority enabled registration. A plugin-specific override
+  /// takes precedence over a wildcard (`*`) one, matching the semantics of
+  /// [_overrideForInjection]. If the matching override exists but leaves
+  /// `enabled: true`, the wrapper is considered live.
+  bool _isDisabled(ServiceId serviceId, RegistrationWrapper wrapper) {
+    final override = _overrideForInjection(serviceId, wrapper);
+    return override != null && !override.enabled;
+  }
+
+  /// Return the first wrapper in [list] that isn't disabled by an override,
+  /// or `null` if every candidate is disabled.
+  RegistrationWrapper? _firstEnabled(
+    ServiceId serviceId,
+    List<RegistrationWrapper> list,
+  ) {
+    for (final wrapper in list) {
+      if (!_isDisabled(serviceId, wrapper)) return wrapper;
+    }
+    return null;
+  }
+
+  /// Instantiate a service from a [RegistrationWrapper] and inject any
+  /// applicable settings from [_overrides].
+  ///
+  /// Single point of truth for the provide-then-inject pattern; all
+  /// resolution methods delegate here.
+  T _provideAndInject<T>(ServiceId serviceId, RegistrationWrapper wrapper) {
+    final service = wrapper.provide();
+
+    if (service is PluginService) {
+      // Stamp the authoritative identity onto the service. This is the
+      // single place where [PluginService.pluginId] and
+      // [PluginService.serviceId] become trustworthy: as "the plugin
+      // that owns me" and "my full key in the registry": regardless of how
+      // the subclass was constructed. Every resolve path flows through here,
+      // so the stamp happens before any consumer sees the instance.
+      service.pluginId = wrapper.pluginId;
+      service.serviceId = serviceId;
+
+      final override = _overrideForInjection(serviceId, wrapper);
+      if (override != null && override.settings.isNotEmpty) {
+        if (wrapper is SingletonWrapper || wrapper is LazySingletonWrapper) {
+          final oldHash = service.settingsHash;
+          final newHash = ConfigNode.hashSettings(override.settings);
+          if (oldHash != newHash) {
+            service.injectSettings(override.settings, hash: newHash);
+          }
+        } else {
+          service.injectSettings(override.settings);
+        }
+      }
+    }
+
+    return service as T;
+  }
+
+  /// Resolve the highest-priority service for [serviceId].
+  ///
+  /// If the resolved instance is a [PluginService], scoped settings from
+  /// [_overrides] are injected automatically.
+  ///
+  /// Throws [StateError] if no service is registered for [serviceId], or if
+  /// every registration for [serviceId] has been disabled via a
+  /// [LocalPluginOverride].
+  T resolve<T>(ServiceId serviceId) {
+    final list =
+        _registry[serviceId] ??
+        (throw StateError('No service registered for "$serviceId"'));
+    final wrapper = _firstEnabled(serviceId, list);
+    if (wrapper == null) {
+      throw StateError(
+        'All registrations for "$serviceId" are disabled by overrides '
+        '(candidates: ${list.map((w) => w.pluginId).join(", ")})',
+      );
+    }
+    return _provideAndInject<T>(serviceId, wrapper);
+  }
+
+  /// Resolve the next service in priority order after [pluginId].
+  ///
+  /// Implements a chain-of-responsibility pattern: finds the registration
+  /// owned by [pluginId], then returns the next one in the sorted list. This
+  /// allows a higher-priority plugin to delegate to the service it overrode.
+  /// Settings injection is applied to the resolved service just as in
+  /// [resolve].
+  ///
+  /// The caller's own enabled state (i.e. whether [pluginId]'s registration
+  /// is disabled by an override) is not consulted; the target is located by
+  /// id only. The walk past the target skips any disabled registrations and
+  /// returns the first enabled wrapper. If no enabled wrapper exists after
+  /// the target, this throws, distinguishing "no later registration" from
+  /// "every later registration is disabled" in the error message.
+  ///
+  /// Throws [StateError] if [serviceId] has no registrations, if [pluginId]
+  /// is not found, or if every registration after [pluginId] is either
+  /// absent or disabled.
+  T resolveAfter<T>({
+    required PluginId pluginId,
+    required ServiceId serviceId,
+  }) {
+    final list =
+        _registry[serviceId] ??
+        (throw StateError('No service registered for "$serviceId"'));
+
+    int targetIndex = 0;
+    while (list[targetIndex].pluginId != pluginId) {
+      targetIndex++;
+      if (targetIndex >= list.length) {
+        throw StateError(
+          'No service registered for "$serviceId" after plugin "$pluginId"',
+        );
+      }
+    }
+
+    final afterTarget = list.sublist(targetIndex + 1);
+    if (afterTarget.isEmpty) {
+      throw StateError(
+        'No service registered for "$serviceId" after plugin "$pluginId"',
+      );
+    }
+    for (final wrapper in afterTarget) {
+      if (_isDisabled(serviceId, wrapper)) continue;
+      return _provideAndInject<T>(serviceId, wrapper);
+    }
+    throw StateError(
+      'All registrations for "$serviceId" after plugin "$pluginId" '
+      'are disabled by overrides (candidates: '
+      '${afterTarget.map((w) => w.pluginId).join(", ")})',
+    );
+  }
+
+  /// Resolve the raw [RegistrationWrapper] for [serviceId] without
+  /// instantiating or injecting settings.
+  ///
+  /// Useful for inspecting registration metadata ([pluginId], [priority],
+  /// [capabilities]) without side effects. Disabled registrations are
+  /// skipped, matching [resolve] semantics.
+  ///
+  /// Throws [StateError] if no service is registered for [serviceId], or if
+  /// every registration for [serviceId] has been disabled by a
+  /// [LocalPluginOverride].
+  RegistrationWrapper<T> resolveRaw<T extends Object>(ServiceId serviceId) {
+    final list =
+        _registry[serviceId] ??
+        (throw StateError('No service registered for "$serviceId"'));
+
+    final wrapper = _firstEnabled(serviceId, list);
+    if (wrapper == null) {
+      throw StateError(
+        'All registrations for "$serviceId" are disabled by overrides '
+        '(candidates: ${list.map((w) => w.pluginId).join(", ")})',
+      );
+    }
+    return wrapper as RegistrationWrapper<T>;
+  }
+
+  /// Resolve the highest-priority enabled service, or `null` if none.
+  ///
+  /// Same as [resolve] but returns `null` instead of throwing when no service
+  /// is registered for [serviceId] or when every registration has been
+  /// disabled by a [LocalPluginOverride].
+  T? maybeResolve<T extends Object>(ServiceId serviceId) {
+    final list = _registry[serviceId];
+    if (list == null || list.isEmpty) return null;
+    final wrapper = _firstEnabled(serviceId, list);
+    if (wrapper == null) return null;
+    return _provideAndInject<T>(serviceId, wrapper);
+  }
+
+  /// Like [resolveRaw] but returns `null` if no service is registered or
+  /// every registration is disabled by an override.
+  RegistrationWrapper? maybeResolveRaw<T extends Object>(ServiceId serviceId) {
+    final list = _registry[serviceId];
+    if (list == null || list.isEmpty) return null;
+    final wrapper = _firstEnabled(serviceId, list);
+    if (wrapper == null) return null;
+    return wrapper as RegistrationWrapper<T>;
+  }
+
+  /// Returns the [Capability] of type [C] attached to the winning
+  /// registration for [serviceId], or `null` if the service is not
+  /// registered, every registration is disabled, or the winner does not
+  /// carry a capability of that type.
+  ///
+  /// Use the non-null return both as a presence check and to read the
+  /// capability's fields:
+  ///
+  /// ```dart
+  /// final formats = registry.resolveCapability<SupportsFileFormats>(
+  ///   const ServiceId('importer'),
+  /// );
+  /// if (formats != null && formats.extensions.contains('md')) {
+  ///   // ...
+  /// }
+  /// ```
+  ///
+  /// No service instance is constructed.
+  C? resolveCapability<C extends Capability>(ServiceId serviceId) {
+    final list = _registry[serviceId];
+    if (list == null || list.isEmpty) return null;
+    final wrapper = _firstEnabled(serviceId, list);
+    if (wrapper == null) return null;
+    return wrapper.capabilities.getOfType<C>();
+  }
+
+  /// Get all instantiated services registered by [plugin].
+  ///
+  /// Iterates all service ids, finds registrations owned by [plugin],
+  /// creates instances via [_provideAndInject], and returns them. Used by
+  /// [Plugin.attach] and [Plugin.detach] to find [StatefulPluginService]s.
+  ///
+  /// When [skipFactories] is true, only singleton and lazy-singleton
+  /// registrations are instantiated. This avoids creating throwaway
+  /// instances from factory registrations when the caller only needs cached
+  /// services (e.g. [StatefulPluginService]s for lifecycle management).
+  /// Defaults to false.
+  List<Object> getPluginServices(
+    PluginId plugin, {
+    bool skipFactories = false,
+  }) {
+    final services = <Object>[];
+    for (final entry in _registry.entries) {
+      final serviceId = entry.key;
+      for (final wrapper in entry.value) {
+        if (wrapper.pluginId != plugin) continue;
+        if (skipFactories && wrapper is FactoryWrapper) continue;
+        services.add(_provideAndInject<Object>(serviceId, wrapper));
+      }
+    }
+    return services;
+  }
+
+  /// Register a factory service that creates a new instance on every resolve.
+  ///
+  /// If a registration from the same [pluginId] already exists for
+  /// [serviceId], it is replaced. The [priority] may be overridden by a
+  /// matching [LocalPluginOverride] in [overrides]. The registration list is
+  /// re-sorted after insertion.
+  void registerFactory<T extends Object>({
+    required PluginId pluginId,
+    required ServiceId serviceId,
+    required Factory<T> create,
+    int priority = ServiceRegistry.defaultPriority,
+    CapabilitySet capabilities = const {},
+  }) {
+    // StatefulPluginService instances must be registered as a singleton or
+    // lazy singleton so the runtime can manage their lifecycle. Factories
+    // are not tracked and would leak orphan instances. The list-of-T
+    // covariance idiom is the canonical way to ask "is T a subtype of X"
+    // without an instance in hand.
+    if (<T>[] is List<StatefulPluginService>) {
+      throw ArgumentError(
+        'StatefulPluginService "$serviceId" must be registered as a '
+        'singleton or lazy singleton, not a factory. '
+        'They require proper lifecycle management which factories do not provide.',
+      );
+    }
+
+    _registry[serviceId] ??= [];
+    final list = _registry[serviceId]!;
+
+    // Remove existing registration from the same plugin to allow replacement
+    list.removeWhere((wrapper) => wrapper.pluginId == pluginId);
+
+    final wrapper = FactoryWrapper<T>(
+      pluginId,
+      create,
+      priority: priority,
+      capabilities: capabilities,
+    );
+    wrapper._setEffectivePriority(_effectivePriorityFor(serviceId, wrapper));
+
+    list
+      ..add(wrapper)
+      ..sort((a, b) => b.priority.compareTo(a.priority));
+  }
+
+  /// Register an eager singleton service with a pre-created [instance].
+  ///
+  /// The [instance] is stored in a [SingletonWrapper] and returned on every
+  /// resolve. Construct it inline at the call site
+  /// (`registerSingleton(instance: MyService())`); each `register` call
+  /// produces a fresh instance for that registry, which is the correct
+  /// behavior for session plugins. Contrast with [registerFactory], where
+  /// a closure runs on every resolve, and [registerLazySingleton], where a
+  /// closure runs once on first resolve. Replaces any existing registration
+  /// from the same [pluginId].
+  void registerSingleton<T extends Object>({
+    required PluginId pluginId,
+    required ServiceId serviceId,
+    required T instance,
+    int priority = ServiceRegistry.defaultPriority,
+    CapabilitySet capabilities = const {},
+  }) {
+    // Guard against the most common shape mistake from the previous
+    // factory-shape API: `registerSingleton<Object>(instance: Object.new,
+    // ...)` (or any tear-off through the scoped positional form,
+    // `registry.registerSingleton<Object>(id, Object.new)`) compiles
+    // because every Function is itself an Object, but the registered
+    // "instance" is the function value, not an `Object()`. Tighter Ts
+    // (e.g. `MyService`) reject Function values at the call site, so this
+    // only catches the placeholder-style misuse where T widens all the
+    // way to Object. `T == dynamic` is rejected by the bound `T extends
+    // Object` at the call site, so we don't need to check it here.
+    assert(
+      T != Object || instance is! Function,
+      'registerSingleton<Object>("$serviceId", ...) was given a Function '
+      'value (${instance.runtimeType}). Did you mean to invoke it? '
+      'Pass an instance (e.g. `MyService()`), not a tear-off '
+      '(`MyService.new`). The type checker can\'t catch this when T '
+      'widens to Object.',
+    );
+    _registry[serviceId] ??= [];
+    final list = _registry[serviceId]!;
+
+    // Remove existing registration from the same plugin to allow replacement.
+    // Re-registering (e.g. after a model switch) replaces the old instance.
+    list.removeWhere((wrapper) => wrapper.pluginId == pluginId);
+
+    final wrapper = SingletonWrapper<T>(
+      pluginId,
+      instance,
+      priority: priority,
+      capabilities: capabilities,
+    );
+    wrapper._setEffectivePriority(_effectivePriorityFor(serviceId, wrapper));
+
+    list
+      ..add(wrapper)
+      ..sort((a, b) => b.priority.compareTo(a.priority));
+  }
+
+  /// Register a lazy singleton that is created on first resolve and cached.
+  ///
+  /// Replaces any existing registration from the same [pluginId].
+  void registerLazySingleton<T extends Object>({
+    required PluginId pluginId,
+    required ServiceId serviceId,
+    required Factory<T> factory,
+    int priority = ServiceRegistry.defaultPriority,
+    CapabilitySet capabilities = const {},
+  }) {
+    _registry[serviceId] ??= [];
+    final list = _registry[serviceId]!;
+
+    // Remove existing registration from the same plugin to allow replacement
+    list.removeWhere((wrapper) => wrapper.pluginId == pluginId);
+
+    final wrapper = LazySingletonWrapper<T>(
+      pluginId,
+      factory,
+      priority: priority,
+      capabilities: capabilities,
+    );
+    wrapper._setEffectivePriority(_effectivePriorityFor(serviceId, wrapper));
+
+    list
+      ..add(wrapper)
+      ..sort((a, b) => b.priority.compareTo(a.priority));
+  }
+
+  /// Returns a plugin-scoped view that fills in [pluginId] on every
+  /// registration call, so plugins don't have to repeat it.
+  ScopedServiceRegistry scopedFor(PluginId pluginId) =>
+      ScopedServiceRegistry(this, pluginId);
+
+  /// Remove a specific plugin's registration for [serviceId].
+  ///
+  /// Returns the removed [RegistrationWrapper], or `null` if no registration
+  /// was found. If the removal empties the list for [serviceId], the entire
+  /// key is removed from the registry. Used during settings reconciliation
+  /// to unregister services from disabled plugins.
+  RegistrationWrapper? unregister({
+    required PluginId pluginId,
+    required ServiceId serviceId,
+  }) {
+    final list = _registry[serviceId];
+    if (list == null) return null;
+
+    final wrapper = list.firstWhereOrNull(
+      (wrapper) => wrapper.pluginId == pluginId,
+    );
+    list.remove(wrapper);
+    if (list.isEmpty) {
+      _registry.remove(serviceId);
+    }
+
+    return wrapper;
+  }
+
+  /// The winning [RegistrationWrapper] for every registered service id, with
+  /// no instantiation.
+  ///
+  /// One entry per service id (the highest-priority enabled wrapper, matching
+  /// [resolveRaw] semantics). For the resolved instances, use
+  /// [listAllServices] which calls [resolve] on each.
+  Map<ServiceId, RegistrationWrapper> getAllResolvedRegistrations() => {
+    for (final serviceId in _registry.keys) serviceId: resolveRaw(serviceId),
+  };
+
+  /// Whether any service from [pluginId] is registered.
+  ///
+  /// Only checks service registrations; plugins that only register tools
+  /// won't be detected here.
+  bool didPluginRegisterServices(PluginId pluginId) => _registry.values.any(
+    (wrappers) => wrappers.any((wrapper) => wrapper.pluginId == pluginId),
+  );
+
+  /// List all service ids, optionally filtered to a specific [pluginId].
+  ///
+  /// When [pluginId] is null, returns all registered service ids. When
+  /// provided, returns only ids that have a registration from that plugin.
+  Set<ServiceId> listAllServiceIds([PluginId? pluginId]) {
+    if (pluginId == null) return _registry.keys.toSet();
+
+    return {
+      for (final entry in _registry.entries)
+        for (final wrapper in entry.value)
+          if (wrapper.pluginId == pluginId) entry.key,
+    };
+  }
+
+  /// Resolve all registered services, returning service id to instance.
+  ///
+  /// Each service is resolved (instantiated and settings-injected) via
+  /// [resolve].
+  Map<ServiceId, Object> listAllServices() => {
+    for (final serviceId in _registry.keys) serviceId: resolve(serviceId),
+  };
+
+  /// Collect all [Capability] tags from services within a namespace.
+  ///
+  /// Scans all service ids whose [ServiceId.value] starts with
+  /// `'${namespace.value}.'` and aggregates their
+  /// [RegistrationWrapper.capabilities]. Nested namespaces are matched too:
+  /// a query for `Namespace('agent')` includes services like
+  /// `'agent.system_prompt.scope'`.
+  CapabilitySet listCapabilitiesOfNamespace(Namespace namespace) {
+    final capabilities = <Capability>{};
+    final prefix = '${namespace.value}.';
+    for (final entry in _registry.entries) {
+      if (!entry.key.value.startsWith(prefix)) continue;
+
+      for (final wrapper in entry.value) {
+        capabilities.addAll(wrapper.capabilities);
+      }
+    }
+    return capabilities;
+  }
+}
+
+/// Per-service override that modifies registration behavior.
+///
+/// `LocalPluginOverride` entries are created by the [PluginRuntime] when
+/// parsing [RuntimeSettings.services] and stored in
+/// [ServiceRegistry.overrides]. They can disable a service, change its
+/// priority, or inject settings.
+///
+/// Overrides are matched by `(plugin, serviceId)` pair. The special
+/// [PluginId.winnerScoped] value for [plugin] indicates a wildcard (winner-scoped)
+/// override that applies to whichever plugin wins the resolution.
+///
+/// ```dart
+/// LocalPluginOverride.disable(
+///   plugin: PluginId('agentic'),
+///   serviceId: ServiceId('main_agent.tools'),
+/// );
+///
+/// LocalPluginOverride.withPriority(
+///   plugin: PluginId('core'),
+///   serviceId: ServiceId('main_agent.agent_service'),
+///   priority: 200,
+/// );
+///
+/// LocalPluginOverride(
+///   plugin: PluginId('agentic'),
+///   serviceId: ServiceId('main_agent.agent_service'),
+///   settings: {'provider': 'anthropic', 'model': 'claude-sonnet-4-5-20250929'},
+/// );
+/// ```
+class LocalPluginOverride {
+  /// The plugin id this override targets, or [PluginId.winnerScoped] for wildcards.
+  final PluginId plugin;
+
+  /// The service id this override applies to.
+  final ServiceId serviceId;
+
+  /// Whether the service is enabled. When false, the service is skipped
+  /// during resolution.
+  final bool enabled;
+
+  /// Optional priority override. When non-null, replaces the registration's
+  /// original priority during [ServiceRegistry.registerFactory] and variants.
+  final int? priority;
+
+  /// Settings to inject into the service via [PluginService.injectSettings].
+  final Map<String, dynamic> settings;
+
+  /// Creates a service override for [plugin] and [serviceId].
+  const LocalPluginOverride({
+    required this.plugin,
+    required this.serviceId,
+    this.enabled = true,
+    this.priority,
+    this.settings = const {},
+  });
+
+  /// Convenience constructor to disable a service.
+  const LocalPluginOverride.disable({
+    required this.plugin,
+    required this.serviceId,
+  }) : enabled = false,
+       priority = null,
+       settings = const {};
+
+  /// Convenience constructor to override a service's priority.
+  const LocalPluginOverride.withPriority({
+    required this.plugin,
+    required this.serviceId,
+    required this.priority,
+  }) : enabled = true,
+       settings = const {};
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other.runtimeType != runtimeType) return false;
+    return other is LocalPluginOverride &&
+        plugin == other.plugin &&
+        serviceId == other.serviceId &&
+        enabled == other.enabled &&
+        priority == other.priority &&
+        const DeepCollectionEquality().equals(settings, other.settings);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    plugin,
+    serviceId,
+    enabled,
+    priority,
+    const DeepCollectionEquality().hash(settings),
+  );
+
+  @override
+  String toString() =>
+      'LocalPluginOverride(plugin: $plugin, serviceId: $serviceId, '
+      'enabled: $enabled, priority: $priority, settings: $settings)';
+}
+
+/// A plugin-scoped view over [ServiceRegistry] that fills in the owning
+/// plugin's `pluginId` on every registration call.
+///
+/// Plugins receive one of these in their [Plugin.register] override, so the
+/// `pluginId` argument is never passed explicitly:
+///
+/// ```dart
+/// @override
+/// void register(ScopedServiceRegistry registry) {
+///   registry.registerSingleton<MyService>(
+///     const ServiceId('my_service'),
+///     MyServiceImpl(),
+///   );
+/// }
+/// ```
+///
+/// To register many services under the same namespace, build each
+/// [ServiceId] inline with `Namespace.call`: a namespace const reads as a
+/// composition primitive, e.g. `agent('model')` and `agent('temperature')`.
+///
+/// Edge cases that need the full registry (registering on behalf of another
+/// plugin, inspecting existing registrations, etc.) can reach through via
+/// [raw].
+class ScopedServiceRegistry {
+  /// The underlying registry. Use this for operations that aren't tied to
+  /// the owning plugin (cross-plugin queries, etc.).
+  final ServiceRegistry raw;
+
+  /// The plugin id this scope belongs to. Every registration call below
+  /// forwards this as the `pluginId` argument.
+  final PluginId pluginId;
+
+  /// Default priority applied by the positional `register*` overloads when
+  /// their `priority` argument is omitted. Set via [withPriority].
+  /// Null means fall back to [ServiceRegistry.defaultPriority].
+  final int? defaultPriority;
+
+  /// Creates a plugin-scoped registry view over [raw] for [pluginId].
+  const ScopedServiceRegistry(this.raw, this.pluginId, {this.defaultPriority});
+
+  /// Returns a copy of this scope that applies [priority] as the default for
+  /// any positional `register*` cascade entry that omits its own `priority`.
+  /// Per-call `priority` always wins.
+  ScopedServiceRegistry withPriority(int priority) =>
+      ScopedServiceRegistry(raw, pluginId, defaultPriority: priority);
+
+  /// Register a factory service using a typed [ServiceId] handle.
+  /// Equivalent to [ServiceRegistry.registerFactory].
+  void registerFactory<T extends Object>(
+    ServiceId service,
+    Factory<T> create, {
+    int? priority,
+    CapabilitySet capabilities = const {},
+  }) => raw.registerFactory<T>(
+    pluginId: pluginId,
+    serviceId: service,
+    create: create,
+    priority: priority ?? defaultPriority ?? ServiceRegistry.defaultPriority,
+    capabilities: capabilities,
+  );
+
+  /// Register a singleton service using a typed [ServiceId] handle.
+  ///
+  /// Construct [instance] inline at the call site
+  /// (`registry.registerSingleton(id, MyService())`). For session plugins,
+  /// `register` runs once per session, so each session gets its own
+  /// instance and there is no cross-session sharing.
+  void registerSingleton<T extends Object>(
+    ServiceId service,
+    T instance, {
+    int? priority,
+    CapabilitySet capabilities = const {},
+  }) => raw.registerSingleton<T>(
+    pluginId: pluginId,
+    serviceId: service,
+    instance: instance,
+    priority: priority ?? defaultPriority ?? ServiceRegistry.defaultPriority,
+    capabilities: capabilities,
+  );
+
+  /// Register a lazy singleton service using a typed [ServiceId] handle.
+  void registerLazySingleton<T extends Object>(
+    ServiceId service,
+    Factory<T> factory, {
+    int? priority,
+    CapabilitySet capabilities = const {},
+  }) => raw.registerLazySingleton<T>(
+    pluginId: pluginId,
+    serviceId: service,
+    factory: factory,
+    priority: priority ?? defaultPriority ?? ServiceRegistry.defaultPriority,
+    capabilities: capabilities,
+  );
+}

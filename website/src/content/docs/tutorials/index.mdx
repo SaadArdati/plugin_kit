@@ -1,0 +1,30 @@
+---
+title: Tutorials
+description: Project-style walkthroughs that build a Plugin Kit feature from start to finish.
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Tutorials are the project-shaped side of the docs. Where guides cover one task and concepts cover one piece of the model, a tutorial walks you through a complete shape: a runtime, a set of plugins, an end-to-end story.
+
+Each one is paired with a runnable example in the [`example/`](https://github.com/SaadArdati/plugin_kit/tree/main/example) directory. Read the page, run the code, swap things around. The example is the source of truth; the tutorial is the map.
+
+## Available tutorials
+
+<CardGrid>
+  <LinkCard
+    title="The villain_lair examples"
+    description="Index of fifteen runnable Dart scenarios in `example/villain_lair/`, each isolating one piece of the runtime. Use it to pick the file that matches what you are trying to learn."
+    href="/tutorials/villain-lair/"
+  />
+  <LinkCard
+    title="The model_embassy tour"
+    description="Six scenarios focused on one shape: priority-based provider routing for an LLM-style application. Passports, visa offices, and the priority cascade that picks one."
+    href="/tutorials/model-embassy/"
+  />
+  <LinkCard
+    title="The code_editor architecture tour"
+    description="A working Flutter app where every UI element beyond the text area is contributed by plugins. Tour of the shell, the descriptor-plus-factory pattern, and the priority-cascade formatter pipeline."
+    href="/tutorials/code-editor/"
+  />
+</CardGrid>

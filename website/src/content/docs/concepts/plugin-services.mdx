@@ -1,0 +1,238 @@
+---
+title: Plugin Services
+description: Stateful services with automatic lifecycle management and settings injection.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Plugins are wiring; services are the meat. This page is about which kind of service holds the meat.
+
+There are three tiers, escalating by which plugin_kit features the behavior actually needs.
+
+| Tier | Use when |
+|---|---|
+| Plain Dart class (no plugin_kit base class) | the behavior does not need settings injection, lifecycle, or event subscriptions |
+| `PluginService` | the service should read injected `RuntimeSettings.services` config and have registry-stamped identity |
+| `StatefulPluginService<Ctx>` | the service needs `attach()` / `detach()`, a bound session context, auto-tracked subscriptions, and a place for session-bound state |
+
+If your plugin class is getting fat, that is almost always a hint that the work belongs in one of these three tiers, not on the plugin. Plain classes register as factories (fresh instance per `context.resolve<T>()`) or as singletons when sharing the instance is safe. `PluginService` and `StatefulPluginService` register as singletons or lazy singletons; the stateful variant rejects factories because the runtime needs an instance to track.
+
+This page is the natural next step after [Adding a Plugin](/guides/adding-a-plugin/): the plugin class stays focused on wiring, services carry settings, state, and long-lived behavior.
+
+## `PluginService`
+
+`PluginService` gives you three things.
+
+- Injected settings, accessible as a typed `ConfigNode` via `config`.
+- The raw settings map as `settings`, for when you need to pass it through.
+- Authoritative identity via `pluginId` and `serviceId`.
+
+```dart
+class ModelRouter extends PluginService {
+  String get defaultModel => config.getString('default_model') ?? 'gpt-4.1';
+  double get temperature => config.getDouble('temperature') ?? 0.7;
+}
+```
+
+<Aside type="caution" title="Identity is stamped on resolve, not on construct">
+`pluginId` and `serviceId` are set by the registry when the service is resolved.
+They are not constructor arguments, and they are not valid until resolution through 
+the registry has happened. Do not read them from the constructor.
+
+They are `late` fields, they will throw a `LateInitializationError` if
+accessed via the constructor.
+</Aside>
+
+## `StatefulPluginService`
+
+`StatefulPluginService` extends `PluginService` with session lifecycle. It adds `attach(context)`, `detach()`, a bound `context`, and automatic subscription tracking.
+
+```dart
+class DebugAdapter extends StatefulPluginService {
+  @override
+  void attach() {
+    on<DebugEvent>((e) {
+      print('debug action: ${e.event.action}');
+    });
+  }
+
+  @override
+  Future<void> detach() async {
+    print('adapter shutting down');
+  }
+}
+```
+
+`attach()` and `detach()` are pure user hooks: no super call, no `context` parameter. The framework binds and unbinds `this.context` around them via library-private `_bindContext` / `_unbindContext`, and cancels every tracked subscription and binding after `detach()` returns. Helpers (`on`, `onRequest`, `bind`, `emit`, `resolve`, etc.) read `this.context` implicitly, so subscriptions inside `attach()` are always bucketed correctly.
+
+The one method that does require super is `injectSettings(...)`, which carries the actual settings injection logic. See "Reacting to settings changes" below.
+
+## Reacting to settings changes
+
+`PluginService.injectSettings(...)` is the handoff point for effective config. The base implementation
+stores the raw settings, builds a fresh `ConfigNode`, and updates the cached hash.
+
+If your service needs to react when settings change (to throw away a compiled cache, 
+for example), override it and call `super`.
+
+```dart
+class CachedFormatter extends StatefulPluginService {
+  String? _compiledTemplate;
+
+  @override
+  void injectSettings(Map<String, dynamic> settings, {String? hash}) {
+    super.injectSettings(settings, hash: hash);
+    _compiledTemplate = null;
+  }
+}
+```
+
+For singletons and lazy singletons, the registry hashes effective settings and
+only re-injects when they actually changed. Each individual `config.getX(...)` read is O(1): a hash-map
+lookup plus at most one type check. The O(n) cost (a deep hash over the new settings) only
+pays out when `injectSettings` actually runs again.
+
+## Subscription tracking
+
+After importing `plugin_kit`, extension helpers appear on `StatefulPluginService`. Use those instead
+of reaching straight for `context.bus` unless you have a reason not to.
+
+The three that track their own subscriptions:
+
+- `on<T>()`
+- `onRequest<Req, Res>()`
+- `onRequestSync<Req, Res>()`
+
+When `detach()` runs, every tracked subscription is cancelled for you. This is most of the point of
+using a stateful service in the first place: the runtime can tear it down predictably
+without you writing explicit cleanup code.
+
+The extension also adds shorthand for the non-subscription actions you need day
+to day: `emit(...)`, `resolve(...)`, `maybeResolve(...)`, and `resolveAfter(...)`. Those are covered
+in the next section. To resolve a namespaced slot, build 
+the `ServiceId` via `Namespace.call(...)` and pass it to `resolve(...)` or `maybeResolve(...)`.
+
+## Resolving and emitting
+
+Stateful services also get short helpers for common runtime actions, so you do not
+have to go through `context` for the normal cases.
+
+```dart
+class ConversationState extends StatefulPluginService {
+  @override
+  void attach() {
+    on<UserMessage>((e) async {
+      final memory = resolve<ConversationMemory>(const ServiceId('memory'));
+      memory.append(e.event.text);
+      await emit(MessageStored(e.event.text));
+    });
+  }
+}
+```
+
+The service-level helpers are thin wrappers over the session context:
+
+- `resolve(...)`
+- `maybeResolve(...)`
+- `resolveAfter(...)`
+- `emit(...)`
+
+For namespaced slots, build a `ServiceId` via `Namespace.call(...)` and pass it to `resolve(...)` or `maybeResolve(...)`.
+
+The convenience `emit(...)` mirrors the underlying `EventBus.emit` signature: pass `(event, {identifier})` and 
+await the returned `EventEnvelope<T>` to read the `stopped` flag, the identifier, or
+the possibly-mutated payload.
+
+[Events](/concepts/events/) and [Event Bus](/concepts/event-bus/) cover what the envelope carries and when it matters.
+
+## How settings arrive
+
+Settings are injected by the `ServiceRegistry` at resolution time, so:
+
+- the service has to be resolved through the registry
+- the service has to extend `PluginService`
+- the settings key has to match the service's slot
+
+```dart
+final settings = RuntimeSettings(
+  services: {
+    const PluginId('model_router').service(const ServiceId('decider')):
+        ServiceSettings(
+          config: {'default_model': 'gpt-4.1-mini'},
+        ),
+  },
+);
+```
+
+```dart
+class ModelRouter extends PluginService {
+  String get defaultModel => config.getString('default_model') ?? 'gpt-4.1';
+}
+```
+
+Singletons and lazy singletons avoid redundant reinjection when the effective settings hash has not changed.
+
+## The case for stateful services
+
+The runtime runs the full plugin lifecycle on a toggle: `attach` re-runs on enable, `detach` re-runs on disable. Subscriptions registered directly from `SessionPlugin.attach(context)` via the auto-tracked helpers (`on(context, ...)`, `bind(context, ...)`) are torn down for you on disable. So plugin-level subscriptions can stay correct without ceremony.
+
+Stateful services pay for themselves when the work is more than wiring:
+
+- The `on / onRequest / bind` helpers track subscriptions and bindings automatically.
+- The framework cancels every tracked subscription after `detach()` returns. You never maintain a `_subs` list.
+- It separates wiring (the plugin class) from state (the service), which scales as the plugin grows.
+
+That makes stateful services the natural home for anything with long-lived state:
+
+- long-lived bus subscriptions
+- timers
+- session-bound caches
+- mutable session state
+
+If you find yourself writing `final _subs = <StreamSubscription>[];` on a `SessionPlugin`, that is usually the signal to promote the state to a stateful service.
+
+## Registration rule
+
+Register stateful services as singletons or lazy singletons.
+
+- `registerSingleton(...)` or
+- `registerLazySingleton(...)`
+
+Factories are rejected. A factory would produce a fresh instance every resolve, and there
+is no way for the runtime to track or detach something it never got to see again.
+
+## Thin plugin, fat service
+
+A clean default structure:
+
+- Plugin class: wiring, ids, registration.
+- `PluginService`: configurable services.
+- `StatefulPluginService`: session-bound behavior and subscriptions.
+
+That keeps the plugin class small and makes lifecycle obvious.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Adding a Plugin"
+    description="The thin-plugin shape this page builds on."
+    href="/guides/adding-a-plugin/"
+  />
+  <LinkCard
+    title="Event Patterns"
+    description="Using on, onRequest, emit, and the envelope from inside plugin code."
+    href="/concepts/events/"
+  />
+  <LinkCard
+    title="Configuration"
+    description="How ConfigNode reads injected settings in a typed way."
+    href="/concepts/configuration/"
+  />
+  <LinkCard
+    title="Settings and Overrides"
+    description="How settings flow from RuntimeSettings down to service injection."
+    href="/guides/settings/"
+  />
+</CardGrid>
+

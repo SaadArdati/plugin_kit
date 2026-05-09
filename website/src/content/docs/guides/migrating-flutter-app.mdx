@@ -1,0 +1,724 @@
+---
+title: Migrating a Flutter App
+description: Add Plugin Kit to a Flutter app that already uses Provider, Riverpod, BLoC, GetIt, injectors, or plain services.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+Most Flutter apps already have architecture. Good.
+
+You might have Provider, Riverpod, BLoC, GetIt, an injector package, or a
+manager class that slowly became the local government. Plugin Kit is not asking
+you to throw that away. It is the thing you add when a feature wants runtime
+identity: maybe it should be replaceable, isolated per session, user-toggleable,
+or handled by whichever plugin currently wins.
+
+If you need the widget-side shell itself, read [Flutter Integration](/guides/flutter-integration/).
+For library-by-library bridge code that is verified by widget tests in the
+example workspace, read
+[State Management Integrations](/guides/state-management-integrations/). This
+page is about where Plugin Kit should touch an app that already exists.
+
+## Start with one seam
+
+Pick one place where the app currently knows too much about a concrete
+implementation.
+
+Before:
+
+```dart
+GetIt.I.registerLazySingleton<SearchService>(
+  () => AlgoliaSearchService(),
+);
+
+final search = GetIt.I<SearchService>();
+final results = await search.query('buttons');
+```
+
+First migration step:
+
+```dart
+class AlgoliaSearchPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('search.algolia');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerLazySingleton<SearchService>(
+      const ServiceId('search'),
+      () => AlgoliaSearchService(),
+    );
+  }
+}
+
+final search = session.resolve<SearchService>(const ServiceId('search'));
+final results = await search.query('buttons');
+```
+
+Name the plugin after the integration, not the slot. `ServiceId('search')`
+is the generic slot; `PluginId('search.algolia')` is the specific
+implementation occupying it. A second plugin, say `ElasticSearchPlugin`
+with `PluginId('search.elastic')`, can register the same slot, and
+runtime priority decides which wins.
+
+Preferred end state for behavior seams:
+
+```dart
+class SearchRequested {
+  final String query;
+  const SearchRequested(this.query);
+}
+
+class SearchResult {
+  final List<String> hits;
+  const SearchResult(this.hits);
+}
+
+class AlgoliaSearchPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('search.algolia');
+
+  @override
+  void attach(SessionPluginContext context) {
+    onRequest<SearchRequested, SearchResult?>(context, (request) async {
+      final results = await performSearch(request.event.query);
+      return SearchResult(results);
+    });
+  }
+}
+
+final result = await session.maybeRequest<SearchRequested, SearchResult?>(
+  const SearchRequested('buttons'),
+);
+```
+
+That is the migration in miniature: stop teaching the app which service exists,
+start teaching it which request it can make.
+
+## Pick seams users can actually feel
+
+The first good migration seams are usually visible in the product.
+
+| Existing Flutter shape | Plugin Kit seam | What the user feels |
+|---|---|---|
+| a widget or controller branching between concrete providers | one slot or request type | switching implementations stops requiring UI rewrites |
+| a model selector manually filtered by feature flags and provider checks | runtime-backed winner slot plus live settings | available models follow enabled plugins automatically |
+| a chat manager calling "gather context", then "pick model", then "send", then "stream progress" | one outgoing action plus typed events around it | plugins can join the turn without the screen owning every phase |
+| a customization dialog flipping booleans and then manually tearing services down | `updateSettings(...)` | features can turn on and off mid-session without weird leftovers |
+
+That is the kind of result worth aiming for. The architecture matters because
+the product starts feeling more alive and less hard-coded.
+
+## Where Plugin Kit fits
+
+Plugin Kit can sit beside or above your state-management library, depending on how much you ask of the bus. Most apps keep both: the bus carries cross-feature events and plugin lifecycle, the state library exposes values to widgets. The split below is what tends to feel cheapest, not what the framework requires.
+
+| Existing tool | Often keep it for | Where Plugin Kit pulls weight |
+|---|---|---|
+| `Provider` / `ChangeNotifier` | exposing state to widgets | feature boundaries and plugin events |
+| `Riverpod` | app state, derived state, async UI state | runtime/session ownership and plugin protocols |
+| `BLoC` / `Cubit` | screen state transitions, `BlocBuilder` rebuild filtering | cross-feature events, request/response, plugin lifecycle |
+| `GetIt` / injectors | existing app services and legacy dependencies | replaceable plugin services and runtime overrides |
+| Plain managers | orchestration your app already depends on | extensibility seams that other features can join |
+
+We don't bill Plugin Kit as a state manager, but the runtime, registry, and event bus do enough that it can pass for one in a small app. The interesting question is which redundancy you want to pay for: a Cubit that listens to a bus event and re-emits it as widget state is doing the same job twice. We have no opinion either way — we just don't want the docs pretending the overlap isn't there.
+
+## Put the runtime at a real boundary
+
+Do not hide the runtime in a leaf widget.
+
+Put it where your app already owns a unit of work: an app shell, document
+screen, workspace screen, editor screen, chat session, or route-level controller.
+
+```dart
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:plugin_kit/plugin_kit.dart';
+
+class EditorScreen extends StatefulWidget {
+  const EditorScreen({super.key});
+
+  @override
+  State<EditorScreen> createState() => _EditorScreenState();
+}
+
+class _EditorScreenState extends State<EditorScreen> {
+  late final PluginRuntimeManager _plugins;
+
+  PluginSession? _session;
+
+  @override
+  void initState() {
+    super.initState();
+    _plugins = PluginRuntimeManager(
+      plugins: [
+        ChatPlugin(),
+        FilesPlugin(),
+        AnalysisPlugin(),
+      ],
+    );
+    _plugins.init();
+    _createSession();
+  }
+
+  Future<void> _createSession() async {
+    final session = await _plugins.createSession();
+    if (!mounted) return;
+    setState(() => _session = session);
+  }
+
+  @override
+  void dispose() {
+    _plugins.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = _session;
+    if (session == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return EditorBody(session: session);
+  }
+}
+```
+
+That gives you one session-scoped registry and one session bus for the screen.
+Your Provider, Riverpod, or BLoC layer can wrap that session however it wants.
+
+## Direct access vs event contracts
+
+There are two valid ways to connect Flutter code to Plugin Kit.
+
+| Style | What the app knows | Good for | Tradeoff |
+|---|---|---|---|
+| Direct service access | service IDs and service interfaces | stable app services, fast migrations, plugin-provided widget factories | tighter coupling to plugin internals |
+| Event-driven integration | event and request classes | feature protocols, interception, streaming, multiple participants, lazy readiness | you must design the event contract |
+
+Direct access is fine when the service really is a public service contract.
+For example, a shell resolving a `PanelWidgetFactory` is reasonable because the
+shell owns the panel slot.
+
+But for behavior like "send this message," "run analysis," "wait until the
+agent is ready," "append streamed output," or "let plugins prepare the prompt,"
+prefer events.
+
+In practice, this is often the difference between:
+
+- a chat screen that knows there is a context injector service, a model router,
+  and a generation coordinator
+- a chat screen that emits one typed "send this" action and then renders the
+  events and blocks that come back
+
+The second version is where Plugin Kit starts paying rent.
+
+<Aside type="tip" title="Prefer event contracts for new seams">
+Direct service access couples your app to "there is a service with this ID."
+Event-driven integration couples your app to "this thing can happen." The
+second usually ages better.
+</Aside>
+
+## The pragmatic middle ground
+
+Real apps rarely go from zero to perfectly event-driven in one pass.
+
+Use this rule:
+
+| If the caller needs... | Prefer... |
+|---|---|
+| a stable object it will call many times | direct service access |
+| a one-off action | `emit<T>()` |
+| an answer from whoever can provide it | `request<TRequest, TResponse>()` |
+| optional participation from many plugins | events handled with `on<T>()` |
+| a stream of domain updates | semantic events emitted over time |
+| plugin-provided UI factories | direct service access behind a slot interface |
+
+Do not be dogmatic. Be intentional.
+
+If you are looking for a first "oh, this is better" moment, it is usually one
+of these:
+
+- The model selector stops caring which provider plugin is enabled.
+- The chat input stops orchestrating pre-send work directly.
+- The settings screen can toggle a feature and trust the runtime to reconcile.
+- A second workspace opens and none of the first workspace's plugin state leaks.
+
+## Event classes become your API
+
+If you choose the event-driven path, the event classes are now the seam. Treat
+them like public API.
+
+Good event classes are small, boring, and named after behavior:
+
+```dart
+class FileSaveRequested {
+  final String path;
+  final String contents;
+  const FileSaveRequested({required this.path, required this.contents});
+}
+
+class FileSaved {
+  final String path;
+  const FileSaved(this.path);
+}
+```
+
+Avoid putting Flutter objects in them unless the event is explicitly a UI
+contract. `BuildContext`, controllers, focus nodes, and widgets usually belong
+on the Flutter side of the bridge, not inside plugin events.
+
+If events cross a server boundary, make them serializable. For requests where
+you want more than one handler to get a chance, declare the response type as
+nullable. Handlers run in ascending priority order; a non-null return claims
+the call and stops dispatch, while returning `null` concedes to the next
+handler. With a non-nullable response there is no cascade — the first handler
+in priority order always wins.
+
+## Provider and ChangeNotifier
+
+Provider can stay as your widget-tree bridge.
+
+Let the `ChangeNotifier` listen to plugin events and expose widget-friendly
+state. Let user actions go back into the session as events.
+
+```dart
+class ChatMessagesChanged {
+  final List<ChatMessage> messages;
+  const ChatMessagesChanged(this.messages);
+}
+
+class SendMessageRequested {
+  final UserPrompt prompt;
+  const SendMessageRequested(this.prompt);
+}
+
+class ChatBridge extends ChangeNotifier {
+  final PluginSession session;
+
+  late final StreamSubscription _messagesSub;
+  bool _disposed = false;
+
+  List<ChatMessage> messages = const [];
+
+  ChatBridge(this.session) {
+    _messagesSub = session.on<ChatMessagesChanged>((envelope) {
+      if (_disposed) return;
+      messages = envelope.event.messages;
+      notifyListeners();
+    });
+  }
+
+  Future<void> send(UserPrompt prompt) async {
+    await session.emit(SendMessageRequested(prompt));
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _messagesSub.cancel();
+    super.dispose();
+  }
+}
+```
+
+If you keep Provider, this is the cheapest split: Provider drives rebuilds and ergonomic `context.watch`, Plugin Kit owns the runtime protocol. Drop Provider and a `setState` in the shell that listens to the same bus event takes the same role with one fewer layer.
+
+Your widgets stay boring:
+
+```dart
+final bridge = context.watch<ChatBridge>();
+
+return ChatView(
+  messages: bridge.messages,
+  onSend: bridge.send,
+);
+```
+
+## Riverpod
+
+Riverpod is a clean fit when you want the plugin runtime to be app-scoped and
+the session to be route-scoped or workspace-scoped.
+
+```dart
+final pluginManagerProvider = Provider<PluginRuntimeManager>((ref) {
+  final manager = PluginRuntimeManager(
+    plugins: [
+      ChatPlugin(),
+      FilesPlugin(),
+      AnalysisPlugin(),
+    ],
+  );
+  manager.init();
+
+  ref.onDispose(() {
+    manager.dispose();
+  });
+
+  return manager;
+});
+
+final pluginSessionProvider =
+    FutureProvider<PluginSession>((ref) async {
+  final manager = ref.watch(pluginManagerProvider);
+  final session = await manager.createSession();
+  ref.onDispose(() => session.dispose());
+  return session;
+});
+```
+
+Then wrap plugin events in a notifier that Riverpod widgets can watch.
+
+```dart
+class ChatController extends AsyncNotifier<List<ChatMessage>> {
+  StreamSubscription? _messagesSub;
+
+  @override
+  Future<List<ChatMessage>> build() async {
+    ref.onDispose(() {
+      _messagesSub?.cancel();
+    });
+
+    final session = await ref.watch(pluginSessionProvider.future);
+
+    _messagesSub = session.on<ChatMessagesChanged>((envelope) {
+      state = AsyncData(envelope.event.messages);
+    });
+
+    return const [];
+  }
+
+  Future<void> send(UserPrompt prompt) async {
+    final session = await ref.read(pluginSessionProvider.future);
+    await session.emit(SendMessageRequested(prompt));
+  }
+}
+```
+
+Riverpod still does what Riverpod is good at: exposing async state and derived
+state to widgets. Plugin Kit handles feature participation behind that state.
+
+## BLoC and Cubit
+
+BLoC should stay focused on screen state.
+
+The Cubit listens to plugin events, emits UI state, and sends user intents back
+to the plugin session.
+
+```dart
+class ChatCubit extends Cubit<ChatState> {
+  final PluginSession session;
+
+  StreamSubscription? _messagesSub;
+
+  ChatCubit(this.session) : super(ChatState.initial()) {
+    _messagesSub = session.on<ChatMessagesChanged>((envelope) {
+      if (isClosed) return;
+      emit(state.copyWith(messages: envelope.event.messages));
+    });
+  }
+
+  Future<void> send(UserPrompt prompt) async {
+    emit(state.copyWith(sending: true));
+
+    await session.emit(SendMessageRequested(prompt));
+    if (isClosed) return;
+
+    emit(state.copyWith(sending: false));
+  }
+
+  @override
+  Future<void> close() async {
+    await _messagesSub?.cancel();
+    return super.close();
+  }
+}
+```
+
+This keeps the boundary clean:
+
+- widgets talk to the Cubit
+- the Cubit talks to Plugin Kit events
+- plugins talk to each other through the bus
+
+No widget has to resolve `ChatMessagesService`. No Cubit has to know which
+plugin owns message storage.
+
+That said, the Cubit-as-bridge is the most redundant of the integrations on the [State Management Integrations](/guides/state-management-integrations/) page. Read `_messagesSub`'s callback: it takes a bus event and re-emits it as widget state. The bus already shipped that event; the Cubit is forwarding it. Keep the Cubit if `state.copyWith` ergonomics or `BlocBuilder` rebuild filtering pay for themselves; reach past it if not.
+
+## Waiting for readiness
+
+If you find yourself reaching for "wait until X is ready," that usually means
+something upstream is not as reactive as it should be. The right shape is for
+the producer to emit a readiness event once and for everyone who cares to
+react to that event. No polling, no introspection, no `request<WaitForX>`.
+
+```dart
+class AssistantReady {
+  final AssistantClient assistant;
+  const AssistantReady(this.assistant);
+}
+
+class AssistantRuntimeService extends StatefulPluginService {
+  @override
+  void attach() {
+    Future(() async {
+      final assistant = await connectAssistant();
+      emit(AssistantReady(assistant));
+    });
+  }
+}
+
+// Anywhere that needs the assistant subscribes once and reacts:
+on<AssistantReady>((envelope) {
+  // Use envelope.event.assistant.
+});
+```
+
+Fix the upstream design first. The work is usually small and pays off
+everywhere downstream.
+
+### When the producer cannot be made reactive yet
+
+Real codebases accumulate tech debt, and not every readiness seam can be
+reactive on day one. If converting the producer is genuinely out of scope,
+the request-based fallback below is a stop on the way to the event-based
+version, not the destination. Treat each occurrence as a smell to track.
+
+```dart
+class WaitForAssistant {
+  const WaitForAssistant();
+}
+
+class AssistantRuntimeService extends StatefulPluginService {
+  AssistantClient? _assistant;
+  Future<AssistantClient?>? _connecting;
+
+  @override
+  void attach() {
+    onRequest<WaitForAssistant, AssistantClient?>((_) async {
+      return _assistant ??= await (_connecting ??= connectAssistant());
+    });
+  }
+}
+
+final assistant = await session.maybeRequest<WaitForAssistant, AssistantClient?>(
+  const WaitForAssistant(),
+);
+
+if (assistant == null) {
+  throw StateError('Assistant is not available.');
+}
+```
+
+This still hides which plugin creates the assistant from the host, but the
+caller is now the one driving timing — exactly the symptom that an
+`AssistantReady` event would let you delete.
+
+## Streaming through the bus
+
+Streaming does not require exposing a service just so widgets can listen to
+it.
+
+If your assistant produces chunks, emit the chunks as events:
+
+```dart
+class MessageChunkReceived {
+  final String text;
+  const MessageChunkReceived(this.text);
+}
+
+class MessageCompleted {
+  const MessageCompleted();
+}
+
+Future<void> streamAssistantResponse(
+  PluginSession session,
+  AssistantClient assistant,
+  UserPrompt prompt,
+) async {
+  await for (final chunk in assistant.stream(prompt)) {
+    await session.emit(MessageChunkReceived(chunk.text));
+  }
+
+  await session.emit(const MessageCompleted());
+}
+```
+
+A chat plugin can listen to `MessageChunkReceived`, update its internal state,
+and emit `ChatMessagesChanged`. A Provider bridge, Riverpod notifier, or Cubit
+can listen to `ChatMessagesChanged` and rebuild the UI.
+
+For raw streams, announce the stream once and translate it into semantic events
+inside a plugin.
+
+```dart
+class ServerEventStreamReady {
+  final Stream<ServerEvent> events;
+  const ServerEventStreamReady(this.events);
+}
+
+class ServerMessageReceived {
+  final ServerEvent event;
+  const ServerMessageReceived(this.event);
+}
+
+class ServerStreamPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('server_stream');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<ServerStreamBridge>(
+      const ServiceId('server_stream_bridge'),
+      ServerStreamBridge(),
+    );
+  }
+}
+
+class ServerStreamBridge extends StatefulPluginService {
+  StreamSubscription<ServerEvent>? _serverSub;
+
+  @override
+  void attach() {
+    on<ServerEventStreamReady>((envelope) {
+      _serverSub?.cancel();
+      _serverSub = envelope.event.events.listen((serverEvent) {
+        emit(ServerMessageReceived(serverEvent));
+      });
+    });
+  }
+
+  @override
+  Future<void> detach() async {
+    await _serverSub?.cancel();
+  }
+}
+```
+
+The raw stream stays at the edge. The rest of the plugin system gets typed
+domain events.
+
+## GetIt and injector migrations
+
+If your app is built around GetIt or an injector package, do not start by
+rewiring the entire application.
+
+Start with one feature that needs runtime behavior.
+
+<Steps>
+
+1. Leave the existing service in GetIt.
+
+2. Create a plugin that adapts that service into a plugin service or event handler.
+
+3. Move Flutter callers from `GetIt.I<T>()` to plugin events.
+
+4. Once callers stop using the GetIt registration, move construction fully into
+   the plugin.
+
+</Steps>
+
+Adapter plugins are not a failure. They are how you migrate without turning a
+working app into a multi-week archaeology project.
+
+```dart
+class LegacySearchAdapterPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('legacy_search_adapter');
+
+  @override
+  void attach(SessionPluginContext context) {
+    onRequest<SearchRequested, SearchResult?>(context, (request) async {
+      final legacy = GetIt.I<SearchService>();
+      final hits = await legacy.query(request.event.query);
+      return SearchResult(hits);
+    });
+  }
+}
+```
+
+The app now talks to `SearchRequested`. Later, the plugin can stop using GetIt
+internally and nothing outside the plugin has to care.
+
+## What should not move
+
+Do not move everything into Plugin Kit.
+
+Keep these in your existing Flutter architecture:
+
+- route state
+- widget-only animation state
+- text controllers and focus nodes
+- repositories that must initialise inside `main()` before the runtime exists
+  (Firebase, Adjust, crash reporters, deep-link handlers). Plugin Kit can
+  still wrap them later, but only once you understand how their startup
+  ordering relates to runtime and session lifecycle
+- simple state holders that have no plugin participation
+
+Move these toward Plugin Kit:
+
+- optional features
+- user-toggleable features
+- competing implementations
+- cross-feature coordination
+- behavior that should be intercepted or extended
+- services that need session isolation
+- protocols that should work across local, remote, and test implementations
+
+Plugin Kit is most valuable where the app has started asking, "How do I let
+something else participate here without hard-coding it into this manager?"
+
+## A migration checklist
+
+<Steps>
+
+1. Pick one feature seam, not one folder.
+
+   Good seams sound like events: "message sent," "file changed," "analysis
+   requested," "preview became ready," "assistant response chunk received."
+
+2. Add a `PluginRuntimeManager` at the app, workspace, or route boundary.
+
+   Do not scatter runtimes through child widgets.
+
+3. Wrap the session in your existing state-management library.
+
+   Provider, Riverpod, BLoC, and GetIt can all hold or expose the session while
+   you migrate.
+
+4. Start with direct service access only where it is obviously stable.
+
+   Service access is allowed. Just do not let every widget learn your plugin
+   internals.
+
+5. Move behavior to event classes.
+
+   The best seams are requests, commands, facts, and streamed domain updates.
+
+6. Add settings and runtime enablement after the seam works.
+
+   The first win is decoupling. Configuration can follow.
+
+</Steps>
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Flutter Integration"
+    description="Wire a Plugin Kit session into widgets once you know the migration shape."
+    href="/guides/flutter-integration/"
+  />
+  <LinkCard
+    title="Event Bus"
+    description="The core event, request, and streaming patterns behind the preferred integration style."
+    href="/concepts/event-bus/"
+  />
+  <LinkCard
+    title="Adding a Plugin"
+    description="Turn the first migrated feature into a thin plugin."
+    href="/guides/adding-a-plugin/"
+  />
+</CardGrid>

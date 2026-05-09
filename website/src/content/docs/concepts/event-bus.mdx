@@ -1,0 +1,222 @@
+---
+title: Event Bus
+description: Typed, priority-ordered events with request/response and explicit cross-scope routing.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The `EventBus` is how plugins coordinate without holding references to each other. It is typed, priority-ordered,
+and supports both fire-and-forget events and typed request/response. This page is the 
+model: envelope, priority direction, dispatch order, scope routing.
+
+For the patterns that go on top (designing an event type, the pre-commit interception pattern,
+etc...), see [Event Patterns](/concepts/events/).
+
+## The smallest possible event
+
+Define an event type. Emit it. Subscribe from somewhere that has no idea who the emitter is.
+
+```dart
+class UserLoggedInEvent {
+  final String userId;
+  UserLoggedInEvent(this.userId);
+}
+
+context.bus.on<UserLoggedInEvent>((e) {
+  print('User logged in: ${e.event.userId}');
+});
+
+await context.bus.emit<UserLoggedInEvent>(
+  event: UserLoggedInEvent('u_123'),
+);
+```
+
+That is the whole happy path. Emit fires every matching handler in priority order. Emitters
+and subscribers never have to know about each other.
+
+## Every handler gets an envelope
+
+There is one subscription API: `on<T>()`. Every handler you register receives an `EventEnvelope<T>`, not the raw payload. The envelope carries:
+
+- `e.event`: the payload (mutable; downstream handlers see changes).
+- `e.identifier`: the optional scope this event was emitted under.
+- `e.stop(value)`: halt the cascade and pin the final payload to `value`.
+
+A handler can read the payload, mutate it for downstream handlers, or call `e.stop(...)` to end the cascade. [Event Patterns](/concepts/events/) covers the practical shapes (observers, mutators, the pre-commit interception pattern) from inside plugin code; this page sticks to the model.
+
+## Priority, and why it goes the way it does
+
+Event handlers run in ascending priority order. Lower number runs first.
+
+```dart
+context.bus.on<UserMessage>((e) {
+  if (e.event.text.contains('spam')) {
+    e.stop(MessageBlocked());
+  }
+}, priority: 0);
+
+context.bus.on<UserMessage>((e) {
+  processMessage(e.event.text);
+}, priority: 10);
+```
+
+The first handler can mutate the payload so later handlers see the new value, or call `e.stop(...)` to halt 
+the cascade and pin the final result. The second handler only runs if the first one did not stop.
+
+<Aside type="note" title="The two priorities point opposite directions">
+Registry priorities: higher wins. Event priorities: lower runs first. The registry is
+a competition; the bus is a pipeline. The rest of the system follows from that pair.
+</Aside>
+
+## Globally observing all events
+
+`bind(...)` registers a callback that sees every non-internal event on the bus before typed handlers run.
+
+```dart
+final unbind = context.bus.bind((envelope) {
+  logger.debug('event ${envelope.event.runtimeType}');
+});
+```
+
+Use it for tracing or analytics. It is not where business logic lives.
+Think of it as a bus-wide tap that sees the pre-dispatch view of every event.
+`bind` callbacks cannot stop the cascade; they only observe.
+
+## Request and response
+
+The same bus also does typed request/response.
+
+```dart
+context.bus.onRequest<SearchQuery, SearchResults?>((req) async {
+  if (!canHandle(req.event)) return null;
+
+  return await performSearch(req.event.query);
+}, priority: 0);
+
+final results = await context.bus.request<SearchQuery, SearchResults?>(
+  SearchQuery(query: 'dart patterns'),
+);
+```
+
+The dispatch model:
+
+1. Merge general handlers with handlers scoped to the request's identifier (if any).
+2. Try them in ascending priority order.
+3. The first non-null response wins.
+
+That is why `Response` types are usually nullable. `return null` means "I concede, let the next handler try." 
+Returning a value short-circuits the rest.
+
+For strictly synchronous dispatch, use `onRequestSync` / `requestSync`.
+
+For callers who prefer `null` over an exception when no handler responds, `maybeRequest` and `maybeRequestSync` exist too.
+
+For a worked LLM-shaped example of priority-based request dispatch (provider routing, capability
+matching, fallback cascades), see [the model_embassy tour](/tutorials/model-embassy/).
+
+## Identifier scoping
+
+Handlers and emissions can be scoped to an identifier. This is how you multiplex one bus across many
+logical targets (tools, agents, panels, departments, per-document channels) without
+needing a separate bus for each.
+
+```dart
+context.bus.on<ToolExecutionEvent>((e) {
+  print('saw tool execution');
+});
+
+context.bus.on<ToolExecutionEvent>(
+  (e) {
+    print('calculator specifically');
+  },
+  identifier: 'calculator',
+);
+
+await context.bus.emit<ToolExecutionEvent>(
+  event: ToolExecutionEvent(),
+  identifier: 'calculator',
+);
+```
+
+When you emit with an identifier, the bus merges general handlers for that type with handlers
+registered for that exact identifier. Handlers scoped to a different identifier do not see the event at all.
+
+## Global bus and session buses
+
+Plugin Kit has two event scopes:
+
+- One **global bus** owned by the runtime.
+- One **session bus** per active session.
+
+The two are isolated. Events emitted on the global bus do not automatically reach session buses,
+and session events do not escape their session. Cross-scope communication is always explicit.
+
+- Global plugin → global plugins: `context.bus.emit(...)`
+- Session plugin → same-session plugins: `context.bus.emit(...)`
+- Session plugin → global scope: `context.globalBus.emit(...)`
+- Global plugin → every active session: `context.sessions.emit<T>(event)` 
+(via the [`SessionBroadcast`](/concepts/sessions/) extension on `GlobalPluginContext.sessions`)
+
+That isolation is intentional. It keeps event routing auditable, which matters once you have more
+than a handful of plugins across the two scopes.
+
+See [Sessions](/concepts/sessions/) for the full story on cross-scope communication.
+
+## `emit` returns the envelope
+
+`emit` returns `EventEnvelope<T>`, not `Future<void>`. If you do not care about interception, ignore the return value and move on. If you do care:
+
+```dart
+final result = await context.bus.emit<BeforeSaveEvent>(
+  event: BeforeSaveEvent(documentId: 'doc_1'),
+);
+
+if (result.stopped) {
+  print('Save was blocked or replaced: ${result.event}');
+}
+
+// Mutated result.
+final BeforeSaveEvent payload = result.event;
+print('Final document ID to save: ${payload.documentId}');
+```
+
+The envelope carries whatever the handler chain ended up with: the possibly-mutated payload, 
+whether it was stopped, and (if so) the final value.
+
+## Internal events
+
+`emitInternal(...)` dispatches to handlers but skips `bind` observers. Most application code
+never needs this. It exists for system-level signals you want typed handlers to react to
+without cluttering analytics and logging taps.
+
+## Errors propagate
+
+The bus does not swallow handler exceptions. If a handler throws during
+`emit`, `request`, or `requestSync`, the caller sees the exception. That is almost always the right
+tradeoff: silent failure in an event pipeline is much harder to debug a month later than a loud,
+unambiguous exception at the call site.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Event Patterns"
+    description="The patterns side: when to reach for an event, designing event types, the pre-commit interception pattern, common pitfalls."
+    href="/concepts/events/"
+  />
+  <LinkCard
+    title="Plugins"
+    description="How plugins subscribe, unsubscribe, and participate in lifecycle."
+    href="/concepts/plugins/"
+  />
+  <LinkCard
+    title="Plugin Services"
+    description="`StatefulPluginService` has helpers that track subscriptions for you."
+    href="/concepts/plugin-services/"
+  />
+  <LinkCard
+    title="Sessions"
+    description="Where the global bus and session buses come from, and the explicit cross-scope APIs."
+    href="/concepts/sessions/"
+  />
+</CardGrid>

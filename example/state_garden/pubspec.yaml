@@ -1,0 +1,32 @@
+name: state_garden
+description: A workshop where the same plugin_kit chat protocol is bridged to seven Flutter state management libraries side by side.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  collection: ^1.19.1
+  plugin_kit: ^1.0.0
+  flutter_plugin_kit: ^0.1.0
+
+  flutter_bloc: ^9.0.0
+  flutter_riverpod: ^2.6.0
+  provider: ^6.1.2
+  signals_flutter: ^6.0.0
+  mobx: ^2.5.0
+  flutter_mobx: ^2.3.0
+  get_it: ^8.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

@@ -1,0 +1,624 @@
+---
+title: Dialog API
+description: API reference for Plugin Kit Dialog. Covers the dart-only declaration types in plugin_kit and the Flutter UI in plugin_kit_dialog.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page is the curated reference for Plugin Kit Dialog. It covers two packages and the line between them is the architectural point of the dialog: declaration types live in `plugin_kit` (Dart-only) so non-Flutter packages can declare configurable services without taking a Flutter dependency, while the actual UI, controller, theme, and visuals live in `plugin_kit_dialog` (Flutter).
+
+For an end-to-end walkthrough, see the [Plugin Kit Dialog guide](/guides/plugin-kit-dialog/). This page is the API.
+
+## Package split at a glance
+
+| Type | Package | Why it lives there |
+|---|---|---|
+| `UiConfigurableCapability` | `plugin_kit` | Declaration; const-constructable from Dart-only code. |
+| `ConfigField` and subclasses | `plugin_kit` | Declaration; no Flutter types in the public surface. |
+| `ConfigFieldHandle` | `plugin_kit` | Read/write contract for renderers; `Object?`-based. |
+| `showPluginKitDialog`, `PluginKitDialog`, `PluginKitDialogBody` | `plugin_kit_dialog` | Material widgets. |
+| `PluginKitDialogController` | `plugin_kit_dialog` | `ChangeNotifier`-backed draft. |
+| `PluginKitDialogTheme`, `buildPluginKitDialog{Dark,Light}Theme` | `plugin_kit_dialog` | `ThemeExtension` and `ThemeData` builders. |
+| `PluginKitVisualsPlugin`, `PluginKitVisual` | `plugin_kit_dialog` | Host-app overrides for icon, color, label across plugin, namespace, and service axes. |
+
+## Declarative types (in `plugin_kit`)
+
+These four exports are everything you need to declare a configurable service. None of them imports Flutter.
+
+### `UiConfigurableCapability`
+
+```dart
+class UiConfigurableCapability extends Capability {
+  final String label;
+  final String? description;
+  final List<ConfigField> fields;
+
+  const UiConfigurableCapability({
+    required this.label,
+    required this.fields,
+    this.description,
+  });
+}
+```
+
+Attach this capability to a service registration to make it editable in the Services tab. `label` is the section title rendered above the fields; `description` is an optional one-line subtitle; `fields` is rendered top-to-bottom in the card.
+
+A service may attach multiple `UiConfigurableCapability` instances; each becomes its own sub-section under the same service card. Capability resolution otherwise follows the rules described on the [Capability](/reference/service-registry-and-capabilities/) reference page.
+
+```dart
+const agent = Namespace('agent');
+
+registry.registerSingleton<TemperatureService>(
+  agent('temperature'),                  // ServiceId('agent.temperature')
+  TemperatureService(),
+  capabilities: const {
+    UiConfigurableCapability(
+      label: 'Temperature',
+      description: 'Controls randomness in responses.',
+      fields: [
+        NumberConfigField(
+          key: 'temperature',
+          label: 'Temperature',
+          min: 0,
+          max: 2,
+          step: 0.1,
+          defaultValue: 1.0,
+        ),
+      ],
+    ),
+  },
+);
+```
+
+### `ConfigField` (sealed base)
+
+```dart
+sealed class ConfigField {
+  final String key;
+  final String label;
+  final String? helperText;
+  final Object? defaultValue;
+
+  const ConfigField({
+    required this.key,
+    required this.label,
+    this.helperText,
+    this.defaultValue,
+  });
+}
+```
+
+Every field carries the same four slots. `key` is a dotted path under `ServiceSettings.config` (`'model'`, `'provider.name'`, `'limits.max_tokens'`); the dotted form writes to nested maps when the dialog saves. `defaultValue` is what the per-field reset button restores to and what `ConfigNode` returns when the value is absent. See [`ConfigNode`](/concepts/configuration/) for the read-side contract.
+
+The `sealed` modifier means the dialog's renderer dispatch is exhaustive; you cannot add new field types without declaring a new renderer for them through [`ExtensionConfigField`](#extensionconfigfield).
+
+### `TextConfigField`
+
+```dart
+final class TextConfigField extends ConfigField {
+  final String? placeholder;
+
+  const TextConfigField({
+    required super.key,
+    required super.label,
+    super.helperText,
+    super.defaultValue,
+    this.placeholder,
+  });
+}
+```
+
+Single-line text input. `placeholder` shows when no value is set.
+
+### `MultilineConfigField`
+
+```dart
+final class MultilineConfigField extends ConfigField {
+  final List<String> moustacheTags;
+  final int? minLines;
+  final int? maxLines;
+
+  const MultilineConfigField({
+    required super.key,
+    required super.label,
+    super.helperText,
+    super.defaultValue,
+    this.moustacheTags = const [],
+    this.minLines = 6,
+    this.maxLines = 14,
+  });
+}
+```
+
+Multi-line editor sized between `minLines` and `maxLines`. `moustacheTags` declares insertable tag chips shown under the editor; tapping a chip inserts the tag at the caret. Useful for system-prompt fields that accept template variables like `{{user_name}}` or `{{tool_list}}`.
+
+### `PasswordConfigField`
+
+```dart
+final class PasswordConfigField extends ConfigField {
+  final String? placeholder;
+
+  const PasswordConfigField({
+    required super.key,
+    required super.label,
+    super.helperText,
+    super.defaultValue,
+    this.placeholder,
+  });
+}
+```
+
+Obscured input with a show/hide toggle. Same shape as `TextConfigField`; rendered with the entry hidden by default.
+
+### `NumberConfigField`
+
+```dart
+final class NumberConfigField extends ConfigField {
+  final double? min;
+  final double? max;
+  final double? step;
+  final NumberFieldStyle? style;
+  final bool isInteger;
+
+  const NumberConfigField({
+    required super.key,
+    required super.label,
+    super.helperText,
+    super.defaultValue,
+    this.min,
+    this.max,
+    this.step,
+    this.style,
+    this.isInteger = false,
+  });
+}
+```
+
+Numeric input with two render modes. When `style` is null (the default), the dialog auto-picks: slider when both `min` and `max` are non-null, otherwise text input. Set `style` explicitly to force a mode.
+
+When `isInteger` is true, values are stored as `int`, parsing strips decimals, and the slider step defaults to `1` if `step` is null.
+
+### `NumberFieldStyle`
+
+```dart
+enum NumberFieldStyle {
+  slider,
+  textInput,
+}
+```
+
+Forces one render mode for `NumberConfigField`. With `textInput`, any `min`/`max` clamp the parsed value rather than constraining a slider track.
+
+### `DropdownConfigField<T>`
+
+```dart
+final class DropdownConfigField<T> extends ConfigField {
+  final List<DropdownOption<T>> options;
+
+  const DropdownConfigField({
+    required super.key,
+    required super.label,
+    required this.options,
+    super.helperText,
+    super.defaultValue,
+  });
+}
+```
+
+Typed dropdown over `List<DropdownOption<T>>`. The generic flows through to the saved value: a `DropdownConfigField<String>` stores `String` in the config map.
+
+### `DropdownOption<T>`
+
+```dart
+class DropdownOption<T> {
+  final T value;
+  final String label;
+
+  const DropdownOption(this.value, this.label);
+}
+```
+
+A single selectable option. Positional constructor, value first, label second.
+
+### `BoolConfigField`
+
+```dart
+final class BoolConfigField extends ConfigField {
+  const BoolConfigField({
+    required super.key,
+    required super.label,
+    super.helperText,
+    super.defaultValue,
+  });
+}
+```
+
+Switch input. Carries no extra state beyond the four base slots.
+
+### `GroupConfigField`
+
+```dart
+final class GroupConfigField extends ConfigField {
+  final List<ConfigField> children;
+
+  const GroupConfigField({
+    required super.key,
+    required super.label,
+    required this.children,
+    super.helperText,
+  });
+}
+```
+
+Visual sub-section. Renders `label` as a sub-heading and indents `children` beneath it. `key` is a sub-section identifier, not a write target; nested fields keep their own dotted keys.
+
+`GroupConfigField` does not accept `defaultValue` (`super.defaultValue` is omitted): groups have no value of their own.
+
+### `ExtensionConfigField`
+
+```dart
+final class ExtensionConfigField extends ConfigField {
+  final String rendererKey;
+  final Map<String, Object?> args;
+
+  const ExtensionConfigField({
+    required super.key,
+    required super.label,
+    required this.rendererKey,
+    this.args = const {},
+    super.helperText,
+    super.defaultValue,
+  });
+}
+```
+
+Escape hatch for custom renderers without taking a Flutter dependency at the declaration site. The dialog looks up a Flutter-side renderer registered under `rendererKey` and forwards `args` to it. See [Custom renderers](#custom-renderers) below.
+
+### `ConfigFieldHandle`
+
+```dart
+abstract class ConfigFieldHandle {
+  Object? get value;
+  set value(Object? next);
+  bool get isOverridden;
+  void reset();
+}
+```
+
+The opaque value handle a renderer receives. `value` reads and writes the current working value; setting it dirties the draft. `isOverridden` is true when the working value differs from the field's declared default. `reset()` restores the value to `defaultValue`.
+
+Use this from custom renderers; the built-in renderers consume it internally.
+
+## Flutter entry points (in `plugin_kit_dialog`)
+
+Three widgets and one controller. Pick the entry point that matches how much chrome you want to bring yourself.
+
+### `showPluginKitDialog`
+
+```dart
+Future<RuntimeSettings?> showPluginKitDialog({
+  required BuildContext context,
+  required PluginRuntime runtime,
+  required RuntimeSettings initialSettings,
+  required SaveCallback onSave,
+  String title = 'Plugin Kit',
+  PluginKitDialogTheme? theme,
+  bool barrierDismissible = true,
+});
+```
+
+The default entry point: opens a Material `Dialog` containing a `PluginKitDialog`, awaits user interaction, and resolves with the saved `RuntimeSettings` or `null` on cancel. The function builds its own `PluginKitDialogController` internally; you do not need to manage one.
+
+`onSave` is the host-side persistence callback. It runs *before* the dialog closes, so the dialog can reflect any error you choose to surface and so you can write to disk or push to `manager.updateSettings(...)` while the user is still looking at the spinner.
+
+```dart
+typedef SaveCallback = FutureOr<void> Function(RuntimeSettings);
+```
+
+The `Future` return is awaited end-to-end; throwing from `onSave` surfaces a SnackBar inside the dialog and leaves the dialog open with the draft intact.
+
+`theme` is a `PluginKitDialogTheme` (a `ThemeExtension`), not a `ThemeData`. The dialog merges it onto the host's existing theme extensions inside the `showDialog` builder so the dialog route picks it up even though it lives under the root navigator. Pass `null` to inherit the host's theme as-is.
+
+`barrierDismissible: true` is the default; while a save is in flight the dialog hardens against barrier-tap and system-back regardless of this flag.
+
+### `PluginKitDialog`
+
+```dart
+class PluginKitDialog extends StatelessWidget {
+  final PluginKitDialogController controller;
+  final SaveCallback onSave;
+  final VoidCallback onCancel;
+
+  const PluginKitDialog({
+    required this.controller,
+    required this.onSave,
+    required this.onCancel,
+    super.key,
+  });
+}
+```
+
+The Material dialog shell with rounded corners, a `maxWidth` of 920, and a `maxHeight` of 90% of the screen. Use this when you want to drive the dialog yourself: own the controller, decide when to push and pop, intercept cancel for your own confirm flow. The runtime is read off `controller.runtime`.
+
+### `PluginKitDialogBody`
+
+```dart
+class PluginKitDialogBody extends StatefulWidget {
+  final PluginKitDialogController controller;
+  final PluginRuntime runtime;
+  final SaveCallback onSave;
+  final VoidCallback onCancel;
+
+  const PluginKitDialogBody({
+    required this.controller,
+    required this.runtime,
+    required this.onSave,
+    required this.onCancel,
+    super.key,
+  });
+}
+```
+
+The header-plus-tab-content body without the surrounding `Dialog` chrome. Use this when you want a custom container: a side panel, a route, a dedicated page in a desktop layout. Pass the runtime explicitly here; this widget does not assume the controller's runtime is the one you want rendered.
+
+### `PluginKitDialogController`
+
+```dart
+class PluginKitDialogController extends ChangeNotifier {
+  PluginKitDialogController({
+    required this.runtime,
+    required RuntimeSettings initialSettings,
+  });
+
+  final PluginRuntime runtime;
+  PluginKitDialogDraft get draft;
+  bool get isDirty;
+  bool get isSaving;
+  set isSaving(bool value);
+  bool get showAllServices;
+  set showAllServices(bool value);
+
+  void setPluginEnabled(PluginId pluginId, bool enabled);
+  void setServiceField({
+    required String scopedKey,
+    required String fieldKey,
+    required Object? value,
+  });
+  void setServiceEnabled(String scopedKey, bool enabled);
+  void setServicePriority(String scopedKey, int? priority);
+  void resetField(String scopedKey, String fieldKey);
+  void resetService(String scopedKey);
+  void resetPlugin(PluginId pluginId);
+  void resetAll();
+  void replaceWorking(RuntimeSettings parsed);
+  void markSaved();
+}
+```
+
+`ChangeNotifier`-backed mutable container for the working draft. Construct with a `runtime` and the current `initialSettings`; the controller seeds an internal draft and tracks every mutation against it.
+
+`draft.working` is the current edited `RuntimeSettings`; `draft.active` is the baseline you constructed from. `isDirty` flips true as soon as `working` diverges from `active` and back to false on `markSaved` (which the dialog body invokes automatically after `onSave` resolves successfully).
+
+`isSaving` is owned by the dialog body, which flips it around its `await onSave(...)` so the header can render an inline spinner and the body can dim the tab area. Treat the setter as read-only from app code; it is public only so the body can drive it.
+
+`showAllServices` is a UI-only flag for the Advanced tab to show services that match the default and would otherwise be pruned from view.
+
+The mutators are designed to be safe to call repeatedly. Setting a field to a value that matches the defaults plus baseline collapses the override to nothing (no-op deletion), so saving from a dirty-then-reset draft produces minimal `RuntimeSettings`.
+
+<Aside type="note" title="Mutator key shape">
+`setServiceField`, `setServiceEnabled`, `setServicePriority`, `resetField`, and `resetService` all take a `scopedKey` of the form `'pluginId:serviceKey'` (for example `'main_agent:agent.temperature'`). This is the same shape used everywhere services are addressed across plugin boundaries.
+</Aside>
+
+## Visuals (`PluginKitVisualsPlugin`)
+
+Visuals are a Flutter-only concern (icons and colors), so the canonical attachment path is a single locked `GlobalPlugin` that carries host-app overrides keyed by the three axes the dialog renders: plugins, namespace headers, and individual service cards.
+
+### `PluginKitVisualsPlugin`
+
+```dart
+class PluginKitVisualsPlugin extends GlobalPlugin {
+  static const String pluginVisualNamespace = 'plugin_visual';
+  static const String namespaceVisualNamespace = 'namespace_visual';
+  static const String serviceVisualNamespace = 'service_visual';
+  static const int dialogVisualsAdapterPriority = 100;
+  static const id = PluginId('plugin_kit_visuals');
+
+  final Map<PluginId, PluginKitVisual> pluginVisuals;
+  final Map<Namespace, PluginKitVisual> namespaceVisuals;
+  final Map<ServiceId, PluginKitVisual> serviceVisuals;
+
+  PluginKitVisualsPlugin({
+    this.pluginVisuals = const {},
+    this.namespaceVisuals = const {},
+    this.serviceVisuals = const {},
+  });
+}
+```
+
+Locked `GlobalPlugin` (not user-toggleable) that registers host-app visual overrides. Three independent maps so a Flutter host can decorate plugins owned by Dart-only packages without those packages depending on Flutter.
+
+The plugin uses priority `100`, above the default registry priority (`50`), so host overrides beat anything a Flutter plugin self-attaches from its own `register()`. When two host plugins decorate the same key, the standard registry priority and registration order rules apply.
+
+Unknown keys are accepted silently. A `PluginId`, `Namespace`, or `ServiceId` that no current plugin registers is retained without warning, so the visual picks up automatically when the matching plugin gets enabled later. Resolution happens at the consumption site (the dialog's chip builder, the services tab card list); the visuals plugin itself never inspects the registry on attach. If you need to detect leftover or typo'd keys, resolve at the consumption site.
+
+### `PluginKitVisual`
+
+```dart
+class PluginKitVisual {
+  final String? label;
+  final String? description;
+  final Widget? icon;
+  final Color? color;
+
+  const PluginKitVisual({
+    this.label,
+    this.description,
+    this.icon,
+    this.color,
+  });
+}
+```
+
+Same value object across all three axes. Every field is optional; the dialog falls back to a derived default for anything you leave null (raw `pluginId` or namespace name or service id, plugin's own `description`, theme primary color, no icon).
+
+`icon` is a full `Widget`, wrapped by the dialog in an `IconTheme` keyed to the resolved accent so a plain `Icon(Icons.psychology)` inherits color and size automatically. The accent color follows a service-to-namespace-to-owning-plugin-to-theme cascade resolved per render.
+
+```dart
+runtime
+  ..addPlugins([...myDartOnlyPlugins])
+  ..addPlugin(PluginKitVisualsPlugin(
+    pluginVisuals: const {
+      PluginId('main_agent'): PluginKitVisual(
+        label: 'Main Agent',
+        icon: Icon(Icons.psychology),
+        color: Color(0xFF7C5CFF),
+      ),
+    },
+    serviceVisuals: const {
+      Namespace('agent')('temperature'): PluginKitVisual(
+        icon: Icon(Icons.thermostat),
+        color: Color(0xFFFF9500),
+      ),
+    },
+  ));
+```
+
+## Theming (`PluginKitDialogTheme`)
+
+The dialog reads chrome (radii, surfaces, typography) off the host's `ThemeData` and pulls domain-semantic accents off a `PluginKitDialogTheme` extension.
+
+### `PluginKitDialogTheme`
+
+```dart
+class PluginKitDialogTheme extends ThemeExtension<PluginKitDialogTheme> {
+  final Color stableAccent;
+  final Color experimentalAccent;
+  final Color agentAccent;
+  final Color statActiveBackground;
+  final Color statStableBackground;
+  final Color statExperimentalBackground;
+
+  const PluginKitDialogTheme({
+    required this.stableAccent,
+    required this.experimentalAccent,
+    required this.agentAccent,
+    required this.statActiveBackground,
+    required this.statStableBackground,
+    required this.statExperimentalBackground,
+  });
+
+  static PluginKitDialogTheme dark();
+  static PluginKitDialogTheme light();
+  static PluginKitDialogTheme of(BuildContext context);
+
+  @override
+  PluginKitDialogTheme copyWith({...});
+
+  @override
+  PluginKitDialogTheme lerp(...);
+}
+```
+
+A `ThemeExtension` with six accent slots that Material's `ColorScheme` cannot supply: stable plugin tier, experimental plugin tier, agent-config tier, plus three matching stat-chip background tints. Everything else (badge surfaces, text styles, JSON-preview surfaces) is derived from `Theme.of(context)`.
+
+`PluginKitDialogTheme.dark()` and `.light()` are the canonical defaults. `PluginKitDialogTheme.of(context)` returns the registered extension if one exists, otherwise picks dark or light from `Theme.of(context).brightness`. `copyWith` and `lerp` are the standard `ThemeExtension` overrides.
+
+```dart
+showPluginKitDialog(
+  context: context,
+  runtime: myRuntime,
+  initialSettings: settings,
+  onSave: persist,
+  theme: PluginKitDialogTheme.dark().copyWith(
+    stableAccent: Colors.greenAccent,
+    experimentalAccent: Colors.deepOrange,
+  ),
+);
+```
+
+### `buildPluginKitDialogDarkTheme` and `buildPluginKitDialogLightTheme`
+
+```dart
+ThemeData buildPluginKitDialogDarkTheme();
+ThemeData buildPluginKitDialogLightTheme();
+```
+
+Full Material 3 `ThemeData` builders that match the screenshots in the guide. Use one as your `MaterialApp.theme` if you want the dialog to look the way it does in the demo without hand-tuning your own scheme. Both builders include a `PluginKitDialogTheme.dark()` or `.light()` extension on the returned `ThemeData`, so the dialog accents are wired up automatically.
+
+## Custom renderers (`ConfigFieldRenderer`)
+
+Custom field widgets register against the same registry that the dialog itself uses. The `ConfigFieldRenderer<F>` interface is the contract.
+
+```dart
+abstract interface class ConfigFieldRenderer<T extends ConfigField> {
+  Widget build(
+    BuildContext context,
+    T field,
+    ConfigFieldHandle handle,
+    FieldRenderResolver resolveRenderer,
+  );
+}
+
+typedef FieldRenderResolver = ConfigFieldRenderer Function(ConfigField field);
+```
+
+A renderer takes a typed field, the field's current value handle, and a resolver for nested fields (used by group rendering). Build whatever widget you want; write through `handle.value = next` and the dialog tracks the edit on the working draft.
+
+Renderers register under the namespace `'config_field_renderer'` keyed by a string `serviceId` of your choosing. The `ExtensionConfigField.rendererKey` you declare on the field side is the `serviceId` the dialog looks up.
+
+```dart
+class ColorPickerRenderer
+    implements ConfigFieldRenderer<ExtensionConfigField> {
+  const ColorPickerRenderer();
+
+  @override
+  Widget build(context, field, handle, resolveRenderer) {
+    final allowAlpha = field.args['allow_alpha'] as bool? ?? false;
+    return ColorPicker(
+      value: handle.value as int? ?? 0xFF000000,
+      onChanged: (next) => handle.value = next,
+      allowAlpha: allowAlpha,
+    );
+  }
+}
+
+class ColorPickerRendererPlugin extends GlobalPlugin {
+  @override
+  PluginId get pluginId => const PluginId('color_picker_renderer');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerFactory<ConfigFieldRenderer>(
+      FieldRenderersPlugin.namespace('color_picker'),
+      ColorPickerRenderer.new,
+    );
+  }
+}
+```
+
+The renderer resolves at render time: registering your plugin after the dialog opens does not affect an in-flight session. If the dialog cannot resolve a `rendererKey`, it surfaces an inline placeholder card naming the missing key rather than throwing during paint.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Plugin Kit Dialog (guide)"
+    description="The how-to walkthrough: install, three tabs, dirty state, the visuals story, custom renderers."
+    href="/guides/plugin-kit-dialog/"
+  />
+  <LinkCard
+    title="Capabilities"
+    description="The Capability base type, attachment shapes, and the metadata model UiConfigurableCapability rides on."
+    href="/concepts/capabilities/"
+  />
+  <LinkCard
+    title="Configuration"
+    description="ConfigNode and the read-side contract for the values these fields write into ServiceSettings.config."
+    href="/concepts/configuration/"
+  />
+  <LinkCard
+    title="Service Registry & Capabilities (reference)"
+    description="The Capability base type and registration helpers used to attach UiConfigurableCapability."
+    href="/reference/service-registry-and-capabilities/"
+  />
+</CardGrid>

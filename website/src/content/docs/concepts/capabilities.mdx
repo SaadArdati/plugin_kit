@@ -1,0 +1,158 @@
+---
+title: Capabilities
+description: Discover service features without instantiating them. Define your own capability types; the runtime stays out of it.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Capabilities are metadata tags attached to service registrations. They exist so you can inspect what a service claims to support without instantiating it.
+
+That sounds minor until you start building:
+
+- settings UIs
+- extension manifests
+- plugin discovery panels
+- slot inspectors
+- routing logic based on declared behavior
+
+At that point, you definitely want to know what a service claims before you pay the cost of constructing it.
+
+This page comes after services and settings. Once a plugin has something useful to expose, capabilities make that usefulness discoverable to the host app.
+
+## The key idea
+
+Capabilities live on the registration wrapper, not on the service instance.
+
+That means you can inspect them through `resolveRaw(...)` without constructing the service.
+
+```dart
+const tooling = Namespace('tooling');
+final wrapper = context.registry.resolveRaw(tooling('formatter'));
+final caps = wrapper.capabilities;
+```
+
+That makes capabilities safe for discovery code. The host can walk the registry without accidentally starting services, opening sockets, or triggering lazy singletons too early.
+
+## A capability can be literally anything
+
+`Capability` is an empty abstract base class. You subclass it to describe whatever facts about a slot matter to your app. The runtime does not interpret the fields, does not validate them, and does not know which subclasses exist. It just stores them.
+
+That is the point. You are not registering against a fixed schema Plugin Kit defined for you. You are stapling arbitrary tags onto a slot and reading them back later on your own terms.
+
+```dart
+class SupportsFileFormats extends Capability {
+  final Set<String> extensions;
+  const SupportsFileFormats(this.extensions);
+}
+
+class IsSlowCapability extends Capability {
+  final bool isSlow;
+  const IsSlowCapability({this.isSlow = true});
+}
+
+class CeoLovesThisCapability extends Capability {
+  const CeoLovesThisCapability();
+}
+```
+
+Any of those is a real capability. All three can coexist on the same registration. The runtime treats them identically.
+
+## Attaching capabilities at registration
+
+Pass a set of capabilities when you register the service.
+
+```dart
+class FormatterCapability extends Capability {
+  final List<String> supportedLanguages;
+  const FormatterCapability(this.supportedLanguages);
+}
+
+registry.registerSingleton<FormatterService>(
+  const ServiceId('formatter'),
+  SqlFormatter(),
+  capabilities: {
+    const FormatterCapability(['sql']),
+    const IsSlowCapability(isSlow: false),
+  },
+);
+```
+
+Later, the host reads them back:
+
+```dart
+final wrapper = context.registry.resolveRaw(const ServiceId('formatter'));
+final cap = wrapper.capabilities.getOfType<FormatterCapability>();
+```
+
+No instance of `SqlFormatter` was ever created.
+
+![Plugin Kit Dialog Services tab showing expanded service cards with capability chips, priority badges, and configuration fields](/images/dialog/services_tab_dark.png)
+
+*Capability chips on each service card are how the dialog renders these tags. Provider, model, priority badges. None of the underlying services were instantiated to draw this.*
+
+## Capability lookup helpers
+
+`CapabilityLookup` adds two small but useful helpers on `Set<Capability>`.
+
+- `hasType<T>()`
+- `getOfType<T>()`
+
+```dart
+final caps = wrapper.capabilities;
+
+if (caps.hasType<IsSlowCapability>()) {
+  final slow = caps.getOfType<IsSlowCapability>()!;
+  if (slow.isSlow) {
+    // Warn the user before invoking this slot in a latency-sensitive path.
+  }
+}
+```
+
+Cleaner than manual casting, and clearer at the call site.
+
+## Discovery APIs
+
+| API | What it gives you |
+|---|---|
+| `resolveRaw(...)` | the current winning wrapper for one slot |
+| `listCapabilitiesOfNamespace(...)` | all capabilities seen under a namespace |
+
+Both return data without instantiating services. Combine them with your own `hasType<T>()` / `getOfType<T>()` reads to build whatever discovery surface your app needs.
+
+## When capabilities are the right tool
+
+Capabilities work best when they describe stable facts about a slot.
+
+**Good examples**
+
+- supported languages or file formats
+- supported runtimes
+- feature tier ("free", "pro", "internal")
+- whether the slot is slow or safe to call on the UI thread
+
+**Less good examples**
+
+- ephemeral runtime state
+- data that only makes sense after the service has started
+
+Rule of thumb: if the answer depends on a running instance, it belongs on the service. If the answer should be discoverable before instantiation, it belongs in a capability.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Service Registry"
+    description="Where capabilities live, and how resolveRaw finds them."
+    href="/concepts/service-registry/"
+  />
+  <LinkCard
+    title="Configuration"
+    description="How typed settings pair with discoverable metadata."
+    href="/concepts/configuration/"
+  />
+  <LinkCard
+    title="Settings and Overrides"
+    description="How wildcard overrides interact with registrations."
+    href="/guides/settings/"
+  />
+</CardGrid>

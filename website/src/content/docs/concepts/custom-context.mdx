@@ -1,0 +1,178 @@
+---
+title: Custom Contexts
+description: Extending PluginContext, GlobalPluginContext, and SessionPluginContext with domain-specific fields.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The default `PluginContext`, `GlobalPluginContext`, and `SessionPluginContext` give you a registry, a bus, and some framework-level plumbing. That is enough for small apps. Once your domain has opinions, you usually want the context to carry them directly instead of resolving the same services over and over.
+
+Custom contexts are how you do that.
+
+Reach for this after the plugin shape is already clear. Contexts are for
+shared domain facts that many plugins need: the current document, current user,
+tool registry, app shell, or routing table.
+
+## When you need one
+
+Use the default contexts if plugins only ever interact with the registry and the bus. If your plugins keep reaching for the same piece of state (the current user, the active document, a tool registry, a routing table), promoting it to a field on a custom context makes every plugin simpler.
+
+Rough rule: if three plugins want the same thing, put it on the context.
+
+## Subclassing
+
+Subclass `SessionPluginContext` (or `GlobalPluginContext`, or both) to add fields.
+
+```dart
+class EditorSessionContext extends SessionPluginContext {
+  final Document document;
+  final UserSession user;
+
+  EditorSessionContext({
+    required super.registry,
+    required super.bus,
+    required super.globalBus,
+    required this.document,
+    required this.user,
+  });
+}
+```
+
+Session plugins can now type their context directly:
+
+```dart
+class AutosavePlugin extends SessionPlugin<EditorSessionContext> {
+  @override
+  PluginId get pluginId => const PluginId('autosave');
+
+  @override
+  void attach(EditorSessionContext context) {
+    on<DocumentEdited>(context, (_) {
+      scheduleSave(context.document, context.user.id);
+    });
+  }
+}
+```
+
+No casting, no re-resolving. `context.document` and `context.user` are always there.
+
+## Telling the runtime about it
+
+The runtime does not know your custom context type unless you hand it a factory.
+
+| Scope | Where to supply the factory |
+|---|---|
+| Global | `runtime.init(globalContextFactory: ...)` |
+| Session | `runtime.createSession(contextFactory: ...)` |
+
+```dart
+runtime.init(
+  globalContextFactory: (registry, bus, sessions) => EditorGlobalContext(
+    registry: registry,
+    bus: bus,
+    sessions: sessions,
+    application: myEditorApp,
+  ),
+);
+
+final session = await runtime.createSession(
+  contextFactory: (registry, sessionBus, globalBus) => EditorSessionContext(
+    registry: registry,
+    bus: sessionBus,
+    globalBus: globalBus,
+    document: currentDocument,
+    user: currentUser,
+  ),
+);
+```
+
+<Aside type="caution" title="Forget the factory and the runtime throws">
+If a plugin expects a custom context type but you forgot to pass the factory, the runtime throws `StateError` at init or `createSession`. The default factories only build the base types, and silently downcasting would hide the misconfiguration until a plugin tried to read a field that did not exist. The loud failure is the better tradeoff.
+</Aside>
+
+## A realistic global context
+
+A global context usually carries application-level singletons that do not belong in the registry: the top-level app object, a telemetry client, a feature flag service.
+
+```dart
+class EditorGlobalContext extends GlobalPluginContext {
+  final EditorApplication application;
+  final FeatureFlagClient flags;
+
+  EditorGlobalContext({
+    required super.registry,
+    required super.bus,
+    required super.sessions,
+    required this.application,
+    required this.flags,
+  });
+}
+```
+
+Global plugins consume it exactly like session plugins consume the session context.
+
+```dart
+class AnalyticsPlugin extends GlobalPlugin<EditorGlobalContext> {
+  @override
+  PluginId get pluginId => const PluginId('analytics');
+
+  @override
+  void attach(EditorGlobalContext context) {
+    if (context.flags.isOn('analytics_v2')) {
+      context.application.telemetry.start();
+    }
+  }
+}
+```
+
+## Mixing scopes
+
+A session plugin can declare a custom session context while the global context stays the default, and vice versa. The two are independent. A plugin that extends `SessionPlugin<EditorSessionContext>` is happy as long as its session's factory produces that type. Whatever the global scope looks like is not its concern.
+
+## Factories on the manager
+
+`PluginRuntimeManager` exposes both factories directly.
+
+```dart
+final manager = PluginRuntimeManager<EditorGlobalContext, EditorSessionContext>();
+
+manager.init(
+  initialSettings: savedSettings,
+  globalContextFactory: (registry, bus, sessions) => EditorGlobalContext(
+    registry: registry,
+    bus: bus,
+    sessions: sessions,
+    application: myEditorApp,
+  ),
+);
+
+final session = await manager.createSession(
+  contextFactory: (registry, sessionBus, globalBus) => EditorSessionContext(
+    registry: registry,
+    bus: sessionBus,
+    globalBus: globalBus,
+    document: currentDocument,
+    user: currentUser,
+  ),
+);
+```
+
+No subclassing or drop-down to `PluginRuntime` needed.
+
+## Do not over-model
+
+Two small cautions.
+
+**Do not put everything on the context.** If only one plugin uses a field, that field belongs in that plugin's services, not on the context. The context is a shared scratchpad for things multiple plugins want.
+
+**Do not mirror the registry.** If a field on the context is already resolvable from the registry, you are probably duplicating information that will drift. Pick one home.
+
+Most teams converge on a small, stable custom context with three to five fields. Anything past that usually wants to be a service, a capability, or a session-scoped service.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard title="Plugins" description="The scope choice (global vs session) determines which context a plugin sees." href="/concepts/plugins/" />
+  <LinkCard title="Runtime" description="Where context factories plug in, and when they run." href="/concepts/runtime/" />
+  <LinkCard title="Plugin Services" description="Service-shaped data vs context-shaped data." href="/concepts/plugin-services/" />
+</CardGrid>

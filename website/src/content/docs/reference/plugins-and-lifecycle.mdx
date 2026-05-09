@@ -1,0 +1,409 @@
+---
+title: Plugins & Lifecycle
+description: Reference for plugin base classes, contexts, the runtime, the manager, and the lifecycle phases that connect them.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page covers the types you reach for when defining plugins, hosting them, or driving lifecycle transitions: `Plugin`, its two scoped subclasses, the contexts they receive, the `PluginRuntime` that owns them, the `PluginRuntimeManager` wrapper, and the exception thrown when a phase aggregates failures. For service registration mechanics see [Service Registry & Capabilities](/concepts/service-registry/); for event dispatch see [Event Bus & Events](/concepts/event-bus/).
+
+## `PluginId`
+
+A zero-cost extension type wrapping a `String`. `PluginId` is the canonical identifier the runtime uses to register plugins, key service overrides, and resolve dependencies. It compiles to its underlying `String`, so `==` against a `String` literal works, and it can be used as a `Map` key with the same hash semantics as the wrapped value.
+
+```dart
+const id = PluginId('greeter');
+
+id.value;          // 'greeter'
+id == 'greeter';   // true (delegates to String equality)
+```
+
+Use `const PluginId('...')` everywhere a plugin id is required. The runtime accepts no other shape.
+
+## `Plugin`
+
+`Plugin` is the abstract base class. You never extend it directly: extend `GlobalPlugin<G>` or `SessionPlugin<S>` instead. Both inherit the same surface, listed here once.
+
+```dart
+abstract class Plugin {
+  PluginId get pluginId;
+  Set<PluginId> get dependencies => const {};
+  List<FeatureFlag> get featureFlags => const [];
+
+  void register(ScopedServiceRegistry registry) {}
+
+  void attach(covariant PluginContext context);
+
+  Future<void> detach(covariant PluginContext context);
+
+  Future<void> onPluginSettingsChanged(
+    covariant PluginContext oldContext,
+    covariant PluginContext newContext,
+  );
+}
+```
+
+| Member | Purpose |
+|---|---|
+| `pluginId` | Unique identifier. Lowercase snake_case by convention. Two plugins with the same id cannot coexist in one runtime. |
+| `dependencies` | Set of `PluginId`s this plugin requires. The runtime auto-disables a plugin whose dependency is not enabled. Locked plugins with unmet dependencies stay enabled and log at severe. |
+| `featureFlags` | Behavioral flags. Used by the runtime to set default enablement and by UI to render badges. |
+| `register` | Contributes services to the registry. Called once per scope on every enabled plugin before any `attach` runs. |
+| `attach` | Called after every plugin in the scope has registered. Subscribe to events here, not in `register`. Pure user hook with a no-op base implementation; do not call `super.attach`. The runtime binds the context and attaches owned `StatefulPluginService`s around your hook. |
+| `detach` | Mirror of attach. Pure user hook with a no-op base implementation; do not call `super.detach`. The runtime detaches owned services, cancels tracked plugin subscriptions, and clears the bound context around your hook. |
+| `onPluginSettingsChanged` | Called for plugins that remain enabled across a settings update. Newly enabled or disabled plugins go through full attach/detach instead. |
+
+Equality is on `(runtimeType, pluginId)`. A `GlobalPlugin('x')` and a `SessionPlugin('x')` are distinct instances and do not collide.
+
+## `StatefulPluginService<PKC>`
+
+`StatefulPluginService` extends `PluginService` and adds lifecycle hooks plus a bound context window. Use it when a service needs `attach` / `detach`, event subscriptions, or direct access to scoped context fields while attached.
+
+```dart
+abstract class StatefulPluginService<PKC extends PluginContext> extends PluginService {
+  void attach();
+  Future<void> detach();
+}
+```
+
+| Member | Purpose |
+|---|---|
+| `activeSubscriptions` | Tracked subscriptions created by service helpers. The framework cancels them automatically after `detach` returns. |
+| `hasContext` | Whether a context is currently bound (`true` between attach and detach). |
+| `context` | The current bound context. Throws `StateError` if accessed outside the attach/detach window. |
+| `attach` | Setup hook for subscription and startup logic while the context is bound. |
+| `detach` | Cleanup hook that runs while context is still bound; framework cleanup runs after it returns. |
+
+## `GlobalPlugin<G>` and `SessionPlugin<S>`
+
+The two scoped subclasses. They differ only in which context they accept and when the runtime instantiates the scope. Pick `GlobalPlugin` for app-lifetime concerns, `SessionPlugin` for per-session concerns. The choice is architectural and is covered in [Plugins](/concepts/plugins/).
+
+```dart
+abstract class GlobalPlugin<G extends GlobalPluginContext> extends Plugin {
+  @override void attach(G context);
+  @override Future<void> detach(G context);
+}
+
+abstract class SessionPlugin<S extends SessionPluginContext> extends Plugin {
+  @override void attach(S context);
+  @override Future<void> detach(S context);
+}
+```
+
+The type parameter narrows `attach` and `detach` so the compiler rejects passing the wrong scope's context. If your runtime uses a custom `GlobalPluginContext` or `SessionPluginContext` subtype, parameterize the plugin on that subtype and the lifecycle hooks pick it up. See [Adding a Plugin](/guides/adding-a-plugin/) for a worked example.
+
+## `FeatureFlag`
+
+A zero-cost extension type wrapping a `String`. Defined flags steer runtime behavior; custom flags are inert tags you can use for UI or audit purposes.
+
+```dart
+extension type const FeatureFlag(String value) {
+  static const locked = FeatureFlag('locked');
+  static const experimental = FeatureFlag('experimental');
+}
+```
+
+| Flag | Effect |
+|---|---|
+| `FeatureFlag.locked` | Plugin is always enabled. Cannot be disabled via `RuntimeSettings`. Unmet dependencies log at severe instead of auto-disabling. |
+| `FeatureFlag.experimental` | Plugin is disabled by default. Must be explicitly enabled via `RuntimeSettings`. |
+| Custom (e.g. `FeatureFlag('requires_network')`) | Inspected by your code or UI. The runtime ignores unknown flags. |
+
+```dart
+@override
+List<FeatureFlag> get featureFlags => const [
+  FeatureFlag.experimental,
+  FeatureFlag('requires_network'),
+];
+```
+
+Because `FeatureFlag` is a `const` extension type, the static constants compose naturally with Dart's dot-shorthand syntax inside a typed list literal.
+
+## `PluginContext`
+
+The bundle of services and helpers handed to every plugin lifecycle hook. Domain-specific projects subclass this to carry additional state.
+
+```dart
+class PluginContext {
+  final ServiceRegistry registry;
+  final EventBus bus;
+  final Map<String, Object> extras;
+
+  T resolve<T extends Object>(ServiceId serviceId);
+  T? maybeResolve<T extends Object>(ServiceId serviceId);
+  T resolveAfter<T extends Object>({required PluginId pluginId, required ServiceId serviceId});
+
+  Future<Response> request<Request, Response>(Request r, {String? identifier});
+  Future<Response?> maybeRequest<Request, Response>(Request r, {String? identifier});
+  Response requestSync<Request, Response>(Request r);
+  Response? maybeRequestSync<Request, Response>(Request r);
+
+  PluginContext copyWith({ServiceRegistry? registry, Map<String, Object>? extras, EventBus? bus});
+
+  factory PluginContext.stub({ServiceRegistry?, EventBus?, Map<String, Object>?});
+}
+```
+
+To resolve a namespaced slot, build the `ServiceId` via `Namespace.call(...)` (or `Namespace.service(...)`) and pass it to `resolve(...)` or `maybeResolve(...)`. There are no separate `*Namespace` helpers; the registry only knows about `ServiceId`.
+
+The shorthand methods on `PluginContext` delegate to `registry` and `bus`. Use them or reach through to the underlying instance directly: both produce identical results.
+
+`PluginContext.stub()` returns a context wired to an empty registry and a fresh bus. Use it from unit tests when you want to instantiate a `PluginService` or call a lifecycle hook without standing up a runtime.
+
+## `GlobalPluginContext`
+
+`PluginContext` plus a list of every active `PluginSession`. Global plugins use this to broadcast across sessions or to look up which session has a particular plugin enabled.
+
+```dart
+class GlobalPluginContext extends PluginContext {
+  final List<PluginSession> sessions;
+
+  PluginSession sessionOf(PluginId pluginId);
+}
+```
+
+To broadcast an event to every session, use the `SessionBroadcast` extension on `List<PluginSession>`. It iterates each session and emits on its bus, which is the explicit cross-scope path documented under [Runtime](/concepts/runtime/).
+
+```dart
+await context.sessions.emit(InvalidateCacheEvent());
+```
+
+`sessionOf` throws `StateError` if no session has the plugin enabled. Wrap the call when you cannot guarantee an enabled session exists.
+
+## `SessionPluginContext`
+
+`PluginContext` plus a reference to the global `EventBus`. Session plugins use it when they need to reach the global scope.
+
+```dart
+class SessionPluginContext extends PluginContext {
+  final EventBus globalBus;
+}
+```
+
+Emit on `context.bus` for in-session communication, on `context.globalBus` to reach handlers on the global bus. There is no implicit forwarding between the two.
+
+## `PluginSession<K>`
+
+A scoped session with its own registry, bus, and plugin attachments. The runtime constructs and tracks `PluginSession` instances; you receive them from `PluginRuntime.createSession` (or `PluginRuntimeManager.createSession`) and dispose them when the session ends.
+
+```dart
+class PluginSession<K extends PluginContext> {
+  final ServiceRegistry registry;
+  final EventBus bus;
+  final K context;
+  final List<Plugin> plugins;
+  final RuntimeSettings settings;
+
+  bool isPluginEnabled(PluginId pluginId);
+  Future<void> dispose();
+
+  // Via SessionHelper extension:
+  T resolve<T>(ServiceId serviceId);
+  T? maybeResolve<T extends Object>(ServiceId serviceId);
+  Future<EventEnvelope<T>> emit<T>(T event, {String? identifier});
+  StreamSubscription on<T>(EventHandler<T> handler, {int priority, String? identifier});
+}
+```
+
+| Member | Behavior |
+|---|---|
+| `registry` | Session-scoped registry seeded with overrides from `settings` and populated by every enabled session plugin's `register`. |
+| `bus` | Session-scoped event bus. Disposed when the session is disposed. |
+| `context` | The domain-specific context handed to lifecycle hooks. Type `K` is whatever your runtime parameterizes on. |
+| `settings` | The `RuntimeSettings` snapshot used to create the session. Read-only; settings updates flow through the runtime's reconciliation path. |
+| `isPluginEnabled` | Whether the plugin is currently attached in this session. Tracked separately from registry contents because some plugins only register tools. |
+| `dispose` | Detaches every enabled plugin, disposes the session bus, removes the session from the runtime. Throws `PluginLifecycleException` aggregating any detach failures. |
+| `resolve` / `emit` / `on` | Convenience helpers via `SessionHelper`. Equivalent to going through `registry` or `bus` directly. |
+
+## `PluginRuntime<G, S>`
+
+The lifecycle engine. Owns the global scope, creates sessions, runs reconciliation. Type parameters: `G extends GlobalPluginContext` is the global context class, `S extends SessionPluginContext` is the session context class. Use the defaults when you do not need extra fields.
+
+```dart
+class PluginRuntime<G extends GlobalPluginContext, S extends SessionPluginContext> {
+  PluginRuntime({List<Plugin>? plugins});
+  PluginRuntime.empty();
+
+  late final ServiceRegistry globalRegistry;
+  late final EventBus globalBus;
+  late final G globalContext;
+
+  List<Plugin> get plugins;
+  List<GlobalPlugin> get globalPlugins;
+  List<SessionPlugin> get sessionPlugins;
+  List<PluginSession<S>> get sessions;
+
+  void addPlugin(Plugin plugin);
+  void addPlugins(List<Plugin> plugins);
+
+  PluginRuntime init({
+    RuntimeSettings? settings,
+    Set<PluginId>? defaultEnabledPluginIds,
+    GlobalContextFactory<G, S>? globalContextFactory,
+  });
+
+  Future<PluginSession<S>> createSession({
+    RuntimeSettings settings = const RuntimeSettings.empty(),
+    SessionContextFactory<G, S>? contextFactory,
+  });
+
+  bool isPluginEnabled(PluginId pluginId, RuntimeSettings settings);
+
+  Future<void> updateGlobalSettings({
+    required RuntimeSettings oldSettings,
+    required RuntimeSettings newSettings,
+  });
+
+  Future<void> updateSessionSettings(
+    PluginSession<S> session, {
+    required RuntimeSettings newSettings,
+  });
+
+  Future<void> dispose();
+}
+```
+
+Order of operations:
+
+1. Instantiate the runtime with an optional plugin list. Add more later with `addPlugin` or `addPlugins`.
+2. Call `init` once. The runtime registers and attaches every enabled `GlobalPlugin`, builds `globalRegistry`, `globalBus`, and `globalContext`.
+3. Call `createSession` per session you need. Each call builds an isolated session registry and bus, registers every enabled `SessionPlugin`, and attaches them.
+4. Call `updateGlobalSettings` or `updateSessionSettings` to reconcile a settings change. The runtime diffs old against new, runs detach for newly disabled plugins, register/attach for newly enabled, and `onPluginSettingsChanged` for survivors.
+5. Call `dispose` once at shutdown. The runtime detaches global plugins, disposes every session, and disposes the global bus.
+
+`init` accepts `defaultEnabledPluginIds`. When `null`, plugins are enabled by default except those marked with `FeatureFlag.experimental`, which default off; when non-null, only listed ids are enabled by default. Explicit `RuntimeSettings.plugins` entries always override these defaults.
+
+`globalContextFactory` is required when `G` is a custom subtype of `GlobalPluginContext`. The default factory builds a base `GlobalPluginContext`, which cannot be cast to a tighter type. Same rule for `contextFactory` on `createSession` when `S` is custom.
+
+`isPluginEnabled` answers "would this plugin be enabled under these settings?" without applying dependency resolution. Use it for previews and UI tooling.
+
+When attach throws inside `init`, `createSession`, or a settings update, the runtime collects every failure and throws `PluginLifecycleException` after the loop completes. Plugins that did not throw remain attached.
+
+## `PluginRuntimeManager<G, S>`
+
+A high-level wrapper around `PluginRuntime` that adds settings storage, a broadcast stream, and a single `updateSettings` call that reconciles every scope and session. Most applications use this rather than `PluginRuntime` directly.
+
+```dart
+class PluginRuntimeManager<G extends GlobalPluginContext, S extends SessionPluginContext> {
+  PluginRuntimeManager({List<Plugin>? plugins});
+
+  late final PluginRuntime<G, S> runtime;
+
+  RuntimeSettings get settings;
+  Stream<RuntimeSettings> get settingsStream;
+
+  void init({
+    RuntimeSettings? initialSettings,
+    Set<PluginId>? defaultEnabledPluginIds,
+    GlobalContextFactory<G, S>? globalContextFactory,
+  });
+
+  void addPlugin(Plugin plugin);
+  void addPlugins(List<Plugin> plugins);
+
+  Future<PluginSession<S>> createSession({
+    RuntimeSettings? settings,
+    S Function(ServiceRegistry, EventBus, EventBus)? contextFactory,
+  });
+
+  Iterable<Plugin> get enabledPlugins;
+  Set<PluginId> get enabledPluginIds;
+  bool isPluginEnabled(PluginId pluginId);
+
+  Future<void> updateSettings(RuntimeSettings newSettings);
+  void updateSettingsSnapshot(RuntimeSettings value);
+  void resetSettings();
+
+  Future<void> dispose();
+}
+```
+
+| Member | Behavior |
+|---|---|
+| `runtime` | The wrapped `PluginRuntime`. Reach through it for advanced operations. |
+| `settings` | The current `RuntimeSettings` snapshot. Updated by `updateSettings`, `updateSettingsSnapshot`, and `resetSettings`. |
+| `settingsStream` | Broadcast stream that emits whenever settings change. New subscribers do not receive the current value; read `settings` for the latest snapshot. |
+| `init` | Applies `initialSettings` to the controller, then delegates to `runtime.init`. |
+| `createSession` | Defaults `settings` to the manager's current snapshot. |
+| `enabledPlugins` / `enabledPluginIds` | Filtered views of `runtime.plugins` against the current snapshot. |
+| `updateSettings` | Full reconciliation: runs `updateGlobalSettings`, then `updateSessionSettings` for every active session sequentially in insertion order, then publishes the new snapshot. The new snapshot is published only after every reconcile call has completed; a failure in any phase aborts and preserves the prior snapshot. |
+| `updateSettingsSnapshot` | Stores and publishes the new snapshot without any lifecycle work. Use when you want listeners to see the change but the runtime has already converged (or you intend to converge it later). |
+| `resetSettings` | Replaces stored settings with `RuntimeSettings()`. No reconciliation. |
+| `dispose` | Disposes the runtime and closes the settings stream. |
+
+```dart
+final manager = PluginRuntimeManager(plugins: allPlugins);
+manager.init(initialSettings: savedSettings);
+
+final session = await manager.createSession();
+await manager.updateSettings(newSettings); // full reconcile
+manager.updateSettingsSnapshot(snapshot);  // publish without reconciling
+```
+
+The two update modes solve different problems. `updateSettings` is the normal path: it converges the live runtime on a new state. `updateSettingsSnapshot` is for cases where listeners need to see a snapshot but the runtime already reflects it (replaying a saved draft into the UI, for example).
+
+## Plugin lifecycle phases
+
+Within a scope, every enabled plugin finishes each phase before any plugin starts the next. The full sequence on a fresh scope is `register` → `attach`. The full sequence on shutdown is `detach`.
+
+| Phase | When | What runs |
+|---|---|---|
+| `register` | During `runtime.init` (global) or `runtime.createSession` (session) | `plugin.register(scopedRegistry)` populates the registry. No bus access yet. |
+| `attach` | After every plugin in the scope has registered | The runtime binds the context, calls `plugin.attach(context)`, and attaches owned `StatefulPluginService`s. Plugins subscribe to events here. |
+| `onPluginSettingsChanged` | During `updateGlobalSettings` or `updateSessionSettings` for plugins enabled both before and after | Receives `oldContext` and `newContext` so the plugin can diff and react. |
+| `detach` | During `dispose`, or during a settings update for a plugin transitioning enabled to disabled | The runtime calls `plugin.detach(context)`, detaches owned services, cancels tracked subscriptions, and clears the bound context. |
+
+The practical rule: anything that depends on another plugin belongs in `attach`. At `register` time, peers may not have registered yet.
+
+## `PluginLifecycleException`
+
+Thrown when one or more plugins fail during a lifecycle phase. The runtime continues processing remaining plugins after a throw, then throws this exception with every collected failure once the loop completes.
+
+```dart
+class PluginLifecycleException implements Exception {
+  final String phase;
+  final List<(PluginId pluginId, Object error, StackTrace stackTrace)> failures;
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `phase` | Name of the phase that aggregated the failures. One of `attachGlobal`, `attachSession`, `detachGlobal`, `detachSession`, `updateSessionSettings`, `updateGlobalSettings`. |
+| `failures` | Unmodifiable list of `(pluginId, error, stackTrace)` records, one per plugin that threw. |
+
+```dart
+try {
+  await runtime.dispose();
+} on PluginLifecycleException catch (e) {
+  for (final (pluginId, error, stackTrace) in e.failures) {
+    log.severe('$pluginId failed during ${e.phase}', error, stackTrace);
+  }
+}
+```
+
+The runtime never swallows lifecycle failures. If you want best-effort disposal that does not surface errors, catch `PluginLifecycleException` at the call site and log; the runtime has already finished its work by the time it throws.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Plugins"
+    description="Conceptual model for plugins, scopes, dependencies, and feature flags."
+    href="/concepts/plugins/"
+  />
+  <LinkCard
+    title="Runtime"
+    description="How the runtime spawns sessions, isolates state, and reconciles settings."
+    href="/concepts/runtime/"
+  />
+  <LinkCard
+    title="Adding a Plugin"
+    description="Step-by-step walkthrough for writing a new plugin from scratch."
+    href="/guides/adding-a-plugin/"
+  />
+  <LinkCard
+    title="Settings"
+    description="The reconciliation flow for live settings updates and overrides."
+    href="/guides/settings/"
+  />
+</CardGrid>

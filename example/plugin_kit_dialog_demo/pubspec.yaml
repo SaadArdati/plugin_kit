@@ -1,0 +1,32 @@
+name: plugin_kit_dialog_demo
+description: Runnable demo for the plugin_kit_dialog package — boots a PluginRuntime with no-op plugins and opens the dialog.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_kit: ^1.0.0
+  plugin_kit_dialog: ^0.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  golden_toolkit: ^0.15.0
+
+flutter:
+  uses-material-design: true
+  fonts:
+    # Override the system 'monospace' family alias so widgets that use
+    # `fontFamily: 'monospace'` render with real glyphs in tests/goldens.
+    # Roboto Mono ships under Apache 2.0.
+    - family: monospace
+      fonts:
+        - asset: assets/fonts/RobotoMono-Regular.ttf
+
