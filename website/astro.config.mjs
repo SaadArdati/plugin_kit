@@ -46,7 +46,7 @@ export default defineConfig({
 			customCss: ['./src/styles/custom.css'],
 			plugins: [
 				starlightPageActions({
-					baseUrl: 'https://SaadArdati.github.io/plugin_kit',
+					baseUrl: 'https://plugin-kit-docs.saadodi44.workers.dev',
 				}),
 			],
 			sidebar: [
