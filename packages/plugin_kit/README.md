@@ -2,7 +2,10 @@
   <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/logo-256.png" width="160" alt="Plugin Kit logo" />
 </p>
 
-# plugin_kit
+<p align="center">
+  <a href="https://pub.dev/packages/plugin_kit"><img src="https://img.shields.io/pub/v/plugin_kit.svg" alt="pub package" /></a>
+  <a href="https://github.com/SaadArdati/plugin_kit/blob/main/packages/plugin_kit/LICENSE"><img src="https://img.shields.io/badge/license-BSD--3--Clause-blue.svg" alt="License: BSD-3-Clause" /></a>
+</p>
 
 A Dart plugin runtime for apps that have grown into platforms. Features get real lifecycles. Services get replaceable, prioritized implementations. Sessions stay sealed. Events flow between parts of your app that have never been formally introduced.
 
@@ -16,16 +19,7 @@ Three primitives carry the whole library:
 
 Plugins are wiring; services are the meat. The plugin class declares an id, registers services, and stays small. Real behavior — anything stateful, configurable, or replaceable — lives in services.
 
-## Install
-
-```yaml
-dependencies:
-  plugin_kit: ^1.0.0
-```
-
-Pure Dart. No Flutter. Depends only on `collection` and `meta`. Requires Dart `>=3.10.0`.
-
-If your app is Flutter and you want scope widgets that carry the runtime/session through the tree plus a `State` mixin that auto-cancels bus subscriptions, add [`flutter_plugin_kit`](https://pub.dev/packages/flutter_plugin_kit). For a drop-in customization UI on top of any runtime, add [`plugin_kit_dialog`](https://pub.dev/packages/plugin_kit_dialog). Both are optional.
+Pure Dart. No Flutter. Depends only on `collection` and `meta`.
 
 ## Quick start
 

@@ -2,20 +2,16 @@
   <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/logo-256.png" width="160" alt="Plugin Kit logo" />
 </p>
 
-# flutter_plugin_kit
+<p align="center">
+  <a href="https://pub.dev/packages/flutter_plugin_kit"><img src="https://img.shields.io/pub/v/flutter_plugin_kit.svg" alt="pub package" /></a>
+  <a href="https://github.com/SaadArdati/plugin_kit/blob/main/packages/flutter_plugin_kit/LICENSE"><img src="https://img.shields.io/badge/license-BSD--3--Clause-blue.svg" alt="License: BSD-3-Clause" /></a>
+</p>
 
 Skip the boilerplate of plumbing [`plugin_kit`](https://pub.dev/packages/plugin_kit) through your widget tree. `flutter_plugin_kit` adds scope widgets that carry the runtime and session, a `State` mixin that auto-cancels event subscriptions, a `ChangeNotifier` adapter, and `BuildContext` extensions for reading the latest event of any type.
 
 The exposed types implement standard Flutter `ChangeNotifier` / `ValueListenable` / `Stream` interfaces, so they drop into `provider`, `flutter_bloc`, `riverpod`, signals, and others as ordinary values. Use only the adapters your app already needs — or skip a state library entirely and use the bus directly.
 
-## Install
-
-```yaml
-dependencies:
-  flutter_plugin_kit: ^0.1.0
-```
-
-Pulls in only `flutter` and `plugin_kit`. Requires Flutter `>=3.27.0` and Dart `>=3.10.0`.
+Pulls in only `flutter` and `plugin_kit`.
 
 ## What's in the box
 

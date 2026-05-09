@@ -2,11 +2,16 @@
   <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/logo-256.png" width="160" alt="Plugin Kit logo" />
 </p>
 
-# plugin_kit_dialog
+<p align="center">
+  <a href="https://pub.dev/packages/plugin_kit_dialog"><img src="https://img.shields.io/pub/v/plugin_kit_dialog.svg" alt="pub package" /></a>
+  <a href="https://github.com/SaadArdati/plugin_kit/blob/main/packages/plugin_kit_dialog/LICENSE"><img src="https://img.shields.io/badge/license-BSD--3--Clause-blue.svg" alt="License: BSD-3-Clause" /></a>
+</p>
 
 A Flutter dialog that inspects and edits any [`plugin_kit`](https://pub.dev/packages/plugin_kit) `PluginRuntime` at runtime. Drop it in once
 and your users get a three-tab UI for toggling plugins, editing service fields, and inspecting the registry, without
 you writing a settings screen per plugin set.
+
+`plugin_kit` carries the dart-only declaration types (`UiConfigurableCapability`, `ConfigField`, etc). `plugin_kit_dialog` adds the Flutter UI.
 
 - **Plugins tab**: enable/disable each plugin; locked entries can't be toggled, experimental ones are flagged.
 - **Services tab**: every service that ships a `UiConfigurableCapability` becomes an editable card. Edit text,
@@ -21,16 +26,6 @@ you writing a settings screen per plugin set.
 ![Plugin Kit Dialog Advanced tab showing the service registry inspector with namespaces, competing registrations, priority badges, and the current winner picked out](https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/example/plugin_kit_dialog_demo/test/goldens/advanced_tab_dark.png)
 
 The dialog is built from `plugin_kit` plugins itself. Every tab, header action, and field renderer is a real plugin you can shadow or replace from your host app.
-
-## Install
-
-```yaml
-dependencies:
-  plugin_kit: ^1.0.0
-  plugin_kit_dialog: ^0.1.0
-```
-
-`plugin_kit` carries the dart-only declaration types (`UiConfigurableCapability`, `ConfigField`, etc). `plugin_kit_dialog` adds the Flutter UI. Requires Flutter `>=3.27.0` and Dart `>=3.10.0`.
 
 ## Quick start
 
