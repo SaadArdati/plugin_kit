@@ -3,8 +3,8 @@ import 'package:plugin_kit/plugin_kit.dart';
 import 'core_plugin.dart';
 
 /// Local LLM runner that competes for `agent:model` with Ollama/LM Studio
-/// targets. Sits below chat_manager (priority 50) so the Advanced inspector
-/// shows it as a shadowed contender.
+/// targets. Sits below the `chat` plugin (priority 50) so the Advanced
+/// inspector shows it as a shadowed contender.
 class LocalLlmRunnerPlugin extends GlobalPlugin {
   /// Stable plugin id used by the registry and overrides.
   static const id = PluginId('local_llm_runner');

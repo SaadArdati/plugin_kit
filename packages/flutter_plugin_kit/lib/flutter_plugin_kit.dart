@@ -3,7 +3,7 @@
 /// Provides:
 ///
 /// - [PluginRuntimeScope] / [PluginSessionScope] — `InheritedWidget`s that
-///   carry a `PluginRuntimeManager` / `PluginSession` through the tree.
+///   carry a `PluginRuntime` / `PluginSession` through the tree.
 /// - [PluginSessionStateListener] — a `State` mixin that subscribes to
 ///   session bus events using portable [EventBinding] descriptors and
 ///   re-attaches automatically across session swaps.

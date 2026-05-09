@@ -103,10 +103,10 @@ class _EditorScreen extends StatefulWidget {
 
 class _EditorScreenState extends State<_EditorScreen>
     with SingleTickerProviderStateMixin {
-  late final PluginRuntimeManager _manager;
+  late final PluginRuntime _runtime;
   PluginSession? _session;
   StreamSubscription? _refreshSub;
-  bool _managerInitialized = false;
+  bool _runtimeInitialized = false;
 
   late final List<TextDocument> _documents;
   late TabController _tabController;
@@ -143,12 +143,12 @@ class _EditorScreenState extends State<_EditorScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_managerInitialized) return;
-    // Manager is owned by the ambient PluginRuntimeScope; this state only
+    if (_runtimeInitialized) return;
+    // Runtime is owned by the ambient PluginRuntimeScope; this state only
     // builds and disposes the session it needs (the toggle handler calls
     // updateSessionSettings, which requires imperative session ownership).
-    _manager = PluginRuntimeScope.of(context);
-    _managerInitialized = true;
+    _runtime = PluginRuntimeScope.of(context);
+    _runtimeInitialized = true;
     unawaited(_createSession());
   }
 
@@ -158,7 +158,7 @@ class _EditorScreenState extends State<_EditorScreen>
         e.key: PluginConfig(enabled: e.value),
     };
 
-    _session = await _manager.createSession(
+    _session = await _runtime.createSession(
       settings: RuntimeSettings(plugins: pluginConfigs),
     );
 
@@ -249,10 +249,10 @@ class _EditorScreenState extends State<_EditorScreen>
     _refreshSub?.cancel();
     _tabController.dispose();
     _textController.dispose();
-    // The ambient PluginRuntimeScope owns the manager and disposes it on
-    // unmount; the manager's own dispose path iterates and disposes its
+    // The ambient PluginRuntimeScope owns the runtime and disposes it on
+    // unmount; the runtime's own dispose path iterates and disposes its
     // sessions. Disposing the session here too would race the scope's
-    // manager.dispose iteration and double-detach the plugins.
+    // runtime.dispose iteration and double-detach the plugins.
     super.dispose();
   }
 
@@ -277,7 +277,7 @@ class _EditorScreenState extends State<_EditorScreen>
             e.key: PluginConfig(enabled: e.value),
         },
       );
-      await _manager.runtime.updateSessionSettings(session, newSettings: next);
+      await _runtime.updateSessionSettings(session, newSettings: next);
       await _collectUI();
     });
     await _togglePending;

@@ -1,18 +1,18 @@
 /// # 13: Settings Reconciliation
 ///
-/// `PluginRuntimeManager` wraps a `PluginRuntime` with a `settingsStream`
-/// and lets you reconcile settings mid-session. Disabled plugins detach;
+/// `PluginRuntime` exposes a `settingsStream` and lets you reconcile
+/// settings mid-session. Disabled plugins detach;
 /// surviving plugins get `onPluginSettingsChanged` so they can re-read
 /// their service config and change behavior without restarting.
 ///
 /// Covers:
-/// - `PluginRuntimeManager` plus `settingsStream`
-/// - `manager.init(initialSettings: ...)` for initial plugin enablement
+/// - `PluginRuntime` plus `settingsStream`
+/// - `runtime.init(settings: ...)` for initial plugin enablement
 /// - `runtime.updateSessionSettings(...)` for session reconciliation
 /// - `Plugin.onPluginSettingsChanged`: react to new service config
 /// - `ServiceSettings` keyed by `pluginId:serviceId`
-/// - `manager.updateSettingsSnapshot(...)`: config-only update, no lifecycle
-/// - `manager.isPluginEnabled(...)`
+/// - `runtime.updateSettingsSnapshot(...)`: config-only update, no lifecycle
+/// - `runtime.isPluginEnabled(...)`
 library;
 
 import 'dart:async';
@@ -179,18 +179,18 @@ class TrapDepartmentPlugin extends SessionPlugin {
 }
 
 Future<void> main() async {
-  print('=== Setting Up with PluginRuntimeManager ===\n');
+  print('=== Setting Up with PluginRuntime ===\n');
 
-  final manager = PluginRuntimeManager();
+  final runtime = PluginRuntime();
 
-  manager.addPlugins([
+  runtime.addPlugins([
     CafeteriaPlugin(),
     DeathRayPlugin(),
     TrapDepartmentPlugin(),
   ]);
 
   // settingsStream publishes every reconciled PluginSettings.
-  final settingsSub = manager.settingsStream.listen((settings) {
+  final settingsSub = runtime.settingsStream.listen((settings) {
     final enabled = settings.plugins.entries
         .where((e) => e.value.enabled)
         .map((e) => e.key)
@@ -207,7 +207,7 @@ Future<void> main() async {
       PluginId('trap_department'): PluginConfig(enabled: true),
     },
   );
-  manager.init(initialSettings: initialPluginSettings);
+  runtime.init(settings: initialPluginSettings);
 
   // Service config targets `pluginId:serviceId` keys. That's how
   // settings reach a PluginService: its `config` field is filled from
@@ -230,11 +230,11 @@ Future<void> main() async {
       ),
     },
   );
-  // Stage the full settings into the manager before createSession uses them.
-  manager.updateSettingsSnapshot(initialSettings);
+  // Stage the full settings into the runtime before createSession uses them.
+  runtime.updateSettingsSnapshot(initialSettings);
 
   print('Creating session: plugins attach and print initial output:');
-  final session = await manager.createSession();
+  final session = await runtime.createSession();
 
   // Helper: reconcile session plugins with new settings, then publish on
   // the settings stream. This routes service config into session plugins
@@ -242,8 +242,8 @@ Future<void> main() async {
   // `updateSessionSettings` already calls `plugin.detach` on newly-disabled
   // plugins, so no manual pre-detach is needed.
   Future<void> reconcile(RuntimeSettings next) async {
-    await manager.runtime.updateSessionSettings(session, newSettings: next);
-    manager.updateSettingsSnapshot(next);
+    await runtime.updateSessionSettings(session, newSettings: next);
+    runtime.updateSettingsSnapshot(next);
   }
 
   print('\n=== Scenario A: Budget Boost ===');
@@ -291,20 +291,20 @@ Future<void> main() async {
 
   print('\n=== Plugin Status ===');
   print(
-    '  Cafeteria enabled: ${manager.isPluginEnabled(const PluginId('cafeteria'))}',
+    '  Cafeteria enabled: ${runtime.isPluginEnabled(const PluginId('cafeteria'))}',
   );
   print(
-    '  Death Ray enabled: ${manager.isPluginEnabled(const PluginId('death_ray'))}',
+    '  Death Ray enabled: ${runtime.isPluginEnabled(const PluginId('death_ray'))}',
   );
   print(
-    '  Trap Dept enabled: ${manager.isPluginEnabled(const PluginId('trap_department'))}',
+    '  Trap Dept enabled: ${runtime.isPluginEnabled(const PluginId('trap_department'))}',
   );
 
   print('\n=== Scenario C: updateSettingsSnapshot (No Reconciliation) ===');
   // updateSettingsSnapshot swaps settings on the stream without running
   // attach/detach/onPluginSettingsChanged. The service's config is
   // updated in place; the next resolve or read reflects it.
-  manager.updateSettingsSnapshot(
+  runtime.updateSettingsSnapshot(
     cuts.copyWith(
       services: {
         Pin('cafeteria', ['menu']): const ServiceSettings(
@@ -320,7 +320,7 @@ Future<void> main() async {
 
   print('\n=== Shutdown ===');
   await settingsSub.cancel();
-  await manager.dispose();
+  await runtime.dispose();
 
   print('\nBudget meeting adjourned. Doug is updating his resume.');
   print("Gary offered to do Doug's job for free. Everyone said no.");

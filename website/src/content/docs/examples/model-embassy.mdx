@@ -5,9 +5,9 @@ description: Six scenarios that teach model provider routing through agents, pas
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-`example/model_embassy/` is a tutorial that teaches Plugin Kit through a model-routing metaphor. An agent presents a `ModelPassport` (model family, requirements). The embassy registers one `VisaOffice` per provider. The first office that can honour the passport issues a `ModelVisa` carrying a ready-to-use client. Offices that cannot serve the request return `null` so the next candidate gets a turn.
+`example/model_embassy/` teaches Plugin Kit through a model-routing metaphor. An agent presents a `ModelPassport` (model family, requirements). The embassy registers one `VisaOffice` per provider. The first office that can honour the passport issues a `ModelVisa` carrying a ready-to-use client. Offices that cannot serve the request return `null` so the next candidate gets a turn.
 
-If [the villain_lair examples](/tutorials/villain-lair/) cover the runtime concept by concept, this one is a focused study of a single shape: priority-based provider routing for an LLM-style application.
+If [the villain_lair examples](/examples/villain-lair/) cover the runtime concept by concept, this one is a focused study of a single shape: priority-based provider routing for an LLM-style application.
 
 ## Run the scenarios
 
@@ -106,7 +106,7 @@ Concepts: every concept page that touches priority, request/response, or setting
   <LinkCard
     title="The villain_lair examples"
     description="Broader walk through every concept in fifteen scenarios. Read this if you want depth across the whole runtime."
-    href="/tutorials/villain-lair/"
+    href="/examples/villain-lair/"
   />
   <LinkCard
     title="Service Registry"

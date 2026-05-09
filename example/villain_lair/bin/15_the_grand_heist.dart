@@ -3,7 +3,7 @@
 /// A full heist demonstrates most of the APIs in one file: a global plugin,
 /// session plugins with dependencies, a stateful service, request/response
 /// with identifiers, event mutation via `on`, settings injection, and
-/// settings reconciliation through `PluginRuntimeManager`.
+/// settings reconciliation through `PluginRuntime`.
 library;
 
 import 'dart:async';
@@ -244,9 +244,9 @@ class GarysPlugin extends SessionPlugin {
 }
 
 Future<void> main() async {
-  final manager = PluginRuntimeManager();
+  final runtime = PluginRuntime();
 
-  manager.addPlugins([
+  runtime.addPlugins([
     WhiskersGlobalPlugin(),
     CommandCenterPlugin(),
     AccountingPlugin(),
@@ -255,7 +255,7 @@ Future<void> main() async {
     GarysPlugin(),
   ]);
 
-  manager.init();
+  runtime.init();
 
   print('╔══════════════════════════════════════╗');
   print('║   OPERATION MIDNIGHT TUNA            ║');
@@ -265,7 +265,7 @@ Future<void> main() async {
   print('╚══════════════════════════════════════╝\n');
 
   // Service settings inject the budget config into BudgetTracker on resolve.
-  final session = await manager.createSession(
+  final session = await runtime.createSession(
     settings: RuntimeSettings(
       services: {
         Pin('accounting', ['budget']): ServiceSettings(
@@ -349,7 +349,7 @@ Future<void> main() async {
       acquiredBy: 'Infiltration Team',
     ),
   );
-  await manager.runtime.globalBus.emit(
+  await runtime.globalBus.emit(
     event: const LootAcquired(
       "World's Largest Tuna (4.2 meters)",
       acquiredBy: 'Infiltration Team',
@@ -401,7 +401,7 @@ Future<void> main() async {
 
   print('\n=== OPERATION COMPLETE ===\n');
 
-  await manager.dispose();
+  await runtime.dispose();
 
   print('Mr. Whiskers has his tuna.');
   print("Dr. Nefarious claims credit for the monologue.");

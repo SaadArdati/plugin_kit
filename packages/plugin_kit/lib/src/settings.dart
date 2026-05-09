@@ -163,7 +163,7 @@ class PluginConfig {
 /// Single source of truth for plugin and service configuration. Serializable
 /// to and from JSON, passed to [PluginRuntime.init] and
 /// [PluginRuntime.createSession], streamed via
-/// [PluginRuntimeManager.settingsStream].
+/// [PluginRuntime.settingsStream].
 ///
 /// [plugins] is keyed by `pluginId`. [services] is keyed by [Pin],
 /// the `(PluginId, ServiceId)` record. The JSON wire form for each key
@@ -245,7 +245,7 @@ class RuntimeSettings {
   /// decision (locked plugins, experimental fallback,
   /// `defaultEnabledPluginIds`, dependency cascade), use
   /// [PluginRuntime.isPluginEnabled]. For "is this plugin currently
-  /// attached at runtime" use [PluginRuntimeManager.isPluginAttached].
+  /// attached at runtime" use [PluginRuntime.isPluginAttached].
   bool isPluginEnabled(PluginId pluginId) {
     final config = plugins[pluginId];
     if (config != null) {

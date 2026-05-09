@@ -20,7 +20,7 @@ For the workflow of applying settings live, see [Settings & Overrides](/guides/s
 host app
    │  RuntimeSettings (plugins map + services map)
    ▼
-PluginRuntime / PluginRuntimeManager
+PluginRuntime
    │  registry materializes overrides, picks the winner per slot
    ▼
 ServiceRegistry.resolve<T>(serviceId)
@@ -61,7 +61,7 @@ class RuntimeSettings {
 | `plugins` | `Map<PluginId, PluginConfig>` | Keyed by `PluginId`, not raw `String`. Wrap literals as `const PluginId('foo')`. |
 | `services` | `Map<Pin, ServiceSettings>` | Keyed by `Pin`, an extension type wrapping the canonical `pluginId:serviceId` (or `*:serviceId`) wire string. See the [key formats](#service-key-formats) below. |
 
-Both key types are typed handles, not raw `String`s — a `Map<String, PluginConfig>` or `Map<String, ServiceSettings>` literal will not type-check against the corresponding field.
+Both key types are typed handles, not raw `String`s. A `Map<String, PluginConfig>` or `Map<String, ServiceSettings>` literal will not type-check against the corresponding field.
 
 Both constructors are `const`. The default constructor's parameters default
 to `const {}`. `RuntimeSettings.empty()` is the canonical "no overrides"
@@ -405,7 +405,7 @@ can use the same hash the registry does.
   />
   <LinkCard
     title="Plugins & Lifecycle"
-    description="PluginRuntimeManager.updateSettings and the reconciliation phases that consume these types."
+    description="PluginRuntime.updateSettings and the reconciliation phases that consume these types."
     href="/reference/plugins-and-lifecycle/"
   />
 </CardGrid>

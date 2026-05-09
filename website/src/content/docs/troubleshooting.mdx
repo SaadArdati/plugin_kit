@@ -1,13 +1,15 @@
 ---
-title: Troubleshooting & FAQ
-description: Symptom-to-cause-to-fix entries for the foot-guns, plus answers to the recurring "why does it work this way" questions.
+title: Troubleshooting
+description: Symptom-to-cause-to-fix entries for the common Plugin Kit mistakes.
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-This page consolidates the foot-guns. Troubleshooting entries are organized by symptom: what you saw in the logs, what you expected to happen, what happened instead. FAQ entries are organized by question: the design rationale, integration choices, and surprises in the API. Most of these are referenced individually in the concept and guide pages, but until now you had to know which page to look on. This is the single index.
+This page is the index of "I saw X, what went wrong?" entries. Each one is a symptom, the cause behind it, and the fix. Most are referenced individually from concept and guide pages; this page is where you go when you do not know which page to look on.
 
 If you have not yet started using the library, the [Getting Started](/getting-started/) page and the [concepts](/concepts/plugins/) are the better entry points. This page assumes you have already hit something confusing.
+
+For "why does it work this way" questions about design choices, see the [FAQ](/faq/).
 
 ## Plugin lifecycle issues
 
@@ -19,7 +21,7 @@ If you have not yet started using the library, the [Getting Started](/getting-st
 
 If you only need to test pure logic that does not read `pluginId` or `serviceId`, level 1 is fine. The moment your assertions touch identity, step up.
 
-### I get a `StateError` on `manager.init` or `runtime.createSession` mentioning a missing factory
+### I get a `StateError` on `runtime.init` or `runtime.createSession` mentioning a missing factory
 
 **Cause.** You declared a custom global or session context type but did not pass the corresponding factory. The runtime cannot construct an arbitrary subtype of `GlobalPluginContext` or `SessionPluginContext` on its own, so when the type parameter is anything other than the default base, the factory is mandatory.
 
@@ -100,11 +102,21 @@ The aggregation is intentional. Fail-fast on the first exception would hide down
 
 ### Why didn't `onPluginSettingsChanged` fire when I called `updateSettingsSnapshot`?
 
-**Cause.** `updateSettingsSnapshot` deliberately does not reconcile. It updates the manager's stored settings value and emits on `settingsStream`, but it does not run plugin lifecycle, does not call `onPluginSettingsChanged`, and does not push new config into already-resolved services. It is for the cases where you only want to publish a new snapshot to listeners (a debug panel, an analytics ping) without any actual lifecycle work.
+**Cause.** `updateSettingsSnapshot` deliberately does not reconcile. It updates the runtime's stored settings value and emits on `settingsStream`, but it does not run plugin lifecycle, does not call `onPluginSettingsChanged`, and does not push new config into already-resolved services. It is for the cases where you only want to publish a new snapshot to listeners (a debug panel, an analytics ping) without any actual lifecycle work.
 
-**Fix.** Use `updateSettings` (on the manager) or `updateGlobalSettings` / `updateSessionSettings` (on the runtime) when you want the runtime to converge on the new settings. Those run the full pipeline: detach plugins that lost enablement, attach newly enabled ones, fire `onPluginSettingsChanged` on plugins whose configuration changed, re-inject settings into resolved services.
+**Fix.** Use `updateSettings` for the all-scopes path or `updateGlobalSettings` / `updateSessionSettings` for the lower-level per-scope paths when you want the runtime to converge on the new settings. Those run the full pipeline: detach plugins that lost enablement, attach newly enabled ones, fire `onPluginSettingsChanged` on plugins whose configuration changed, re-inject settings into resolved services.
 
 If you wanted reconciliation and got silence, you almost certainly called the snapshot variant. See [Settings](/guides/settings/) and the [Settings & Configuration reference](/reference/settings-and-configuration/).
+
+### My plugin compiled but never attached
+
+The most common cause is forgetting to enable it. `RuntimeSettings` controls plugin enablement, and a plugin not listed in the active settings is not attached. Plugins with `FeatureFlag.experimental` are disabled by default and require explicit opt-in. Plugins with `FeatureFlag.locked` are always enabled and cannot be turned off.
+
+Pass `defaultEnabledPluginIds` to `runtime.init` if you want a specific subset enabled at startup, or build a `RuntimeSettings` that lists your plugins and pass that.
+
+The next most common cause is a dependency that is not enabled. The runtime auto-disables a plugin whose declared `dependencies` are missing, and logs a warning. Look for a `WARNING` log entry mentioning your plugin id and the unmet dependency.
+
+Once the plugin is enabled and its dependencies are satisfied, check the lifecycle: did your `attach` handler actually run, and did you pass `context` to the `Plugin` helpers? See the first entry on this page.
 
 ## Service resolution issues
 
@@ -132,7 +144,7 @@ See the "Stateful services cannot be factories" Aside in [Service Registry](/con
 
 Do not silently bump priority numbers in unrelated plugins. The library treats priority as a public, ordered competition; a plugin that quietly ratchets to `1000` to win a slot will surprise the next person who reads it. Pick a number that reads.
 
-See [Service Registry](/concepts/service-registry/) for the full priority model, and the priority direction FAQ below.
+See [Service Registry](/concepts/service-registry/) for the full priority model, and the priority direction question in the [FAQ](/faq/#why-do-registry-priority-and-event-priority-go-in-opposite-directions).
 
 ## Event bus and request/response
 
@@ -237,85 +249,14 @@ flutter:
 
 Now the test asset bundle resolves the alias to a real font, and `loadAppFonts` picks it up. The full setup lives in `example/plugin_kit_dialog_demo/test/golden_test.dart`.
 
-## FAQ: design and architecture
-
-### Why do registry priority and event priority go in opposite directions?
-
-Registry priority is a competition: the highest number wins resolution. Event priority is a pipeline: the lowest number runs first, then the next, then the next. The two would feel unnatural unified because they are different shapes. The registry is "who is best for this slot." The bus is "what order do we cascade through." The library makes both directions explicit rather than picking one and forcing the other to read backwards. See [Service Registry](/concepts/service-registry/) and [Event Bus](/concepts/event-bus/) for the full model.
-
-### Should I use Plugin Kit, Provider, Riverpod, BLoC, or GetIt?
-
-There's overlap. Plugin Kit's primary job is runtime-replaceable behavior at the plugin boundary — priority-resolved services, typed event coordination, and a settings model that survives session lifetimes. The registry doubles as DI; the bus doubles as a state-update channel. Provider, Riverpod, BLoC, and GetIt cover the same DI/state-update space at the app layer with mature widget integrations.
-
-Most apps keep both because the libraries are cheap to add and the widget ergonomics (`context.watch`, `BlocBuilder`, `ref.watch`) pay for themselves. Some apps drop the state library and let the bus do that work — the reference `code_editor` example takes that path with plain `setState`. Either is fine; we don't pick for you.
-
-The [Migrating a Flutter App](/guides/migrating-flutter-app/) guide covers the canonical bridges (Provider/`ChangeNotifier`, Riverpod notifiers that surface bus events as `AsyncValue`, Cubits that translate user intents into `emit()` calls), and flags where those bridges turn into pure forwarding. If you have an existing app, that page is the right starting point.
-
-### What is the runtime cost of a `resolve<T>`?
-
-Constant time after the first resolution. Singletons cache their instance the moment the registry constructs them; lazy singletons cache on first resolve. Factory registrations call the constructor every time, which is the explicit contract of a factory. Priority-sorted insertion happens at registration time, not at resolve, so resolution is a single map lookup plus an array head read.
-
-If you are calling `resolve` in a hot path and worried about it, the library is not the bottleneck. Profile before optimizing.
-
-### How does Plugin Kit handle concurrency?
-
-Each session is its own scope. `PluginRuntime` holds the global scope; `PluginSession` is created per session and disposed at session end. Within a session, the bus is single-threaded: handlers run sequentially in the order the cascade dictates.
-
-`updateSessionSettings` and `updateGlobalSettings` are async. Inside a single call, the runtime reconciles plugins one at a time. Across two concurrent calls, you are responsible for serialization (see the back-to-back toggles entry above).
-
-There is no implicit isolate boundary. If you need genuine parallelism, spawn isolates from inside a plugin and bridge results back through the bus.
-
-### Why is the dialog package architecturally split?
-
-`plugin_kit` is dart-only. It carries the declaration types, including `UiConfigurableCapability`, `ConfigField`, and the rest of the dialog's data model. Your non-Flutter packages can declare what their services configure without taking a Flutter dependency.
-
-`plugin_kit_dialog` is the Flutter UI on top. It reads the dialog declarations and renders them, and it lives in its own package so server-side and CLI consumers of `plugin_kit` never have to pull in Flutter.
-
-The split is what lets a backend Dart package describe its `UiConfigurableCapability` once, then have any Flutter app surface a real settings UI for it without the backend ever knowing Flutter exists.
-
-## FAQ: getting started and integration
-
-### Can I share state across sessions?
-
-Yes, through the global scope. Use a `GlobalPlugin`, register services there, and emit on `globalBus` when you want every session to react. Cross-session broadcast also has the `SessionBroadcast` extension on `runtime.sessions`, which iterates active sessions and emits on each session bus.
-
-What you should not do is pass session-scoped service instances directly between sessions. They are not thread-safe across the boundary, their lifecycle is tied to a specific session, and their event subscriptions are scoped to one session bus. If you find yourself wanting to do this, you wanted a global service.
-
-### Where is the API reference?
-
-The [Reference](/reference/) section of these docs is the curated reference: every public type grouped by intent (plugins, registry, bus, settings, dialog), with the canonical signatures and the common usage shapes inline. It is curated, not exhaustive. When a method has three overloads and two of them are rarely the right call, the reference says so.
-
-Auto-generated dartdoc will live on pub.dev once the packages ship there. It will be exhaustive and organized the way the source is. Both will coexist. Each curated reference page will eventually link to the relevant pub.dev section.
-
-### Why two pages on events (`event-bus` and `events` in concepts)?
-
-`/concepts/event-bus/` is the model: priorities, dispatch order, identifier scoping, request/response, the global tap, error propagation. It is the page you read once and refer back to.
-
-`/concepts/events/` is the patterns: how plugins use the bus from the inside, how envelopes flow, the canonical "do X on Y" shapes, and the common pitfalls list (unwrapped envelopes, forgetting the `context` arg on `Plugin` helpers, emitting from constructors). It is the page you read while writing your first plugin.
-
-Both link to each other. Splitting them keeps the model page short and the patterns page concrete.
-
-## FAQ: surprises in the API
-
-### Why did my plugin compile but never attach?
-
-The most common cause is forgetting to enable it. `RuntimeSettings` controls plugin enablement, and a plugin not listed in the active settings is not attached. Plugins with `FeatureFlag.experimental` are disabled by default and require explicit opt-in. Plugins with `FeatureFlag.locked` are always enabled and cannot be turned off.
-
-Pass `defaultEnabledPluginIds` to `runtime.init` if you want a specific subset enabled at startup, or build a `RuntimeSettings` that lists your plugins and pass that.
-
-The next most common cause is a dependency that is not enabled. The runtime auto-disables a plugin whose declared `dependencies` are missing, and logs a warning. Look for a `WARNING` log entry mentioning your plugin id and the unmet dependency.
-
-Once the plugin is enabled and its dependencies are satisfied, check the lifecycle: did your `attach` handler actually run, and did you pass `context` to the `Plugin` helpers? See the first troubleshooting entry on this page.
-
-### What happens to a `lazy_singleton` service if no one ever resolves it?
-
-It is never constructed. The factory you passed to `registerLazySingleton` is held until the first `resolve<T>` call, then run once, then the result is cached for every subsequent resolve. If nothing ever asks, the constructor never runs.
-
-This is by design. Lazy singletons are how you express "this service is expensive, only build it if someone needs it." If you want eager construction, use `registerSingleton`.
-
 ## Related reading
 
 <CardGrid>
+  <LinkCard
+    title="FAQ"
+    description="Design rationale, integration choices, and API surprises."
+    href="/faq/"
+  />
   <LinkCard
     title="Plugins"
     description="The lifecycle model, attach/detach hooks, dependencies, feature flags."
@@ -325,11 +266,6 @@ This is by design. Lazy singletons are how you express "this service is expensiv
     title="Service Registry"
     description="Registration modes, priority resolution, capability lookup."
     href="/concepts/service-registry/"
-  />
-  <LinkCard
-    title="Event Bus"
-    description="Priorities, request/response, identifier scoping, error propagation."
-    href="/concepts/event-bus/"
   />
   <LinkCard
     title="Logging"

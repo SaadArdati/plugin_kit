@@ -2,20 +2,20 @@ import 'package:plugin_kit/plugin_kit.dart';
 
 import 'core_plugin.dart';
 
-/// Chat-manager no-op demo plugin exposing the main agent configuration stack.
+/// Chat no-op demo plugin exposing the main agent configuration stack.
 ///
 /// Defines its own `agent.temperature` slot in the shared `agent` namespace
 /// (redeclared here independently of [CorePlugin]). Registers against
 /// [CorePlugin.model] and [CorePlugin.systemMessage] for the other agent slots.
-class ChatManagerPlugin extends GlobalPlugin {
+class ChatPlugin extends GlobalPlugin {
   /// Stable plugin id used by the registry and overrides.
-  static const id = PluginId('chat_manager');
+  static const id = PluginId('chat');
 
   /// The `agent` namespace, redeclared here to show namespaces are
   /// coordination points, not single-plugin possessions.
   static const agentNamespace = Namespace('agent');
 
-  /// The sampling temperature service slot, owned by ChatManager.
+  /// The sampling temperature service slot, owned by [ChatPlugin].
   static const temperature = ServiceId.namespaced(
     agentNamespace,
     'temperature',

@@ -7,7 +7,7 @@ import 'package:plugin_kit/plugin_kit.dart';
 import 'package:provider/provider.dart';
 import 'package:state_garden/state_garden.dart';
 
-/// Pumps the supplied screen against a real [PluginRuntimeManager], types
+/// Pumps the supplied screen against a real [PluginRuntime], types
 /// "hello" into the message input, taps send, and asserts the user line and
 /// bot reply both render.
 ///
@@ -209,12 +209,10 @@ void main() {
   testWidgets('Riverpod bridge: provider swap tears down old subscription', (
     WidgetTester tester,
   ) async {
-    final PluginRuntimeManager m1 = PluginRuntimeManager(
-      plugins: <Plugin>[ChatPlugin()],
-    )..init();
-    final PluginRuntimeManager m2 = PluginRuntimeManager(
-      plugins: <Plugin>[ChatPlugin()],
-    )..init();
+    final PluginRuntime m1 = PluginRuntime(plugins: <Plugin>[ChatPlugin()])
+      ..init();
+    final PluginRuntime m2 = PluginRuntime(plugins: <Plugin>[ChatPlugin()])
+      ..init();
     addTearDown(m1.dispose);
     addTearDown(m2.dispose);
 

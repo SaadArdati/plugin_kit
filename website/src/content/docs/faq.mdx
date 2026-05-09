@@ -1,0 +1,99 @@
+---
+title: FAQ
+description: Design rationale, integration choices, and API surprises.
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page answers the recurring "why does it work this way" questions. Symptom-driven entries (something is broken, fix it) live on the [Troubleshooting](/troubleshooting/) page.
+
+## Design and architecture
+
+### Why do registry priority and event priority go in opposite directions?
+
+Registry priority is a competition: the highest number wins resolution. Event priority is a pipeline: the lowest number runs first, then the next, then the next. The two would feel unnatural unified because they are different shapes. The registry is "who is best for this slot." The bus is "what order do we cascade through." The library makes both directions explicit rather than picking one and forcing the other to read backwards. See [Service Registry](/concepts/service-registry/) and [Event Bus](/concepts/event-bus/) for the full model.
+
+### Should I use Plugin Kit, Provider, Riverpod, Bloc, or GetIt?
+
+There's overlap. Plugin Kit's primary job is runtime-replaceable behavior at the plugin boundary: priority-resolved services, typed event coordination, and a settings model that survives session lifetimes. The registry doubles as DI; the bus doubles as a state-update channel. Provider, Riverpod, Bloc, and GetIt cover the same DI/state-update space at the app layer with mature widget integrations.
+
+Most apps keep both because the libraries are cheap to add and the widget ergonomics (`context.watch`, `BlocBuilder`, `ref.watch`) pay for themselves. Some apps drop the state library and let the bus do that work; the reference `code_editor` example takes that path with plain `setState`. Either is fine; we don't pick for you.
+
+The [Migrating a Flutter App](/guides/migrating-flutter-app/) guide covers the canonical bridges (Provider/`ChangeNotifier`, Riverpod notifiers that surface bus events as `AsyncValue`, Cubits that translate user intents into `emit()` calls), and flags where those bridges turn into pure forwarding. If you have an existing app, that page is the right starting point.
+
+### What is the runtime cost of a `resolve<T>`?
+
+Constant time after the first resolution. Singletons cache their instance the moment the registry constructs them; lazy singletons cache on first resolve. Factory registrations call the constructor every time, which is the explicit contract of a factory. Priority-sorted insertion happens at registration time, not at resolve, so resolution is a single map lookup plus an array head read.
+
+If you are calling `resolve` in a hot path and worried about it, the library is not the bottleneck. Profile before optimizing.
+
+### How does Plugin Kit handle concurrency?
+
+Each session is its own scope. `PluginRuntime` holds the global scope; `PluginSession` is created per session and disposed at session end. Within a session, the bus is single-threaded: handlers run sequentially in the order the cascade dictates.
+
+`updateSessionSettings` and `updateGlobalSettings` are async. Inside a single call, the runtime reconciles plugins one at a time. Across two concurrent calls, you are responsible for serialization (see the back-to-back toggles entry in [Troubleshooting](/troubleshooting/#two-back-to-back-plugin-toggles-silently-lose-the-second-one)).
+
+There is no implicit isolate boundary. If you need genuine parallelism, spawn isolates from inside a plugin and bridge results back through the bus.
+
+### Why is the dialog package architecturally split?
+
+`plugin_kit` is dart-only. It carries the declaration types, including `UiConfigurableCapability`, `ConfigField`, and the rest of the dialog's data model. Your non-Flutter packages can declare what their services configure without taking a Flutter dependency.
+
+`plugin_kit_dialog` is the Flutter UI on top. It reads the dialog declarations and renders them, and it lives in its own package so server-side and CLI consumers of `plugin_kit` never have to pull in Flutter.
+
+The split is what lets a backend Dart package describe its `UiConfigurableCapability` once, then have any Flutter app surface a real settings UI for it without the backend ever knowing Flutter exists.
+
+## Getting started and integration
+
+### Can I share state across sessions?
+
+Yes, through the global scope. Use a `GlobalPlugin`, register services there, and emit on `globalBus` when you want every session to react. Cross-session broadcast also has the `SessionBroadcast` extension on `runtime.sessions`, which iterates active sessions and emits on each session bus.
+
+What you should not do is pass session-scoped service instances directly between sessions. They are not thread-safe across the boundary, their lifecycle is tied to a specific session, and their event subscriptions are scoped to one session bus. If you find yourself wanting to do this, you wanted a global service.
+
+### Where is the API reference?
+
+The [Reference](/reference/) section of these docs is the curated reference: every public type grouped by intent (plugins, registry, bus, settings, dialog), with the canonical signatures and the common usage shapes inline. It is curated, not exhaustive. When a method has three overloads and two of them are rarely the right call, the reference says so.
+
+Auto-generated dartdoc will live on pub.dev once the packages ship there. It will be exhaustive and organized the way the source is. Both will coexist. Each curated reference page will eventually link to the relevant pub.dev section.
+
+### Why two pages on events (`event-bus` and `events` in concepts)?
+
+`/concepts/event-bus/` is the model: priorities, dispatch order, identifier scoping, request/response, the global tap, error propagation. It is the page you read once and refer back to.
+
+`/concepts/events/` is the patterns: how plugins use the bus from the inside, how envelopes flow, the canonical "do X on Y" shapes, and the common pitfalls list (unwrapped envelopes, forgetting the `context` arg on `Plugin` helpers, emitting from constructors). It is the page you read while writing your first plugin.
+
+Both link to each other. Splitting them keeps the model page short and the patterns page concrete.
+
+## Surprises in the API
+
+### What happens to a `lazy_singleton` service if no one ever resolves it?
+
+It is never constructed. The factory you passed to `registerLazySingleton` is held until the first `resolve<T>` call, then run once, then the result is cached for every subsequent resolve. If nothing ever asks, the constructor never runs.
+
+This is by design. Lazy singletons are how you express "this service is expensive, only build it if someone needs it." If you want eager construction, use `registerSingleton`.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard
+    title="Troubleshooting"
+    description="Symptom-to-cause-to-fix entries for the common Plugin Kit mistakes."
+    href="/troubleshooting/"
+  />
+  <LinkCard
+    title="Plugins"
+    description="The lifecycle model, attach/detach hooks, dependencies, feature flags."
+    href="/concepts/plugins/"
+  />
+  <LinkCard
+    title="Service Registry"
+    description="Registration modes, priority resolution, capability lookup."
+    href="/concepts/service-registry/"
+  />
+  <LinkCard
+    title="Event Bus"
+    description="Priorities, request/response, identifier scoping, error propagation."
+    href="/concepts/event-bus/"
+  />
+</CardGrid>

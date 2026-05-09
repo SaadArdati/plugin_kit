@@ -309,7 +309,7 @@ Future<RuntimeSettings?> showPluginKitDialog({
 
 The default entry point: opens a Material `Dialog` containing a `PluginKitDialog`, awaits user interaction, and resolves with the saved `RuntimeSettings` or `null` on cancel. The function builds its own `PluginKitDialogController` internally; you do not need to manage one.
 
-`onSave` is the host-side persistence callback. It runs *before* the dialog closes, so the dialog can reflect any error you choose to surface and so you can write to disk or push to `manager.updateSettings(...)` while the user is still looking at the spinner.
+`onSave` is the host-side persistence callback. It runs *before* the dialog closes, so the dialog can reflect any error you choose to surface and so you can write to disk or push to `runtime.updateSettings(...)` while the user is still looking at the spinner.
 
 ```dart
 typedef SaveCallback = FutureOr<void> Function(RuntimeSettings);

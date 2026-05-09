@@ -7,7 +7,7 @@ import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/compo
 
 Plugin Kit Dialog is a Flutter dialog that inspects and edits any [`PluginRuntime`](/concepts/runtime/) at runtime. Drop it in once and your users get a three-tab UI for toggling plugins, editing service config, and inspecting the registry. You write zero settings-screens-per-plugin code.
 
-The dialog is wholly dogfooded: it builds itself out of `plugin_kit` plugins, so every tab, header action, and field renderer is a real plugin you can shadow or replace from your host app.
+The dialog is built from `plugin_kit` plugins itself. Every tab, header action, and field renderer is a real plugin you can shadow or replace from your host app.
 
 ## Install
 
@@ -41,7 +41,7 @@ if (next != null) {
 
 That is it. If your plugins already attach `UiConfigurableCapability`, the Services tab populates itself.
 
-`onSave` is awaited before the dialog closes, so you can persist (write to disk, push to a server, call `manager.updateSettings(...)`) without racing the dismissal.
+`onSave` is awaited before the dialog closes, so you can persist (write to disk, push to a server, call `runtime.updateSettings(...)`) without racing the dismissal.
 
 ## What the three tabs do
 
@@ -152,7 +152,7 @@ runtime
   ));
 ```
 
-Because the visuals plugin lives in your host app (which has Flutter), Dart-only plugins still get rich visuals without importing Flutter. The decoration is keyed by `PluginId`, `Namespace`, or `ServiceId`, so the host owns the map and the plugin source code stays portable.
+Because the visuals plugin lives in your host app (which has Flutter), Dart-only plugins still get icons, labels, and colors without importing Flutter. The decoration is keyed by `PluginId`, `Namespace`, or `ServiceId`, so the host owns the map and the plugin source code stays portable.
 
 The plugin registers at priority `100`, above the default registry priority of `50`, so host overrides beat anything a Flutter plugin self-attaches from its own `register()`. Unknown keys (a plugin or service that does not currently exist) are accepted silently; this lets you keep visuals for plugins that may be enabled later. When no visual is found, cards fall back to a generic gear icon and the theme's primary color.
 
@@ -239,7 +239,7 @@ The dialog is non-destructive. Edits accumulate in a working draft; nothing reac
 Overrides matching the active baseline are pruned automatically, so the resulting `RuntimeSettings` stays minimal. Two users with different starting points can save the same diff.
 
 <Aside type="note" title="Reconciling vs persisting">
-`onSave` runs before the dialog closes. If you only persist (write to disk), the runtime stays on its old settings until something calls `manager.updateSettings(...)`. If you want the runtime to converge live as the user clicks Save, call `await manager.updateSettings(settings)` from `onSave`. See [Settings & Overrides](/guides/settings/) for the reconciliation model.
+`onSave` runs before the dialog closes. If you only persist (write to disk), the runtime stays on its old settings until something calls `runtime.updateSettings(...)`. If you want the runtime to converge live as the user clicks Save, call `await runtime.updateSettings(settings)` from `onSave`. See [Settings & Overrides](/guides/settings/) for the reconciliation model.
 </Aside>
 
 ## Example app

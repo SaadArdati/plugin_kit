@@ -46,10 +46,10 @@ class _ThrowOnDetachPlugin extends SessionPlugin {
   }
 }
 
-PluginRuntimeManager _newThrowingRuntime() {
-  final manager = PluginRuntimeManager(plugins: [_ThrowOnDetachPlugin()]);
-  manager.init();
-  return manager;
+PluginRuntime _newThrowingRuntime() {
+  final runtime = PluginRuntime(plugins: [_ThrowOnDetachPlugin()]);
+  runtime.init();
+  return runtime;
 }
 
 class _ThrowOnDetachWithStateError extends SessionStatefulPluginService {
@@ -76,22 +76,22 @@ class _ThrowStateErrorPlugin extends SessionPlugin {
   }
 }
 
-PluginRuntimeManager _newStateErrorRuntime() {
-  final manager = PluginRuntimeManager(plugins: [_ThrowStateErrorPlugin()]);
-  manager.init();
-  return manager;
+PluginRuntime _newStateErrorRuntime() {
+  final runtime = PluginRuntime(plugins: [_ThrowStateErrorPlugin()]);
+  runtime.init();
+  return runtime;
 }
 
-PluginRuntimeManager _newRuntime() {
-  final manager = PluginRuntimeManager(plugins: [_NoopPlugin()]);
-  manager.init();
-  return manager;
+PluginRuntime _newRuntime() {
+  final runtime = PluginRuntime(plugins: [_NoopPlugin()]);
+  runtime.init();
+  return runtime;
 }
 
-class _PendingRuntime implements PluginRuntimeManager {
+class _PendingRuntime implements PluginRuntime {
   _PendingRuntime(this._real);
 
-  final PluginRuntimeManager _real;
+  final PluginRuntime _real;
   Completer<PluginSession>? _pending;
 
   /// Hold the next [createSession] call pending. Resolve it manually via
@@ -123,10 +123,10 @@ class _PendingRuntime implements PluginRuntimeManager {
       Function.apply(_real.noSuchMethod, [invocation]);
 }
 
-class _ThrowingRuntime implements PluginRuntimeManager {
+class _ThrowingRuntime implements PluginRuntime {
   _ThrowingRuntime(this._real, this.error);
 
-  final PluginRuntimeManager _real;
+  final PluginRuntime _real;
   final Object error;
   bool _throwed = false;
 
@@ -149,11 +149,11 @@ class _ThrowingRuntime implements PluginRuntimeManager {
 
 void main() {
   group('PluginRuntimeScope', () {
-    testWidgets('exposes an externally-owned manager via .of', (tester) async {
+    testWidgets('exposes an externally-owned runtime via .of', (tester) async {
       final runtime = _newRuntime();
       addTearDown(runtime.dispose);
 
-      PluginRuntimeManager? captured;
+      PluginRuntime? captured;
       await tester.pumpWidget(
         PluginRuntimeScope.value(
           runtime: runtime,
@@ -169,10 +169,10 @@ void main() {
       expect(captured, same(runtime));
     });
 
-    testWidgets('auto-creates and disposes a manager from plugins', (
+    testWidgets('auto-creates and disposes a runtime from plugins', (
       tester,
     ) async {
-      PluginRuntimeManager? captured;
+      PluginRuntime? captured;
       await tester.pumpWidget(
         PluginRuntimeScope(
           plugins: [_NoopPlugin()],
@@ -194,7 +194,7 @@ void main() {
     });
 
     testWidgets('maybeOf returns null without a scope', (tester) async {
-      PluginRuntimeManager? captured = _newRuntime();
+      PluginRuntime? captured = _newRuntime();
       await tester.pumpWidget(
         Builder(
           builder: (context) {
@@ -366,8 +366,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('external'), findsOneWidget);
 
-      // The auto-created session must have been disposed by the scope —
-      // post-dispose, its bus throws on any mutating call. Probing
+      // The auto-created session must have been disposed by the scope.
+      // Post-dispose, its bus throws on any mutating call. Probing
       // isDisposed avoids materializing a thrown exception.
       expect(
         autoCreated.bus.isDisposed,
@@ -449,7 +449,7 @@ void main() {
       final runtimeB = _newRuntime();
       addTearDown(runtimeB.dispose);
 
-      Widget tree(PluginRuntimeManager r) => Directionality(
+      Widget tree(PluginRuntime r) => Directionality(
         textDirection: TextDirection.ltr,
         child: PluginSessionScope(
           runtime: r,
@@ -579,7 +579,7 @@ void main() {
         ),
       );
       await tester.pump();
-      // Confirm the scope is still in loading state — create is pending.
+      // Confirm the scope is still in loading state; create is pending.
       expect(find.text('loading'), findsOneWidget);
 
       // Swap to an explicit session WHILE the first create is in flight.
@@ -625,7 +625,7 @@ void main() {
       // Tree shape: PluginRuntimeScope.value(runtime: ...) wraps a
       // PluginSessionScope with NO explicit runtime. The session scope
       // resolves its runtime from the ambient PluginRuntimeScope.
-      Widget tree(PluginRuntimeManager r) => Directionality(
+      Widget tree(PluginRuntime r) => Directionality(
         textDirection: TextDirection.ltr,
         child: PluginRuntimeScope.value(
           runtime: r,
@@ -705,7 +705,7 @@ void main() {
       expect(find.text('error'), findsOneWidget);
       expect(capturedError, isA<StateError>());
 
-      // Swap to an explicit session — error UI must clear.
+      // Swap to an explicit session; error UI must clear.
       final external = await realRuntime.createSession();
       addTearDown(external.dispose);
 
@@ -936,7 +936,7 @@ void main() {
       final runtime = _newThrowingRuntime();
       addTearDown(runtime.dispose);
 
-      // Mount with auto-create — scope owns the session.
+      // Mount with auto-create; scope owns the session.
       await tester.pumpWidget(
         Directionality(
           textDirection: TextDirection.ltr,
@@ -948,7 +948,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Unmount — this triggers _session.dispose() which will throw.
+      // Unmount; this triggers _session.dispose() which will throw.
       await tester.pumpWidget(const SizedBox.shrink());
       // Drain any pending microtasks from the async dispose.
       await tester.pumpAndSettle();
@@ -987,7 +987,7 @@ void main() {
 
       // The runtime wraps any plugin-side throw from detach in a
       // PluginLifecycleException. The .catchError site catches Object, so
-      // ANY error type still flows through to FlutterError.reportError —
+      // ANY error type still flows through to FlutterError.reportError,
       // but to prove the original cause survives the trip (and isn't
       // swallowed/replaced by an unrelated exception), assert that the
       // wrapped failure list carries the StateError this fixture threw.
@@ -1256,8 +1256,8 @@ void main() {
       await tester.pump();
       expect(find.text('seen: 1'), findsOneWidget);
 
-      // Re-pump with the same probe widget type but a different session
-      // — Flutter reuses the State and calls didUpdateWidget; the mixin
+      // Re-pump with the same probe widget type but a different session.
+      // Flutter reuses the State and calls didUpdateWidget; the mixin
       // must re-attach to sessionB.
       await tester.pumpWidget(tree(sessionB));
       await sessionA.emit(const _Ping(99));
@@ -1523,7 +1523,7 @@ void main() {
     ) async {
       // Regression: PluginSessionEvents tracks the latest event per type
       // for the active session. After a session swap, the cache must
-      // start empty for the new session — otherwise the first build
+      // start empty for the new session; otherwise the first build
       // against session B would surface a stale value emitted on session A.
       final runtime = _newRuntime();
       addTearDown(runtime.dispose);
@@ -1552,7 +1552,7 @@ void main() {
       await tester.pump();
       expect(find.text('val: 7'), findsOneWidget);
 
-      // Swap to session B. The watchEvent cache must reset — first paint
+      // Swap to session B. The watchEvent cache must reset; first paint
       // against B must show 'none', not the stale '7' from A.
       final sessionB = await runtime.createSession();
       addTearDown(sessionB.dispose);

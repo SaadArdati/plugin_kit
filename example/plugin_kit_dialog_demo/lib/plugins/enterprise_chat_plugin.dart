@@ -1,12 +1,12 @@
 import 'package:plugin_kit/plugin_kit.dart';
 
-import 'chat_manager_plugin.dart';
+import 'chat_plugin.dart';
 import 'core_plugin.dart';
 
-/// Enterprise chat plugin that overrides the default chat_manager stack with
-/// stricter defaults. Wins against chat_manager (priority 120 > 100) on
-/// model, system message, and temperature so the inspector demonstrates a
-/// fully shadowed plugin.
+/// Enterprise chat plugin that overrides the default chat stack with
+/// stricter defaults. Wins against the `chat` plugin (priority 120 > 100)
+/// on model, system message, and temperature so the inspector demonstrates
+/// a fully shadowed plugin.
 class EnterpriseChatPlugin extends GlobalPlugin {
   /// Stable plugin id used by the registry and overrides.
   static const id = PluginId('enterprise_chat');
@@ -54,7 +54,7 @@ class EnterpriseChatPlugin extends GlobalPlugin {
         },
       )
       ..registerSingleton<Object>(
-        ChatManagerPlugin.temperature,
+        ChatPlugin.temperature,
         Object(),
         capabilities: const {
           UiConfigurableCapability(

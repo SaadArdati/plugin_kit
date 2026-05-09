@@ -8,12 +8,12 @@ void main() {
   test(
     'settings reconcile: disabling the plugin tears down its handlers',
     () async {
-      final PluginRuntimeManager manager = PluginRuntimeManager(
+      final PluginRuntime runtime = PluginRuntime(
         plugins: <Plugin>[ChatPlugin()],
       )..init();
-      addTearDown(manager.dispose);
+      addTearDown(runtime.dispose);
 
-      final PluginSession session = await manager.createSession();
+      final PluginSession session = await runtime.createSession();
 
       ChatMessagesChanged? received;
       final sub = session.on<ChatMessagesChanged>((env) {
@@ -30,7 +30,7 @@ void main() {
       expect(received!.messages.last.text, equals('echo: first'));
 
       received = null;
-      await manager.runtime.updateSessionSettings(
+      await runtime.updateSessionSettings(
         session,
         newSettings: const RuntimeSettings(
           plugins: <PluginId, PluginConfig>{
@@ -45,19 +45,18 @@ void main() {
   );
 
   test('session swap: a new session has fresh state', () async {
-    final PluginRuntimeManager manager = PluginRuntimeManager(
-      plugins: <Plugin>[ChatPlugin()],
-    )..init();
-    addTearDown(manager.dispose);
+    final PluginRuntime runtime = PluginRuntime(plugins: <Plugin>[ChatPlugin()])
+      ..init();
+    addTearDown(runtime.dispose);
 
-    final PluginSession s1 = await manager.createSession();
+    final PluginSession s1 = await runtime.createSession();
     await s1.emit(const SendMessageRequested('on-s1'));
     final ChatService svc1 = s1.resolve<ChatService>(ChatPlugin.serviceId);
     expect(svc1.messages, hasLength(2));
 
     await s1.dispose();
 
-    final PluginSession s2 = await manager.createSession();
+    final PluginSession s2 = await runtime.createSession();
     final ChatService svc2 = s2.resolve<ChatService>(ChatPlugin.serviceId);
     expect(
       svc2.messages,
@@ -80,13 +79,12 @@ void main() {
   });
 
   test('two live sessions stay isolated', () async {
-    final PluginRuntimeManager manager = PluginRuntimeManager(
-      plugins: <Plugin>[ChatPlugin()],
-    )..init();
-    addTearDown(manager.dispose);
+    final PluginRuntime runtime = PluginRuntime(plugins: <Plugin>[ChatPlugin()])
+      ..init();
+    addTearDown(runtime.dispose);
 
-    final PluginSession s1 = await manager.createSession();
-    final PluginSession s2 = await manager.createSession();
+    final PluginSession s1 = await runtime.createSession();
+    final PluginSession s2 = await runtime.createSession();
 
     await s1.bus.emit<SendMessageRequested>(
       event: const SendMessageRequested('to s1'),
@@ -107,25 +105,24 @@ void main() {
     await s2.dispose();
   });
 
-  test('canonical dispose: manager.dispose tears down sessions', () async {
-    final PluginRuntimeManager manager = PluginRuntimeManager(
-      plugins: <Plugin>[ChatPlugin()],
-    )..init();
+  test('canonical dispose: runtime.dispose tears down sessions', () async {
+    final PluginRuntime runtime = PluginRuntime(plugins: <Plugin>[ChatPlugin()])
+      ..init();
 
-    final PluginSession session = await manager.createSession();
+    final PluginSession session = await runtime.createSession();
     final EventBus bus = session.bus;
     expect(bus.isDisposed, isFalse);
-    expect(manager.runtime.sessions, hasLength(1));
+    expect(runtime.sessions, hasLength(1));
 
-    await manager.dispose();
+    await runtime.dispose();
 
     expect(
       bus.isDisposed,
       isTrue,
-      reason: 'manager.dispose must dispose live session buses',
+      reason: 'runtime.dispose must dispose live session buses',
     );
     expect(
-      manager.runtime.sessions,
+      runtime.sessions,
       isEmpty,
       reason: 'sessions list must be drained after dispose',
     );
@@ -134,12 +131,12 @@ void main() {
   test(
     'hot-swap: priority winner shifts when higher one is disabled',
     () async {
-      final PluginRuntimeManager manager = PluginRuntimeManager(
+      final PluginRuntime runtime = PluginRuntime(
         plugins: <Plugin>[ChatPlugin(), AltChatPlugin()],
       )..init();
-      addTearDown(manager.dispose);
+      addTearDown(runtime.dispose);
 
-      final PluginSession session = await manager.createSession();
+      final PluginSession session = await runtime.createSession();
 
       final ChatService winner1 = session.resolve<ChatService>(
         ChatPlugin.serviceId,
@@ -151,7 +148,7 @@ void main() {
       );
       expect(winner1.replyPrefix, equals('alt: '));
 
-      await manager.runtime.updateSessionSettings(
+      await runtime.updateSessionSettings(
         session,
         newSettings: const RuntimeSettings(
           plugins: <PluginId, PluginConfig>{
@@ -178,11 +175,11 @@ void main() {
   );
 
   test('toggle race: latest intent converges deterministically', () async {
-    final PluginRuntimeManager manager = PluginRuntimeManager(
+    final PluginRuntime runtime = PluginRuntime(
       plugins: <Plugin>[ChatPlugin(), AltChatPlugin()],
     )..init();
-    addTearDown(manager.dispose);
-    final PluginSession session = await manager.createSession();
+    addTearDown(runtime.dispose);
+    final PluginSession session = await runtime.createSession();
 
     expect(session.isPluginEnabled(ChatPlugin.id), isTrue);
     expect(session.isPluginEnabled(AltChatPlugin.id), isTrue);
@@ -198,17 +195,17 @@ void main() {
       },
     );
 
-    final Future<void> f1 = manager.updateSettings(settings1);
-    final Future<void> f2 = manager.updateSettings(settings2);
+    final Future<void> f1 = runtime.updateSettings(settings1);
+    final Future<void> f2 = runtime.updateSettings(settings2);
     await Future.wait<void>(<Future<void>>[f1, f2]);
 
     expect(
-      manager.attachedPluginIds.contains(AltChatPlugin.id),
+      runtime.attachedPluginIds.contains(AltChatPlugin.id),
       isFalse,
       reason: 'latest intent should disable AltChatPlugin at runtime',
     );
     expect(
-      manager.enabledPluginIds.contains(AltChatPlugin.id),
+      runtime.enabledPluginIds.contains(AltChatPlugin.id),
       isFalse,
       reason: 'latest intent should disable AltChatPlugin in settings',
     );

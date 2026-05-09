@@ -44,35 +44,35 @@ void main() {
     () async {
       final pluginA = _PluginA();
       final pluginB = _PluginB();
-      final manager = PluginRuntimeManager();
+      final runtime = PluginRuntime();
 
-      manager.addPlugins([pluginA, pluginB]);
-      manager.init(initialSettings: RuntimeSettings.empty());
+      runtime.addPlugins([pluginA, pluginB]);
+      runtime.init(settings: RuntimeSettings.empty());
 
-      await manager.updateSettings(
+      await runtime.updateSettings(
         RuntimeSettings(plugins: {PluginId('b'): PluginConfig(enabled: false)}),
       );
 
-      final session = await manager.createSession();
+      final session = await runtime.createSession();
 
       // Runtime-effective state: plugin A is cascade-disabled due to missing dep.
       expect(session.isPluginEnabled(const PluginId('a')), isFalse);
       expect(pluginA.lifecycleCalls, isEmpty);
 
-      // Settings-intent state: manager getters still use base enablement.
-      expect(manager.enabledPluginIds, contains(const PluginId('a')));
+      // Settings-intent state: runtime getters still use base enablement.
+      expect(runtime.enabledPluginIds, contains(const PluginId('a')));
       expect(
-        manager.enabledPlugins.map((plugin) => plugin.pluginId),
+        runtime.enabledPlugins.map((plugin) => plugin.pluginId),
         contains(const PluginId('a')),
       );
-      expect(manager.isPluginEnabled(const PluginId('a')), isTrue);
+      expect(runtime.isPluginEnabled(const PluginId('a')), isTrue);
       expect(
-        manager.runtime.isPluginEnabled(const PluginId('a'), manager.settings),
+        runtime.isPluginEnabled(const PluginId('a'), runtime.settings),
         isTrue,
       );
-      expect(manager.attachedPluginIds, isNot(contains(const PluginId('a'))));
-      expect(manager.isPluginAttached(const PluginId('a')), isFalse);
-      await manager.dispose();
+      expect(runtime.attachedPluginIds, isNot(contains(const PluginId('a'))));
+      expect(runtime.isPluginAttached(const PluginId('a')), isFalse);
+      await runtime.dispose();
     },
   );
 }

@@ -7,7 +7,7 @@ import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 `example/code_editor/` is a Flutter capstone: a modular code editor where every UI element beyond the text area and tab bar is contributed by plugins. The shell knows zero specific plugins. It emits collection events, reads the descriptors plugins append, resolves widget factories from the registry, and renders.
 
-This is the longest-running example in the repo and the most architecturally complete. If [the villain_lair examples](/tutorials/villain-lair/) teaches the runtime concept-by-concept, code_editor teaches what those concepts look like assembled into a working app.
+This is the longest-running example in the repo and the most architecturally complete. If [the villain_lair examples](/examples/villain-lair/) teach the runtime concept-by-concept, code_editor teaches what those concepts look like assembled into a working app.
 
 ## Run it
 
@@ -21,7 +21,7 @@ The app opens with a SQL document, a left panel for git, a bottom panel for the 
 
 ## The architecture in one sentence
 
-The shell is a `StatefulWidget` that holds a `PluginRuntimeManager`, listens for session-bus events, and renders the descriptors plugins append to mutable collection events. Plugins contribute *what* should appear (descriptors) and *how to render it* (widget factories), separately. The shell stitches both together at build time.
+The shell is a `StatefulWidget` that holds a `PluginRuntime`, listens for session-bus events, and renders the descriptors plugins append to mutable collection events. Plugins contribute *what* should appear (descriptors) and *how to render it* (widget factories), separately. The shell stitches both together at build time.
 
 ```
    shell                   plugins
@@ -46,7 +46,7 @@ Two files do most of the architectural work.
 
 **`lib/app/factories.dart`** declares the Flutter side: abstract widget factories (`PanelWidgetFactory`, `ToolbarActionWidgetFactory`). Plugins implement these and register them in the registry under the matching namespace.
 
-**`lib/app/editor_app.dart`** is the shell `StatefulWidget`. It boots the manager, opens a session, subscribes to session-bus events for refresh, and on every `setState` re-emits the collection events to discover what plugins want to contribute now.
+**`lib/app/editor_app.dart`** is the shell `StatefulWidget`. It boots the runtime, opens a session, subscribes to session-bus events for refresh, and on every `setState` re-emits the collection events to discover what plugins want to contribute now.
 
 ## How a plugin contributes UI
 
@@ -101,9 +101,9 @@ Toggle `formatter_pipeline` itself off and dependency cascade kicks in: both `da
 
 ## Settings dialog wired in
 
-The shell mounts [Plugin Kit Dialog](/guides/plugin-kit-dialog/) as the customization UI. The user opens it, toggles a plugin, and saves. The shell's `onSave` callback calls `manager.updateSettings(...)` against the dialog's returned `RuntimeSettings`. The runtime reconciles. The shell re-emits collection events. The UI converges on the new state without a restart.
+The shell mounts [Plugin Kit Dialog](/guides/plugin-kit-dialog/) as the customization UI. The user opens it, toggles a plugin, and saves. The shell's `onSave` callback calls `runtime.updateSettings(...)` against the dialog's returned `RuntimeSettings`. The runtime reconciles. The shell re-emits collection events. The UI converges on the new state without a restart.
 
-This is the dogfooding: every primitive the docs describe is visible in this one app, working end to end.
+The example uses Plugin Kit on itself: every primitive the docs describe is visible in this one app, working end to end.
 
 ## What to take from it
 
@@ -123,7 +123,7 @@ Three patterns that scale to non-editor apps:
   />
   <LinkCard
     title="Migrating a Flutter App"
-    description="If you are adopting Plugin Kit alongside Provider/Riverpod/BLoC/GetIt, this is the strategy companion."
+    description="If you are adopting Plugin Kit alongside Provider/Riverpod/Bloc/GetIt, this is the strategy companion."
     href="/guides/migrating-flutter-app/"
   />
   <LinkCard

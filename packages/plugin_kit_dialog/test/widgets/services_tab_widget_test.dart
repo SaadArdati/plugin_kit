@@ -211,7 +211,7 @@ void main() {
         capabilities: [UiConfigurableCapability(label: 'Root', fields: [])],
       ),
       const ServiceEntry(
-        pluginId: PluginId('chat_manager'),
+        pluginId: PluginId('chat'),
         serviceId: ServiceId('agent.model'),
         namespace: Namespace('agent'),
         priority: 100,

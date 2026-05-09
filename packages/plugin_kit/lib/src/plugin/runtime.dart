@@ -106,6 +106,30 @@ class PluginRuntime<
   /// [RuntimeSettings.plugins] entries always override these defaults.
   Set<PluginId>? _defaultEnabledPluginIds;
 
+  late final _settingsController = StreamController<RuntimeSettings>.broadcast(
+    sync: true,
+  );
+
+  late RuntimeSettings _settings = const RuntimeSettings.empty();
+
+  /// The current [RuntimeSettings] snapshot.
+  ///
+  /// Initialized to [RuntimeSettings.empty] on construction, replaced by the
+  /// `settings` argument passed to [init] (when non-null), and updated by
+  /// [updateSettings], [updateSettingsSnapshot], and [resetSettings].
+  RuntimeSettings get settings => _settings;
+
+  set _settingsValue(RuntimeSettings value) {
+    _settings = value;
+    _settingsController.add(value);
+  }
+
+  /// Broadcast stream that emits whenever [settings] changes.
+  ///
+  /// New subscribers do not receive the current value; read [settings] for
+  /// the latest snapshot.
+  Stream<RuntimeSettings> get settingsStream => _settingsController.stream;
+
   /// Creates an empty runtime with no pre-registered plugins.
   PluginRuntime.empty();
 
@@ -164,6 +188,10 @@ class PluginRuntime<
     _initialized = true;
     _defaultEnabledPluginIds = defaultEnabledPluginIds;
     _runtimeLog.info('Initializing runtime');
+
+    if (settings != null) {
+      _settingsValue = settings;
+    }
 
     globalBus = EventBus();
 
@@ -287,7 +315,7 @@ class PluginRuntime<
   /// );
   /// ```
   Future<PluginSession<S>> createSession({
-    RuntimeSettings settings = const RuntimeSettings.empty(),
+    RuntimeSettings? settings,
     SessionContextFactory<G, S>? contextFactory,
   }) async {
     if (!_initialized) {
@@ -296,6 +324,8 @@ class PluginRuntime<
         'Call init() first to initialize the global scope.',
       );
     }
+
+    settings ??= this.settings;
 
     _validateServiceSettingPluginIds(services: settings.services);
 
@@ -864,14 +894,105 @@ class PluginRuntime<
 
   /// Determine if a plugin would be enabled for a given [settings] snapshot.
   ///
+  /// When [settings] is null, the runtime's current snapshot ([this.settings])
+  /// is used.
+  ///
   /// Applies the same precedence as [_determineEnabledPluginIds]: locked
   /// plugins are always enabled, explicit config wins over defaults, and
   /// experimental plugins are disabled by default. Dependency validation is
   /// not applied here: this returns the base enablement only.
-  bool isPluginEnabled(PluginId pluginId, RuntimeSettings settings) {
+  bool isPluginEnabled(PluginId pluginId, [RuntimeSettings? settings]) {
     final plugin = _plugins.firstWhereOrNull((p) => p.pluginId == pluginId);
     if (plugin == null) return false;
-    return _isPluginEnabled(plugin, settings);
+    return _isPluginEnabled(plugin, settings ?? this.settings);
+  }
+
+  /// Plugins enabled per current settings (settings-intent).
+  ///
+  /// Reports the base enablement decision: locked + explicit settings +
+  /// defaults + experimental heuristic. Does not account for dependency
+  /// cascade; a plugin whose dependency is disabled remains in this list
+  /// even though the runtime has actually disabled it.
+  ///
+  /// For runtime truth, use [attachedPlugins].
+  Iterable<Plugin> get enabledPlugins sync* {
+    for (final plugin in _plugins) {
+      if (isPluginEnabled(plugin.pluginId)) yield plugin;
+    }
+  }
+
+  /// Plugin ids enabled per current settings (settings-intent).
+  ///
+  /// For runtime truth, use [attachedPluginIds].
+  Set<PluginId> get enabledPluginIds => {
+    for (final p in enabledPlugins) p.pluginId,
+  };
+
+  /// Plugins currently attached at runtime.
+  ///
+  /// Distinct from [enabledPlugins], which reports settings-intent
+  /// (locked + explicit settings + defaults + experimental heuristic).
+  /// `attachedPlugins` reports the post-cascade effective set: plugins
+  /// whose dependencies are satisfied AND that the runtime has actually
+  /// run `attach` on. A plugin enabled in settings but cascade-disabled
+  /// because its dependency is off appears in [enabledPlugins] but NOT
+  /// in [attachedPlugins].
+  ///
+  /// Read this when you need runtime truth (e.g., a UI that shows which
+  /// plugins are running). Read [enabledPlugins] when you need settings
+  /// truth (e.g., a settings-screen toggle list).
+  List<Plugin> get attachedPlugins => [
+    for (final plugin in _plugins)
+      if (attachedPluginIds.contains(plugin.pluginId)) plugin,
+  ];
+
+  /// Plugin ids currently attached at runtime (post-cascade effective set).
+  Set<PluginId> get attachedPluginIds {
+    final ids = <PluginId>{...attachedGlobalPluginIds};
+    for (final session in _sessions) {
+      ids.addAll(session.attachedPluginIds);
+    }
+    return ids;
+  }
+
+  /// Whether [pluginId] is currently attached at runtime.
+  bool isPluginAttached(PluginId pluginId) =>
+      attachedPluginIds.contains(pluginId);
+
+  /// Reconciles the runtime to [newSettings] in serialized order: global
+  /// scope first, then each active session sequentially.
+  ///
+  /// Updates the stored [settings] snapshot only after every reconcile
+  /// completes. If any reconcile throws, the stored snapshot stays at the
+  /// previous state.
+  Future<void> updateSettings(RuntimeSettings newSettings) async {
+    final oldSettings = _settings;
+    await updateGlobalSettings(
+      oldSettings: oldSettings,
+      newSettings: newSettings,
+    );
+    for (final session in _sessions) {
+      await updateSessionSettings(session, newSettings: newSettings);
+    }
+    _settingsValue = newSettings;
+  }
+
+  /// Replace the stored [settings] snapshot and emit it on [settingsStream]
+  /// without running any reconciliation.
+  ///
+  /// Use [updateSettings] when you want the runtime to converge on the new
+  /// settings (attach, detach, re-inject). Use this method when you only
+  /// want to publish a new snapshot to listeners (e.g. replaying a saved
+  /// draft into the UI), or when the runtime has already converged and you
+  /// just need to broadcast the change.
+  void updateSettingsSnapshot(RuntimeSettings value) {
+    if (value == _settings) return;
+    _settingsValue = value;
+  }
+
+  /// Reset [settings] to [RuntimeSettings.empty]. Does not run reconciliation.
+  void resetSettings() {
+    _settingsValue = const RuntimeSettings.empty();
   }
 
   /// Update global plugin settings with reconciliation.
@@ -1011,6 +1132,7 @@ class PluginRuntime<
     globalBus.dispose();
     _enabledGlobalPluginIds.clear();
     _defaultEnabledPluginIds = null;
+    await _settingsController.close();
     _initialized = false;
 
     if (detachErrors.isNotEmpty) {

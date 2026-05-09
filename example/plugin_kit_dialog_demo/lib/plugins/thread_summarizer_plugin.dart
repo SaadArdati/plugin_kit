@@ -3,7 +3,7 @@ import 'package:plugin_kit/plugin_kit.dart';
 import 'core_plugin.dart';
 
 /// Thread-summarizer competitor for `agent:system_message`. Sits just under
-/// chat_manager (priority 90 < 100) so the inspector shows it as the
+/// the `chat` plugin (priority 90 < 100) so the inspector shows it as the
 /// runner-up.
 class ThreadSummarizerPlugin extends GlobalPlugin {
   /// Stable plugin id used by the registry and overrides.

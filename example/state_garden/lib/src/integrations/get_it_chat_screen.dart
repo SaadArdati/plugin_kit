@@ -13,12 +13,12 @@ import '../widgets/chat_view.dart';
 /// The host registers the active [PluginSession] into a [GetIt] instance at
 /// app boot. The screen looks it up by type. GetIt does not own the session
 /// lifecycle: the dispose discipline (cancel subscription on State.dispose,
-/// dispose the manager at app shutdown) is identical to the setState
+/// dispose the runtime at app shutdown) is identical to the setState
 /// recipe.
 ///
 /// This recipe is intentionally minimal. The only meaningful differentiator
 /// from [SetStateChatScreen] is the `widget.locator.get<PluginSession>()`
-/// lookup at the top of [State.initState] — every line below that is
+/// lookup at the top of [State.initState]; every line below that is
 /// identical to the setState pattern. Keep this recipe in mind as
 /// "service-locator-style session resolution"; reach for the dialog-driven
 /// scope ergonomics in `package:flutter_plugin_kit` if you want

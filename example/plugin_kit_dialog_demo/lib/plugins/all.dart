@@ -3,7 +3,7 @@ import 'package:plugin_kit/plugin_kit.dart';
 import 'auto_retry_plugin.dart';
 import 'base_mcp_plugin.dart';
 import 'brave_search_plugin.dart';
-import 'chat_manager_plugin.dart';
+import 'chat_plugin.dart';
 import 'circuit_breaker_plugin.dart';
 import 'context_injector_plugin.dart';
 import 'core_plugin.dart';
@@ -24,7 +24,7 @@ import 'web_search_explorer_plugin.dart';
 export 'auto_retry_plugin.dart';
 export 'base_mcp_plugin.dart';
 export 'brave_search_plugin.dart';
-export 'chat_manager_plugin.dart';
+export 'chat_plugin.dart';
 export 'circuit_breaker_plugin.dart';
 export 'context_injector_plugin.dart';
 export 'core_plugin.dart';
@@ -47,7 +47,7 @@ export 'web_search_explorer_plugin.dart';
 /// The set showcases:
 /// - Namespace coordination via parallel redeclaration: `agent` is
 ///   co-defined by [CorePlugin] (`model`, `system_message`),
-///   [ChatManagerPlugin] (`temperature`), and [ResearchAgentPlugin]
+///   [ChatPlugin] (`temperature`), and [ResearchAgentPlugin]
 ///   (`research_policy`) - each redeclares `Namespace('agent')` independently.
 /// - Namespace coordination via dependency: `mcp` is owned by
 ///   [BaseMcpPlugin]; [FirebaseMcpPlugin] and [DartSdkMcpPlugin] depend on it
@@ -67,7 +67,7 @@ List<Plugin> demoPlugins() {
 
     // Default stable stack.
     AutoRetryPlugin(),
-    ChatManagerPlugin(),
+    ChatPlugin(),
     ContextInjectorPlugin(),
     FirebaseMcpPlugin(),
     WebSearchExplorerPlugin(),

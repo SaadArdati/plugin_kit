@@ -159,16 +159,10 @@ final runtime = PluginRuntime(
 )..init(settings: settings);
 ```
 
-Or through the manager:
-
-```dart
-manager.init(initialSettings: settings);
-```
-
 ### 2. Reconcile live settings
 
 ```dart
-await manager.updateSettings(nextSettings);
+await runtime.updateSettings(nextSettings);
 ```
 
 This is the full lifecycle-aware path. It reconciles the global scope and every active session.
@@ -186,14 +180,14 @@ right path.
 ### 3. Update the snapshot without lifecycle work
 
 ```dart
-manager.updateSettingsSnapshot(nextSettings);
+runtime.updateSettingsSnapshot(nextSettings);
 ```
 
-This updates the manager's stored settings and emits on `settingsStream`. It does not run reconciliation, and it does not inject new config into already-resolved services. Useful for optimistic UI, bookkeeping updates, and anything where you are confident the runtime does not need to converge. When unsure, reach for `updateSettings(...)` instead.
+This updates the runtime's stored settings and emits on `settingsStream`. It does not run reconciliation, and it does not inject new config into already-resolved services. Useful for optimistic UI, bookkeeping updates, and anything where you are confident the runtime does not need to converge. When unsure, reach for `updateSettings(...)` instead.
 
-## Low-level runtime APIs
+## Low-level scope-specific APIs
 
-If you are not using the manager, the runtime exposes the two pieces separately:
+When you want finer control over which scope reconciles, the runtime exposes the two pieces separately:
 
 - `updateGlobalSettings(...)`
 - `updateSessionSettings(...)`

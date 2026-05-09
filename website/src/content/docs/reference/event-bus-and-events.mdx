@@ -179,7 +179,7 @@ Response? maybeRequestSync<Request, Response>(
 
 `SyncRequestHandler<Request, Response>` is `Response Function(EventEnvelope<Request>)`. Handlers registered via `onRequestSync` are stored in the same buckets as async ones; the sync wrapper exists to refuse `Future` returns at the call boundary.
 
-`requestSync` throws `StateError` if any invoked handler returns a `Future`. Same throw conditions as `request` for missing or fully-conceding handlers — both surface as `RequestUnavailableException`. `maybeRequestSync` catches `RequestUnavailableException` and returns `null` on availability failure; any *other* exception thrown by a handler (including the `StateError` on a Future-returning sync handler) propagates, matching the async `maybeRequest` contract.
+`requestSync` throws `StateError` if any invoked handler returns a `Future`. Same throw conditions as `request` for missing or fully-conceding handlers; both surface as `RequestUnavailableException`. `maybeRequestSync` catches `RequestUnavailableException` and returns `null` on availability failure; any *other* exception thrown by a handler (including the `StateError` on a Future-returning sync handler) propagates, matching the async `maybeRequest` contract.
 
 ## Identifier scoping
 
@@ -234,7 +234,7 @@ extension PluginHelper on Plugin {
 }
 ```
 
-Every helper takes the [`PluginContext`](/reference/plugins-and-lifecycle/) as its first argument because the same plugin instance is shared across sessions — there is no safe "current context" to read from a field. Inside `Plugin.attach` / `Plugin.detach` the `context` parameter is right there; pass it along.
+Every helper takes the [`PluginContext`](/reference/plugins-and-lifecycle/) as its first argument because the same plugin instance is shared across sessions; there is no safe "current context" to read from a field. Inside `Plugin.attach` / `Plugin.detach` the `context` parameter is right there; pass it along.
 
 Each subscription helper registers on `context.bus` and bookkeeps the returned `StreamSubscription` into a per-context bucket. The framework cancels each context's bucket when that context detaches, so concurrent sessions of the same plugin do not trample each other's teardown.
 
@@ -335,7 +335,7 @@ The full cross-scope story, including why isolation defaults are intentional, is
   <LinkCard
     title="Runtime"
     description="Where the global bus and session buses come from, and the cross-scope routing rules."
-    href="/concepts/sessions/"
+    href="/concepts/runtime/"
   />
   <LinkCard
     title="Service Registry & Capabilities"

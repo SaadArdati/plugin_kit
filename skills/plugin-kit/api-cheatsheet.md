@@ -11,7 +11,7 @@ Dense reference. Source pointers at the end.
 5. Event bus
 6. RuntimeSettings
 7. Sessions
-8. Runtime manager (enabled vs attached)
+8. Runtime (enabled vs attached)
 9. Source pointers
 
 ## Typed handles (`typed_handles.dart`)
@@ -19,7 +19,7 @@ Dense reference. Source pointers at the end.
 Zero-cost extension types over `String`. At runtime they are the underlying String.
 
 ```dart
-const PluginId         chatId    = PluginId('chat_manager');
+const PluginId         chatId    = PluginId('chat');
 const Namespace        agent     = Namespace('agent');
 const ServiceId        modelId   = ServiceId('agent.model');
 
@@ -42,7 +42,7 @@ ServiceId.namespaced(agent, 'model');  // const-friendly composition
 
 // Pin is the map-key type used by RuntimeSettings.services. Build via the
 // typed chain (preserves PluginId / ServiceId types) or directly with strings.
-chatId.service(modelId);                                  // wire 'chat_manager:agent.model'
+chatId.service(modelId);                                  // wire 'chat:agent.model'
 PluginId.wildcard.service(modelId);                       // wire '*:agent.model'
 PluginId('chat').namespace('agent').service('model');     // wire 'chat:agent.model'
 PluginId('chat').namespace('agent')('model');             // shorthand for .service('model')
@@ -60,7 +60,7 @@ pin.isWildcard;                           // false
 pin.wire;                                 // 'chat:agent.model'
 
 // Wire-format parse side (used by RuntimeSettings.fromJson; const-evaluable):
-const Pin.fromWire('chat_manager:agent.model');
+const Pin.fromWire('chat:agent.model');
 const Pin.fromWire('*:agent.tools');
 ```
 
@@ -111,7 +111,7 @@ FeatureFlag (`Plugin.featureFlags`):
 - `.experimental`: disabled by default; requires opt-in via `RuntimeSettings` or by inclusion in `defaultEnabledPluginIds`.
 - Custom flags: `const FeatureFlag('your_string')`. Zero-cost extension type over String.
 
-`PluginRuntimeManager.init(defaultEnabledPluginIds: null)`: every non-experimental plugin is on by default. Non-null: only listed ids are on (experimental is overridden by explicit inclusion).
+`PluginRuntime.init(defaultEnabledPluginIds: null)`: every non-experimental plugin is on by default. Non-null: only listed ids are on (experimental is overridden by explicit inclusion).
 
 Scope:
 - `GlobalPlugin<G extends GlobalPluginContext>`: one instance per runtime; lifetime equals runtime.
@@ -119,7 +119,7 @@ Scope:
 
 `super.attach()` / `super.detach()` are no-ops on both `Plugin` and `StatefulPluginService`. Don't call them. `super.injectSettings(settings, hash: hash)` IS required when overriding settings injection on `PluginService`.
 
-Default-context generics are inferred. `extends SessionPlugin` infers `<SessionPluginContext>`; `extends GlobalPlugin` infers `<GlobalPluginContext>`; `PluginRuntime` and `PluginRuntimeManager` default to `<GlobalPluginContext, SessionPluginContext>`; `PluginSession` defaults to `<SessionPluginContext>`. Spell the type parameters out only when using a custom context subclass.
+Default-context generics are inferred. `extends SessionPlugin` infers `<SessionPluginContext>`; `extends GlobalPlugin` infers `<GlobalPluginContext>`; `PluginRuntime` and `PluginRuntime` default to `<GlobalPluginContext, SessionPluginContext>`; `PluginSession` defaults to `<SessionPluginContext>`. Spell the type parameters out only when using a custom context subclass.
 
 `StatefulPluginService<PKC extends PluginContext>` has a wider bound because it serves both global and session scopes. Bare `extends StatefulPluginService` infers `<PluginContext>`. Two typedef aliases give you the common cases without spelling the generic: `extends SessionStatefulPluginService` for session-scoped (`StatefulPluginService<SessionPluginContext>`), `extends GlobalStatefulPluginService` for global-scoped (`StatefulPluginService<GlobalPluginContext>`). Pure syntactic sugar; the explicit form still works.
 
@@ -361,37 +361,36 @@ GlobalPluginContext.stub();        // includes empty sessions list
 SessionPluginContext.stub();       // includes default empty global bus
 ```
 
-## Runtime manager (`runtime_manager.dart`)
+## Runtime (`runtime.dart`)
 
-Higher-level wrapper used by most apps. Holds the current settings snapshot, exposes a stream, and runs serialized reconciliation.
+The lifecycle engine. Holds the current settings snapshot, exposes a stream, and runs serialized reconciliation.
 
 ```dart
-final manager = PluginRuntimeManager(plugins: [/* ... */]);
-manager.init(
-  initialSettings: const RuntimeSettings.empty(),
+final runtime = PluginRuntime(plugins: [/* ... */]);
+runtime.init(
+  settings: const RuntimeSettings.empty(),
   defaultEnabledPluginIds: null,   // null: all on except experimental; non-null: only listed are on
 );
 
-manager.runtime;                   // PluginRuntime
-manager.settings;                  // current RuntimeSettings snapshot
-manager.settingsStream;            // Stream<RuntimeSettings>; broadcast, no replay
+runtime.settings;                  // current RuntimeSettings snapshot
+runtime.settingsStream;            // Stream<RuntimeSettings>; broadcast, no replay
 
-manager.enabledPlugins;            // Iterable<Plugin> per current settings (settings-intent)
-manager.enabledPluginIds;          // Set<PluginId>
-manager.isPluginEnabled(pluginId); // bool
+runtime.enabledPlugins;            // Iterable<Plugin> per current settings (settings-intent)
+runtime.enabledPluginIds;          // Set<PluginId>
+runtime.isPluginEnabled(pluginId); // bool
 
-manager.attachedPlugins;           // List<Plugin> the runtime actually attached (runtime-effective)
-manager.attachedPluginIds;         // Set<PluginId>
-manager.isPluginAttached(pluginId); // bool
+runtime.attachedPlugins;           // List<Plugin> the runtime actually attached (runtime-effective)
+runtime.attachedPluginIds;         // Set<PluginId>
+runtime.isPluginAttached(pluginId); // bool
 
-manager.addPlugin(MyPlugin());     // before init only
-manager.addPlugins([...]);
+runtime.addPlugin(MyPlugin());     // before init only
+runtime.addPlugins([...]);
 
-await manager.createSession(contextFactory: ...);
-await manager.updateSettings(newSettings);    // serialized: global, then each session
-manager.updateSettingsSnapshot(snapshot);     // emits on stream without reconciling
-manager.resetSettings();
-await manager.dispose();
+await runtime.createSession(contextFactory: ...);
+await runtime.updateSettings(newSettings);    // serialized: global, then each session
+runtime.updateSettingsSnapshot(snapshot);     // emits on stream without reconciling
+runtime.resetSettings();
+await runtime.dispose();
 ```
 
 `enabledPlugins` reports settings-intent: locked + explicit settings + `defaultEnabledPluginIds` whitelist (when non-null) + experimental heuristic. Does not account for dependency cascade. `attachedPlugins` reports the post-cascade effective set the runtime actually attached. A plugin enabled in settings but cascade-disabled because its dependency is off appears in `enabledPlugins` but not `attachedPlugins`. Use `enabledPlugins` for settings UI; `attachedPlugins` for "is it actually running."
@@ -400,12 +399,12 @@ await manager.dispose();
 
 ## Flutter integration (`package:flutter_plugin_kit`)
 
-Separate package; not exported from plugin_kit. Use it instead of holding `_manager`/`_session` fields and inline `StreamSubscription` plumbing on a Flutter `State`.
+Separate package; not exported from plugin_kit. Use it instead of holding `_runtime`/`_session` fields and inline `StreamSubscription` plumbing on a Flutter `State`.
 
 Widgets:
-- `PluginRuntimeScope({required List<Plugin> plugins, RuntimeSettings? initialSettings, required Widget child})`: scope-owned manager. Calls `init` in initState, `dispose` in dispose.
-- `PluginRuntimeScope.value({required PluginRuntimeManager runtime, required Widget child})`: externally-owned manager. Scope does not dispose.
-- `PluginSessionScope({PluginSession? session, PluginRuntimeManager? runtime, WidgetBuilder? loading, Widget Function(BuildContext, Object)? error, required Widget child})`: at most one of `session`/`runtime`. Resolution order: explicit `session`, then explicit `runtime`, then ambient `PluginRuntimeScope`. Renders `loading` while creating, `error` on creation failure.
+- `PluginRuntimeScope({required List<Plugin> plugins, RuntimeSettings? initialSettings, required Widget child})`: scope-owned runtime. Calls `init` in initState, `dispose` in dispose.
+- `PluginRuntimeScope.value({required PluginRuntime runtime, required Widget child})`: externally-owned runtime. Scope does not dispose.
+- `PluginSessionScope({PluginSession? session, PluginRuntime? runtime, WidgetBuilder? loading, Widget Function(BuildContext, Object)? error, required Widget child})`: at most one of `session`/`runtime`. Resolution order: explicit `session`, then explicit `runtime`, then ambient `PluginRuntimeScope`. Renders `loading` while creating, `error` on creation failure.
 - `PluginSessionListener<E>({required Widget Function(BuildContext, EventEnvelope<E>?) builder, ...})`: rebuilds on matching events from the ambient session.
 - `PluginEventNotifier<E>(session)`: `ValueListenable<EventEnvelope<E>?>` over the latest event of `E`.
 
@@ -434,7 +433,7 @@ Plugin and service code stays the same. The mixins are widget-side adapters; the
 - `packages/plugin_kit/lib/src/event_bus.dart`: EventBus, EventEnvelope, EventBinding
 - `packages/plugin_kit/lib/src/settings.dart`: RuntimeSettings, ServiceSettings, PluginConfig
 - `packages/plugin_kit/lib/src/plugin/runtime.dart`: PluginRuntime, PluginSession
-- `packages/plugin_kit/lib/src/runtime_manager.dart`: PluginRuntimeManager
+- `packages/plugin_kit/lib/src/runtime.dart`: PluginRuntime
 - `packages/plugin_kit/lib/src/capabilities.dart`: Capability, CapabilitySet
 - `packages/plugin_kit/lib/src/config_node.dart`: ConfigNode
 - `packages/plugin_kit/lib/src/dialog/`: UI configurability schema, opt-in

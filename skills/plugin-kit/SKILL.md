@@ -49,9 +49,9 @@ Full surface lives in api-cheatsheet.md. Quick pointers:
 
 ### From Flutter widgets
 
-Flutter integration lives in `package:flutter_plugin_kit/flutter_plugin_kit.dart`, NOT in plugin_kit itself. Use it instead of holding `_manager`/`_session` fields and manual `StreamSubscription` plumbing on a `State`:
+Flutter integration lives in `package:flutter_plugin_kit/flutter_plugin_kit.dart`, NOT in plugin_kit itself. Use it instead of holding `_runtime`/`_session` fields and manual `StreamSubscription` plumbing on a `State`:
 
-- `PluginRuntimeScope` owns or carries a `PluginRuntimeManager`. Two constructors: bare (give it a `plugins:` list, scope calls `init`/`dispose`) or `PluginRuntimeScope.value(runtime: ...)` for an externally-owned manager.
+- `PluginRuntimeScope` owns or carries a `PluginRuntime`. Two constructors: bare (give it a `plugins:` list, scope calls `init`/`dispose`) or `PluginRuntimeScope.value(runtime: ...)` for an externally-owned runtime.
 - `PluginSessionScope` owns or carries a `PluginSession`. Resolution order: explicit `session:`, then explicit `runtime:`, then ambient `PluginRuntimeScope`. Pass at most one of `session`/`runtime` (asserted in debug).
 - `PluginSessionListener<E>` widget rebuilds on matching events from the ambient session.
 - `PluginSessionStateListener` mixin replaces inline `session.on<E>(...)` plumbing on a `State`. It tracks bindings, cancels them on dispose, and re-attaches across session swap. Pair with `BuildContext.watchEvent<E>()` / `readEvent<E>()` to read the latest event during build without manual subscription.
@@ -74,13 +74,13 @@ Plugin and service code stays the same. The mixins are widget-side adapters; the
 
 7. Events: mutable T fields on the event class when interception is the contract (pre-commit drafts, stream-wrapping). Final T fields when the event is a fact or notification. Mutability is a contract signal to handlers, not a default.
 
-8. Default-context generics are inferred. `extends SessionPlugin` infers `<SessionPluginContext>`; `extends GlobalPlugin` infers `<GlobalPluginContext>`; `PluginRuntime` and `PluginRuntimeManager` infer `<GlobalPluginContext, SessionPluginContext>`; `PluginSession` infers `<SessionPluginContext>`. Specify generics only when using a custom context subclass.
+8. Default-context generics are inferred. `extends SessionPlugin` infers `<SessionPluginContext>`; `extends GlobalPlugin` infers `<GlobalPluginContext>`; `PluginRuntime` and `PluginRuntime` infer `<GlobalPluginContext, SessionPluginContext>`; `PluginSession` infers `<SessionPluginContext>`. Specify generics only when using a custom context subclass.
 
    `StatefulPluginService<PKC extends PluginContext>` has a wider bound because it can host both global and session services. Bare `extends StatefulPluginService` infers `<PluginContext>`, which limits `this.context` to the base type. Two ergonomic typedef aliases ship with the library: `extends SessionStatefulPluginService` (alias for `StatefulPluginService<SessionPluginContext>`) and `extends GlobalStatefulPluginService` (alias for `StatefulPluginService<GlobalPluginContext>`). The aliases are pure syntactic sugar; the explicit `extends StatefulPluginService<S>` form still works and is required when `S` is a custom context subclass.
 
 9. `enabledPlugins` is settings-intent (what `RuntimeSettings` says is on); `attachedPlugins` is runtime-effective (what the runtime actually attached after dependency cascade). Use `enabledPlugins` for settings UI; `attachedPlugins` for "is it actually running." Per-scope underliers and full semantics in api-cheatsheet.md.
 
-10. `PluginId` values starting with `__pk_` are reserved for internal sentinels (`PluginId.wildcard.value == '__pk_wildcard__'`, `PluginId.winnerScoped.value == '__pk_winner__'`). `PluginRuntime.addPlugin` rejects any user-supplied id with that prefix. Pick any other naming; plugin ids conventionally read as lowercase_snake_case (`chat_manager`, `model_router`).
+10. `PluginId` values starting with `__pk_` are reserved for internal sentinels (`PluginId.wildcard.value == '__pk_wildcard__'`, `PluginId.winnerScoped.value == '__pk_winner__'`). `PluginRuntime.addPlugin` rejects any user-supplied id with that prefix. Pick any other naming; plugin ids conventionally read as lowercase_snake_case (`chat`, `model_router`).
 
 11. Request/response failure is a typed exception. `context.bus.request<R, S>(req)` and `requestSync<R, S>(req)` throw `RequestUnavailableException` when no handler is registered or every handler conceded with null on a non-nullable `S`. `maybeRequest` and `maybeRequestSync` convert ONLY that exception to null; handler-thrown exceptions propagate. `null` means "request unavailable," not "handler crashed." Catch `RequestUnavailableException` when you need to distinguish.
 

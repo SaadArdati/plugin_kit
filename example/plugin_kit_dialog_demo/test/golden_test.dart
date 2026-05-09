@@ -80,7 +80,7 @@ void main() {
     );
   });
 
-  testWidgets('services_tab_dark matches golden (chat_manager expanded)', (
+  testWidgets('services_tab_dark matches golden (chat expanded)', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1280, 1300);

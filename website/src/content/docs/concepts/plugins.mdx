@@ -3,7 +3,7 @@ title: Plugins
 description: The foundational building block. Global vs Session scope, lifecycle, and dependencies.
 ---
 
-import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 A plugin is the smallest thing the runtime cares about as a unit. It has an identity,
 a lifecycle, and a bit of code that wires behavior into a service registry and an event bus.
@@ -84,59 +84,22 @@ The visuals are from the Plugin Kit Dialog, a built-in customization surface tha
 toggling a plugin on or off runs the lifecycle right there and then. The dialog is optional, but it is a useful reference for what your plugin 
 metadata looks like in practice. The color, icon, title, and description of your plugin can be registered via the `plugin_kit_dialog` package.
 
-## Lifecycle, in order
+## How the lifecycle shapes plugin code
 
-Global and session plugins run through the same sequence, each inside their own scope.
+Every plugin runs through three phases (`register` → `attach` → `detach`) inside its scope. `register` populates the registry. `attach` is where the plugin subscribes to events. `detach` tears down. A fourth hook, `onPluginSettingsChanged`, fires for plugins that stay enabled across a settings update so they can react without a full reattach. See [Plugins & Lifecycle](/reference/plugins-and-lifecycle/) for the full reference.
 
-<Steps>
+The shape of those phases is load-bearing for how Plugin Kit code is written.
 
-1. **`register`.** The plugin contributes services to its scope's registry. No attaching yet, no event subscriptions. Just "here are the services I own."
+- **No order guarantees within a phase.** Other plugins may not be registered yet during your `register`, and the order plugins *attach* in is also not guaranteed. A direct reference cached during `attach` can go stale when a higher-priority plugin is enabled later. Resolve services at point of use, not at attach time.
+- **Be reactive, not eager.** Plugin Kit pushes work toward "react when called or when an event fires." A service that does work in its constructor or during `register` runs that work even when nothing is asking for it, which breaks hot-swap, dependency cascade, and lazy initialization.
 
-2. **The scope is assembled.** The runtime builds the global context (or session context), finishes collecting every enabled plugin's registrations,
-and applies any wildcard or per-plugin overrides from settings.
+That stricture pays off in three ways.
 
-3. **`attach`.** Now the plugin can safely subscribe to events. Only "I want to do something when this event happens" logic should go here. Resolving from
-the registry works at this point (every enabled plugin is registered by now), but the order plugins *attach* in is not guaranteed, and any plugin can be
-enabled later. Caching a direct reference here is fragile. If you need to react to something from another plugin, subscribe to an event that signals that
-thing happened, or use `resolveAfter` to get a future for it instead of asking for it directly.
+- **Hot-swappable features.** A higher-priority plugin can take over a slot live; if your service does nothing until called, the swap is invisible to callers.
+- **Safe dependency declarations.** A plugin auto-disables when its dependency is missing. As long as your plugin does no work until called, it can be disabled without leaving zombies.
+- **Lazy initialization.** Work runs only when something asks for it. Toggling a plugin off and on does not re-run startup code; it just removes and re-adds its services.
 
-4. **The scope runs.** Events fly. Services get resolved. Settings may change, in which case `onPluginSettingsChanged` may be called.
-Your services may be forcefully attached or reattached, you do not get a say in that as a plugin author. The runtime is in
-charge of keeping the session coherent as settings are flipped and plugins come and go.
-
-5. **`detach`.** When the scope is torn down (runtime disposal for global, session disposal for session), every enabled plugin gets a chance to clean up.
-
-</Steps>
-
-### The Consequence:
-During `register`, other plugins may not be registered yet. There is no guaranteed order of registration, so you cannot reliably ask the registry for
-something that may or may not be there. During `attach`, every enabled plugin is registered, but the order plugins *attach* in is not guaranteed and
-plugins can be enabled later, so a direct reference cached here can become stale or be missing. This is by design to force you to avoid coupling your
-plugin to ANY other plugin strictly.
-Plugin Kit is designed for a reactive architecture. Your service ONLY reacts when it is explicitly triggered by an event or function resolution call from somewhere else.
-Your service is never, or extremely discouraged from initializing itself upon construction.
-
-This strict architecture pays off in dividends in the future. Avoid eager initialization and direct coupling, and you get:
-- **Hot-swappable features.** The runtime can disable a plugin and re-resolve a service to get a different implementation without restarting the session. If your plugin is not doing anything until it is asked for, it can be swapped out live.
-- **Safe dependency declaration.** If you declare a dependency on another plugin, the runtime can disable you if that plugin is missing, or at least warn you if the dependency is experimental. If you are not asking for anything during registration, you can be disabled safely without breaking the runtime.
-- **Lazy initialization.** If your plugin is doing work during registration, that work runs even if the plugin is disabled later. If your plugin is doing work during attach, that work runs every time the plugin is enabled, even if it was already enabled once before. If your plugin is not doing work until it is asked for, it only runs when it is asked for, and the runtime can control when that is.
-
-## Hooks are pure: no super call
-
-`Plugin.attach` and `Plugin.detach` are pure user hooks. The framework runs orchestration around them via library-private `_runAttach` / `_runDetach`: it walks every `StatefulPluginService` this plugin registered, binds their context, and tears down tracked subscriptions after the user hooks return. You do not need to call `super.attach(context)` or `super.detach(context)`. Both base implementations are no-ops.
-
-```dart
-@override
-void attach(SessionPluginContext context) {
-  on<UserJoinedEvent>(context, (event) { /* ... */ });
-}
-
-@override
-Future<void> detach(SessionPluginContext context) async {
-}
-```
-
-The same applies to `StatefulPluginService.attach()` and `detach()`: pure user hooks, no super call. The one method that does require super is `PluginService.injectSettings(...)`, which carries the actual settings injection logic. Override it to react to settings changes, and call `super.injectSettings(settings, hash: hash)` first.
+`Plugin.attach` and `Plugin.detach` are pure user hooks: the framework wraps them with orchestration (context binding, owned `StatefulPluginService` attach/detach, subscription cleanup), so there is no `super.attach` / `super.detach` to call. The one hook that does require `super` is `PluginService.injectSettings(...)`. See [Plugin Services](/concepts/plugin-services/).
 
 ## Declaring dependencies
 
@@ -154,7 +117,7 @@ Locked plugins are the exception. A plugin that declares `FeatureFlag.locked` st
 situation as a configuration error instead of silently disabling the plugin. Use this sparingly: locking around a missing dependency hides config
 errors instead of surfacing them.
 
-<Aside type="caution" title="Dependencies do not care about registeration order">
+<Aside type="caution" title="Dependencies do not care about registration order">
 As mentioned earlier, there is no guaranteed order of registration or attach. Declaring a dependency on another plugin does not guarantee that the
 dependency has registered before your `register` runs, nor that it has attached before your `attach` runs. It only means that the runtime will disable
 you if that plugin is missing, so you can be sure it is there when you are asked for it later.
@@ -166,21 +129,9 @@ for its services during my attach phase." That is not guaranteed, and you should
 
 ## Feature flags
 
-Two flags ship with the library.
+Two flags ship with the library: `FeatureFlag.experimental` (off by default; settings must explicitly enable it) and `FeatureFlag.locked` (always on; settings cannot disable it). Both let plugin authors carry behavioral intent without the host app inventing a separate flagging system.
 
-| Flag | Meaning |
-|---|---|
-| `FeatureFlag.experimental` | disabled by default; settings must explicitly enable it |
-| `FeatureFlag.locked` | always enabled; settings cannot disable it |
-
-```dart
-@override
-List<FeatureFlag> get featureFlags => const [.experimental];
-```
-
-Enablement precedence goes: `locked`, then explicit settings, then the runtime's default-enabled set if one was supplied,
-then the experimental heuristic. That last line matters: `experimental` is a default, not a hard rule. Settings can still
-enable an experimental plugin. It just will not be on unless explicitly enabled via RuntimeSettings.
+The interesting consequence is that `experimental` is a *default*, not a *block*. The precedence the runtime applies, highest to lowest, is `locked`, then explicit `RuntimeSettings.plugins` entries, then a caller-supplied default-enabled set, then the experimental heuristic. Settings can still enable an experimental plugin; it just will not be on unless someone opts in. See [Plugins & Lifecycle](/reference/plugins-and-lifecycle/) for the full mechanics and signature.
 
 ## Identity and uniqueness
 

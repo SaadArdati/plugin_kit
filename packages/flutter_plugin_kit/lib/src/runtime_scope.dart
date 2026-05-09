@@ -3,36 +3,36 @@ import 'package:plugin_kit/plugin_kit.dart';
 
 import 'dispose_reporter.dart';
 
-/// Carries a [PluginRuntimeManager] through the widget tree.
+/// Carries a [PluginRuntime] through the widget tree.
 ///
 /// Two construction modes:
 ///
-/// - Pass [runtime] to expose an already-constructed manager. The scope
-///   does not own its lifecycle; whoever created the manager disposes it.
+/// - Pass [runtime] to expose an already-constructed runtime. The scope
+///   does not own its lifecycle; whoever created the runtime disposes it.
 ///   Equivalent to `Provider.value` for a runtime.
 ///
 /// - Pass [plugins] (and optionally [initialSettings]) to let the scope
-///   construct, [PluginRuntimeManager.init], and [PluginRuntimeManager.dispose]
-///   the manager itself. Convenient for simple apps where the scope's
+///   construct, [PluginRuntime.init], and [PluginRuntime.dispose]
+///   the runtime itself. Convenient for simple apps where the scope's
 ///   lifetime matches the runtime's.
 ///
 /// Exactly one of [runtime] or [plugins] must be supplied.
 ///
-/// Descendants read the manager via [PluginRuntimeScope.of] (throws if
+/// Descendants read the runtime via [PluginRuntimeScope.of] (throws if
 /// missing) or [PluginRuntimeScope.maybeOf] (returns `null`).
 class PluginRuntimeScope extends StatefulWidget {
   /// Wrap [child] with an externally-owned [runtime]. The scope will not
-  /// dispose the manager.
+  /// dispose the runtime.
   const PluginRuntimeScope.value({
     super.key,
-    required PluginRuntimeManager this.runtime,
+    required PluginRuntime this.runtime,
     required this.child,
   }) : plugins = null,
        initialSettings = null;
 
-  /// Wrap [child] with a manager built from [plugins]. The scope owns the
-  /// manager: it calls [PluginRuntimeManager.init] in `initState` and
-  /// [PluginRuntimeManager.dispose] in `dispose`.
+  /// Wrap [child] with a runtime built from [plugins]. The scope owns the
+  /// runtime: it calls [PluginRuntime.init] in `initState` and
+  /// [PluginRuntime.dispose] in `dispose`.
   const PluginRuntimeScope({
     super.key,
     required List<Plugin> this.plugins,
@@ -40,40 +40,40 @@ class PluginRuntimeScope extends StatefulWidget {
     required this.child,
   }) : runtime = null;
 
-  /// Externally-owned manager. Mutually exclusive with [plugins].
-  final PluginRuntimeManager? runtime;
+  /// Externally-owned runtime. Mutually exclusive with [plugins].
+  final PluginRuntime? runtime;
 
-  /// Plugins to register on a scope-owned manager. Mutually exclusive
+  /// Plugins to register on a scope-owned runtime. Mutually exclusive
   /// with [runtime].
   final List<Plugin>? plugins;
 
   /// Optional initial settings applied during init when the scope owns
-  /// the manager.
+  /// the runtime.
   final RuntimeSettings? initialSettings;
 
   /// The wrapped subtree.
   final Widget child;
 
-  /// Returns the manager exposed by the nearest enclosing
+  /// Returns the runtime exposed by the nearest enclosing
   /// [PluginRuntimeScope]. Throws [FlutterError] if no scope is found.
-  static PluginRuntimeManager of(BuildContext context) {
-    final manager = maybeOf(context);
-    if (manager == null) {
+  static PluginRuntime of(BuildContext context) {
+    final runtime = maybeOf(context);
+    if (runtime == null) {
       throw FlutterError(
         'PluginRuntimeScope.of() called with a context that does not contain '
         'a PluginRuntimeScope.\n'
         'Wrap the relevant subtree with PluginRuntimeScope before calling.',
       );
     }
-    return manager;
+    return runtime;
   }
 
-  /// Returns the manager exposed by the nearest enclosing
+  /// Returns the runtime exposed by the nearest enclosing
   /// [PluginRuntimeScope], or `null` if no scope is in the tree.
-  static PluginRuntimeManager? maybeOf(BuildContext context) {
+  static PluginRuntime? maybeOf(BuildContext context) {
     final inherited = context
         .dependOnInheritedWidgetOfExactType<_PluginRuntimeInherited>();
-    return inherited?.manager;
+    return inherited?.runtime;
   }
 
   @override
@@ -81,28 +81,28 @@ class PluginRuntimeScope extends StatefulWidget {
 }
 
 class _PluginRuntimeScopeState extends State<PluginRuntimeScope> {
-  PluginRuntimeManager? _ownedManager;
+  PluginRuntime? _ownedRuntime;
 
-  PluginRuntimeManager get _manager => widget.runtime ?? _ownedManager!;
+  PluginRuntime get _runtime => widget.runtime ?? _ownedRuntime!;
 
   @override
   void initState() {
     super.initState();
     if (widget.runtime == null) {
-      final manager = PluginRuntimeManager(plugins: widget.plugins);
-      manager.init(initialSettings: widget.initialSettings);
-      _ownedManager = manager;
+      final runtime = PluginRuntime(plugins: widget.plugins);
+      runtime.init(settings: widget.initialSettings);
+      _ownedRuntime = runtime;
     }
   }
 
   @override
   void dispose() {
-    final manager = _ownedManager;
-    if (manager != null) {
+    final runtime = _ownedRuntime;
+    if (runtime != null) {
       disposeAndReport(
-        manager.dispose,
+        runtime.dispose,
         contextDescription:
-            'disposing owned PluginRuntimeManager on PluginRuntimeScope unmount',
+            'disposing owned PluginRuntime on PluginRuntimeScope unmount',
       );
     }
     super.dispose();
@@ -110,16 +110,16 @@ class _PluginRuntimeScopeState extends State<PluginRuntimeScope> {
 
   @override
   Widget build(BuildContext context) {
-    return _PluginRuntimeInherited(manager: _manager, child: widget.child);
+    return _PluginRuntimeInherited(runtime: _runtime, child: widget.child);
   }
 }
 
 class _PluginRuntimeInherited extends InheritedWidget {
-  const _PluginRuntimeInherited({required this.manager, required super.child});
+  const _PluginRuntimeInherited({required this.runtime, required super.child});
 
-  final PluginRuntimeManager manager;
+  final PluginRuntime runtime;
 
   @override
   bool updateShouldNotify(_PluginRuntimeInherited old) =>
-      !identical(manager, old.manager);
+      !identical(runtime, old.runtime);
 }

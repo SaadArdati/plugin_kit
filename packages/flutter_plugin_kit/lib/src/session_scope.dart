@@ -14,9 +14,9 @@ import 'session_events.dart';
 /// - Pass [session] to expose an externally-owned session. The scope
 ///   does not own its lifecycle; the caller disposes it.
 /// - Pass [runtime] (without [session]) to let the scope call
-///   [PluginRuntimeManager.createSession] and dispose the resulting
+///   [PluginRuntime.createSession] and dispose the resulting
 ///   session when the widget unmounts.
-/// - Pass neither: the scope reads [PluginRuntimeManager] from the
+/// - Pass neither: the scope reads [PluginRuntime] from the
 ///   nearest enclosing [PluginRuntimeScope] and creates and owns a
 ///   session from it.
 ///
@@ -53,11 +53,11 @@ class PluginSessionScope extends StatefulWidget {
   /// or dispose; lifecycle is the caller's responsibility.
   final PluginSession? session;
 
-  /// Runtime to call [PluginRuntimeManager.createSession] on. Used only
+  /// Runtime to call [PluginRuntime.createSession] on. Used only
   /// when [session] is null. The scope does not dispose [runtime].
-  final PluginRuntimeManager? runtime;
+  final PluginRuntime? runtime;
 
-  /// Widget to display while [PluginRuntimeManager.createSession] is in
+  /// Widget to display while [PluginRuntime.createSession] is in
   /// flight. Defaults to a centred [CircularProgressIndicator].
   final WidgetBuilder? loading;
 
@@ -104,7 +104,7 @@ class _PluginSessionScopeState extends State<PluginSessionScope> {
   Object? _error;
   bool _creationStarted = false;
   int _creationGen = 0;
-  PluginRuntimeManager? _activeManager;
+  PluginRuntime? _activeRuntime;
 
   @override
   void initState() {
@@ -122,13 +122,13 @@ class _PluginSessionScopeState extends State<PluginSessionScope> {
     super.didChangeDependencies();
     // Detect ambient runtime swap when in auto-create mode without an
     // explicit widget.runtime: the ambient PluginRuntimeScope changed
-    // its manager. The dependency on _PluginRuntimeInherited fires
-    // didChangeDependencies; we re-create the session from the new manager.
+    // its runtime. The dependency on _PluginRuntimeInherited fires
+    // didChangeDependencies; we re-create the session from the new runtime.
     if (widget.session == null && widget.runtime == null) {
       final ambient = PluginRuntimeScope.maybeOf(context);
-      if (_activeManager != null &&
+      if (_activeRuntime != null &&
           ambient != null &&
-          !identical(ambient, _activeManager)) {
+          !identical(ambient, _activeRuntime)) {
         _creationGen++;
         if (_ownsSession && _session != null) {
           disposeAndReport(
@@ -186,18 +186,18 @@ class _PluginSessionScopeState extends State<PluginSessionScope> {
 
   Future<void> _createSession() async {
     final gen = _creationGen;
-    final PluginRuntimeManager manager;
+    final PluginRuntime runtime;
     try {
-      manager = widget.runtime ?? PluginRuntimeScope.of(context);
+      runtime = widget.runtime ?? PluginRuntimeScope.of(context);
     } catch (error) {
       if (!mounted) return;
       if (_creationGen != gen) return;
       setState(() => _error = error);
       return;
     }
-    _activeManager = manager;
+    _activeRuntime = runtime;
     try {
-      final session = await manager.createSession();
+      final session = await runtime.createSession();
       if (!mounted) {
         disposeAndReport(
           session.dispose,
@@ -234,7 +234,7 @@ class _PluginSessionScopeState extends State<PluginSessionScope> {
         );
       }
     }
-    _activeManager = null;
+    _activeRuntime = null;
     super.dispose();
   }
 

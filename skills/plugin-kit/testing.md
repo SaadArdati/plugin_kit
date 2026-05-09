@@ -39,10 +39,10 @@ For request/response: `bus.maybeRequest` returns null on no-handler-or-all-conce
 
 ## Pitfalls
 
-- Stubs do NOT run `register-all -> attach-all`. Multi-plugin lifecycle tests (deps, settings reconciliation, `onPluginSettingsChanged`) need a real `PluginRuntime` or `PluginRuntimeManager`.
+- Stubs do NOT run `register-all -> attach-all`. Multi-plugin lifecycle tests (deps, settings reconciliation, `onPluginSettingsChanged`) need a real `PluginRuntime` or `PluginRuntime`.
 - `StatefulPluginService.this.context` is bound by framework `_bindContext` during attach. A stub bypasses this; `this.context` throws. Drive through a real runtime, or test only pure methods.
 - `PluginService.injectSettings` runs during attach. In a stub, call it manually if your service reads `config`.
 - `ctx.bus.on(...)` subscriptions do not auto-cancel. Within a single test the bus is discarded, so this is fine. In production code, use the helpers (anti-patterns.md #7).
 - Fresh state per test. Don't share registries or buses across tests.
 
-For an integration-style example driving a real `PluginRuntimeManager` through settings reconciliation and session swap, see `example/state_garden/test/lifecycle_proofs_test.dart`.
+For an integration-style example driving a real `PluginRuntime` through settings reconciliation and session swap, see `example/state_garden/test/lifecycle_proofs_test.dart`.

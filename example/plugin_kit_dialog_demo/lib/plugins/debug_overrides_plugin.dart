@@ -1,6 +1,6 @@
 import 'package:plugin_kit/plugin_kit.dart';
 
-import 'chat_manager_plugin.dart';
+import 'chat_plugin.dart';
 import 'core_plugin.dart';
 
 /// Debug overrides plugin that wins every contested agent slot at priority 200.
@@ -47,7 +47,7 @@ class DebugOverridesPlugin extends GlobalPlugin {
         },
       )
       ..registerSingleton<Object>(
-        ChatManagerPlugin.temperature,
+        ChatPlugin.temperature,
         Object(),
         capabilities: const {
           UiConfigurableCapability(

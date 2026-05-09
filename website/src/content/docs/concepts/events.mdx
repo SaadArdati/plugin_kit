@@ -49,7 +49,7 @@ Two conventions that pay off over time:
 
 - **Keep normal events immutable.** For facts, commands, and requests, make the fields `final` and create a new object when you need a variant.
 - **Name the verb deliberately.** Past tense for things that already happened (`UserMessageReceived`, `DocumentSaved`, `PaymentRejected`).
-Imperative for request types (`SendNotification`, `WaitForAssistant`). The full naming guide lives in [Naming Conventions](/guides/naming-conventions/).
+Imperative for request types (`SendNotification`, `WaitForAssistant`). The full naming guide lives in [Naming Conventions](/reference/naming-conventions/).
 
 The main exception is a deliberate pre-commit draft object emitted so handlers can rewrite it before some outside effect happens.
 The "pre-commit interception" section below covers when that exception is right and how to name it.
@@ -285,7 +285,7 @@ trivial wiring; put anything you'd want to be replaceable in a `StatefulPluginSe
   <LinkCard
     title="Naming Conventions"
     description="The full guide to event type naming (past-tense vs imperative vs draft) and why."
-    href="/guides/naming-conventions/"
+    href="/reference/naming-conventions/"
   />
   <LinkCard
     title="Sessions"

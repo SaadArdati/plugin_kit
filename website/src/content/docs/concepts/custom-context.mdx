@@ -129,15 +129,15 @@ class AnalyticsPlugin extends GlobalPlugin<EditorGlobalContext> {
 
 A session plugin can declare a custom session context while the global context stays the default, and vice versa. The two are independent. A plugin that extends `SessionPlugin<EditorSessionContext>` is happy as long as its session's factory produces that type. Whatever the global scope looks like is not its concern.
 
-## Factories on the manager
+## Factories on the runtime
 
-`PluginRuntimeManager` exposes both factories directly.
+`PluginRuntime` exposes both factories directly.
 
 ```dart
-final manager = PluginRuntimeManager<EditorGlobalContext, EditorSessionContext>();
+final runtime = PluginRuntime<EditorGlobalContext, EditorSessionContext>();
 
-manager.init(
-  initialSettings: savedSettings,
+runtime.init(
+  settings: savedSettings,
   globalContextFactory: (registry, bus, sessions) => EditorGlobalContext(
     registry: registry,
     bus: bus,
@@ -146,7 +146,7 @@ manager.init(
   ),
 );
 
-final session = await manager.createSession(
+final session = await runtime.createSession(
   contextFactory: (registry, sessionBus, globalBus) => EditorSessionContext(
     registry: registry,
     bus: sessionBus,
@@ -157,7 +157,7 @@ final session = await manager.createSession(
 );
 ```
 
-No subclassing or drop-down to `PluginRuntime` needed.
+No subclassing needed.
 
 ## Do not over-model
 

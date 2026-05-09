@@ -44,7 +44,7 @@ When direct subscription on multiple registrants IS correct: the slot is additiv
 ```dart
 const settings = RuntimeSettings(
   services: {
-    'chat_manager:agent.model': ServiceSettings(config: {'temperature': 0.7}),
+    'chat:agent.model': ServiceSettings(config: {'temperature': 0.7}),
     '*:agent.tools': ServiceSettings(priority: 200),
   },
 );
@@ -56,7 +56,7 @@ Fix:
 ```dart
 final settings = RuntimeSettings(
   services: {
-    const PluginId('chat_manager').namespace('agent').service('model'):
+    const PluginId('chat').namespace('agent').service('model'):
         ServiceSettings(config: {'temperature': 0.7}),
     PluginId.wildcard.namespace('agent').service('tools'):
         ServiceSettings(priority: 200),
@@ -196,7 +196,7 @@ Reach for `context.bus.on(...)` only when the subscription's lifetime should NOT
 ## 8. Coupling to a plugin id for resolution
 
 ```dart
-final svc = registry.resolveByPlugin(PluginId('chat_manager'), ServiceId('agent.model'));
+final svc = registry.resolveByPlugin(PluginId('chat'), ServiceId('agent.model'));
 ```
 
 The registry resolves by `ServiceId` and priority decides the winner. There is no `resolveByPlugin` API. Wanting one means coupling to a plugin that may be disabled, replaced, or renamed.
@@ -219,7 +219,7 @@ runtime.addPlugin(MyPlugin());  // throws ArgumentError
 Fix: pick any other naming. Plugin ids conventionally read as lowercase_snake_case matching the feature.
 
 ```dart
-PluginId('chat_manager')   // fine
+PluginId('chat')   // fine
 PluginId('my_internal')    // fine
 PluginId('_my_internal')   // single-underscore is fine; only '__pk_' is reserved
 ```

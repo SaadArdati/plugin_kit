@@ -1,11 +1,11 @@
 ---
 title: Plugins & Lifecycle
-description: Reference for plugin base classes, contexts, the runtime, the manager, and the lifecycle phases that connect them.
+description: Reference for plugin base classes, contexts, the runtime, and the lifecycle phases that connect them.
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-This page covers the types you reach for when defining plugins, hosting them, or driving lifecycle transitions: `Plugin`, its two scoped subclasses, the contexts they receive, the `PluginRuntime` that owns them, the `PluginRuntimeManager` wrapper, and the exception thrown when a phase aggregates failures. For service registration mechanics see [Service Registry & Capabilities](/concepts/service-registry/); for event dispatch see [Event Bus & Events](/concepts/event-bus/).
+This page covers the types you reach for when defining plugins, hosting them, or driving lifecycle transitions: `Plugin`, its two scoped subclasses, the contexts they receive, the `PluginRuntime` that owns them, and the exception thrown when a phase aggregates failures. For service registration mechanics see [Service Registry & Capabilities](/reference/service-registry-and-capabilities/); for event dispatch see [Event Bus & Events](/reference/event-bus-and-events/).
 
 ## `PluginId`
 
@@ -184,7 +184,7 @@ Emit on `context.bus` for in-session communication, on `context.globalBus` to re
 
 ## `PluginSession<K>`
 
-A scoped session with its own registry, bus, and plugin attachments. The runtime constructs and tracks `PluginSession` instances; you receive them from `PluginRuntime.createSession` (or `PluginRuntimeManager.createSession`) and dispose them when the session ends.
+A scoped session with its own registry, bus, and plugin attachments. The runtime constructs and tracks `PluginSession` instances; you receive them from `PluginRuntime.createSession` (or `PluginRuntime.createSession`) and dispose them when the session ends.
 
 ```dart
 class PluginSession<K extends PluginContext> {
@@ -233,6 +233,9 @@ class PluginRuntime<G extends GlobalPluginContext, S extends SessionPluginContex
   List<SessionPlugin> get sessionPlugins;
   List<PluginSession<S>> get sessions;
 
+  RuntimeSettings get settings;
+  Stream<RuntimeSettings> get settingsStream;
+
   void addPlugin(Plugin plugin);
   void addPlugins(List<Plugin> plugins);
 
@@ -243,11 +246,20 @@ class PluginRuntime<G extends GlobalPluginContext, S extends SessionPluginContex
   });
 
   Future<PluginSession<S>> createSession({
-    RuntimeSettings settings = const RuntimeSettings.empty(),
+    RuntimeSettings? settings,
     SessionContextFactory<G, S>? contextFactory,
   });
 
-  bool isPluginEnabled(PluginId pluginId, RuntimeSettings settings);
+  Iterable<Plugin> get enabledPlugins;
+  Set<PluginId> get enabledPluginIds;
+  List<Plugin> get attachedPlugins;
+  Set<PluginId> get attachedPluginIds;
+  bool isPluginEnabled(PluginId pluginId, [RuntimeSettings? settings]);
+  bool isPluginAttached(PluginId pluginId);
+
+  Future<void> updateSettings(RuntimeSettings newSettings);
+  void updateSettingsSnapshot(RuntimeSettings value);
+  void resetSettings();
 
   Future<void> updateGlobalSettings({
     required RuntimeSettings oldSettings,
@@ -279,65 +291,26 @@ Order of operations:
 
 When attach throws inside `init`, `createSession`, or a settings update, the runtime collects every failure and throws `PluginLifecycleException` after the loop completes. Plugins that did not throw remain attached.
 
-## `PluginRuntimeManager<G, S>`
-
-A high-level wrapper around `PluginRuntime` that adds settings storage, a broadcast stream, and a single `updateSettings` call that reconciles every scope and session. Most applications use this rather than `PluginRuntime` directly.
-
-```dart
-class PluginRuntimeManager<G extends GlobalPluginContext, S extends SessionPluginContext> {
-  PluginRuntimeManager({List<Plugin>? plugins});
-
-  late final PluginRuntime<G, S> runtime;
-
-  RuntimeSettings get settings;
-  Stream<RuntimeSettings> get settingsStream;
-
-  void init({
-    RuntimeSettings? initialSettings,
-    Set<PluginId>? defaultEnabledPluginIds,
-    GlobalContextFactory<G, S>? globalContextFactory,
-  });
-
-  void addPlugin(Plugin plugin);
-  void addPlugins(List<Plugin> plugins);
-
-  Future<PluginSession<S>> createSession({
-    RuntimeSettings? settings,
-    S Function(ServiceRegistry, EventBus, EventBus)? contextFactory,
-  });
-
-  Iterable<Plugin> get enabledPlugins;
-  Set<PluginId> get enabledPluginIds;
-  bool isPluginEnabled(PluginId pluginId);
-
-  Future<void> updateSettings(RuntimeSettings newSettings);
-  void updateSettingsSnapshot(RuntimeSettings value);
-  void resetSettings();
-
-  Future<void> dispose();
-}
-```
+### Settings storage and reconciliation
 
 | Member | Behavior |
 |---|---|
-| `runtime` | The wrapped `PluginRuntime`. Reach through it for advanced operations. |
-| `settings` | The current `RuntimeSettings` snapshot. Updated by `updateSettings`, `updateSettingsSnapshot`, and `resetSettings`. |
-| `settingsStream` | Broadcast stream that emits whenever settings change. New subscribers do not receive the current value; read `settings` for the latest snapshot. |
-| `init` | Applies `initialSettings` to the controller, then delegates to `runtime.init`. |
-| `createSession` | Defaults `settings` to the manager's current snapshot. |
-| `enabledPlugins` / `enabledPluginIds` | Filtered views of `runtime.plugins` against the current snapshot. |
-| `updateSettings` | Full reconciliation: runs `updateGlobalSettings`, then `updateSessionSettings` for every active session sequentially in insertion order, then publishes the new snapshot. The new snapshot is published only after every reconcile call has completed; a failure in any phase aborts and preserves the prior snapshot. |
-| `updateSettingsSnapshot` | Stores and publishes the new snapshot without any lifecycle work. Use when you want listeners to see the change but the runtime has already converged (or you intend to converge it later). |
-| `resetSettings` | Replaces stored settings with `RuntimeSettings()`. No reconciliation. |
-| `dispose` | Disposes the runtime and closes the settings stream. |
+| `settings` | The current `RuntimeSettings` snapshot. Updated by `init` (when given a non-null `settings:`), `updateSettings`, `updateSettingsSnapshot`, and `resetSettings`. |
+| `settingsStream` | Broadcast stream that emits whenever `settings` changes. New subscribers do not receive the current value; read `settings` for the latest snapshot. |
+| `enabledPlugins` / `enabledPluginIds` | Settings-intent: plugins the current snapshot says should be on. Use for settings UI. |
+| `attachedPlugins` / `attachedPluginIds` | Runtime-effective: plugins the runtime actually attached after dependency cascade. Use for "is it actually running." |
+| `isPluginEnabled` | Pass an explicit `RuntimeSettings` to preview, omit it to query the current snapshot. |
+| `updateSettings` | Full reconciliation: runs `updateGlobalSettings`, then `updateSessionSettings` for every active session sequentially in insertion order, then publishes the new snapshot. A failure in any phase aborts and preserves the prior snapshot. |
+| `updateSettingsSnapshot` | Stores and publishes the new snapshot without any lifecycle work. Use when listeners need to see the change but the runtime has already converged (or you intend to converge it later). |
+| `resetSettings` | Replaces stored settings with `RuntimeSettings.empty()`. No reconciliation. |
 
 ```dart
-final manager = PluginRuntimeManager(plugins: allPlugins);
-manager.init(initialSettings: savedSettings);
+final runtime = PluginRuntime(plugins: allPlugins);
+runtime.init(settings: savedSettings);
 
-final session = await manager.createSession();
-await manager.updateSettings(newSettings); // full reconcile
-manager.updateSettingsSnapshot(snapshot);  // publish without reconciling
+final session = await runtime.createSession();
+await runtime.updateSettings(newSettings); // full reconcile
+runtime.updateSettingsSnapshot(snapshot);  // publish without reconciling
 ```
 
 The two update modes solve different problems. `updateSettings` is the normal path: it converges the live runtime on a new state. `updateSettingsSnapshot` is for cases where listeners need to see a snapshot but the runtime already reflects it (replaying a saved draft into the UI, for example).

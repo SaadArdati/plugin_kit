@@ -1,6 +1,6 @@
 ---
-title: State Management Integrations
-description: Wire plugin_kit into Bloc, Riverpod, ChangeNotifier+Provider, signals_flutter, MobX, GetIt, or plain setState. Each recipe is backed by a runnable widget test in the example workspace.
+title: State Management Bridges
+description: Reference catalog of plugin_kit bridges for Bloc, Riverpod, ChangeNotifier+Provider, signals_flutter, MobX, GetIt, and plain setState. Every recipe is backed by a runnable widget test in the example_state_garden workspace.
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -8,11 +8,11 @@ import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 Plugin Kit is library-agnostic about state management, but the bus, registry, and session lifecycle overlap with what most state libraries do. You can wire it through whatever your app already uses, or lean on the bus directly when an extra layer would only forward events. This page shows the wire-up between a `PluginSession` and seven common state holders, with the same chat protocol used in every example so you can read the differences side by side and pick the cost you actually want to pay.
 
 <Aside type="tip" title="Source of citation">
-Every recipe on this page is implemented in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden). Sixteen tests in that package compile, run, and assert the recipes against a real `PluginRuntimeManager`, including the two `flutter_plugin_kit` variants shown inline below. If a recipe here drifts from what actually works, the test in that package fails on the next commit.
+Every recipe on this page is implemented in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden). Sixteen tests in that package compile, run, and assert the recipes against a real `PluginRuntime`, including the two `flutter_plugin_kit` variants shown inline below. If a recipe here drifts from what actually works, the test in that package fails on the next commit.
 </Aside>
 
 <Aside type="note" title="The flutter_plugin_kit variant">
-Two of the recipes below — `StatefulWidget + setState` and `ChangeNotifier + provider` — drop most of the bookkeeping (subscription field, `_disposed` flag, manual `cancel()` in `dispose`) once you pull in [`flutter_plugin_kit`](/guides/flutter-plugin-kit/). Line counts come out roughly similar; what shrinks is the cognitive load: the package ships a `PluginSessionStateListener` mixin that owns the subscription lifecycle for `State<W>`, plus a `PluginEventNotifier<E>` that already *is* a `ChangeNotifier` exposing the latest event as `.value`. Each affected recipe shows the package variant inline. The remaining recipes (Bloc, Riverpod, signals, MobX, GetIt) keep their library-native shape — `flutter_plugin_kit` does not displace state libraries, it just removes the bookkeeping layer for hosts that *are* a `State` or a `ChangeNotifier`.
+Two of the recipes below (`StatefulWidget + setState` and `ChangeNotifier + provider`) drop most of the bookkeeping (subscription field, `_disposed` flag, manual `cancel()` in `dispose`) once you pull in [`flutter_plugin_kit`](/guides/flutter-plugin-kit/). Line counts come out roughly similar; what shrinks is the cognitive load: the package ships a `PluginSessionStateListener` mixin that owns the subscription lifecycle for `State<W>`, plus a `PluginEventNotifier<E>` that already *is* a `ChangeNotifier` exposing the latest event as `.value`. Each affected recipe shows the package variant inline. The remaining recipes (Bloc, Riverpod, signals, MobX, GetIt) keep their library-native shape; `flutter_plugin_kit` does not displace state libraries, it just removes the bookkeeping layer for hosts that *are* a `State` or a `ChangeNotifier`.
 </Aside>
 
 ## The shape every recipe shares
@@ -21,7 +21,7 @@ A state holder bridge has the same three duties no matter which library you pick
 
 1. Subscribe to the relevant fact event on the session bus (`ChatMessagesChanged` in these recipes), store the resulting `StreamSubscription` in a field, and update the holder's state inside the handler.
 2. Translate UI intents into bus events with `session.emit(SomeIntent(...))`.
-3. Cancel the subscription in whatever disposal hook the library provides — `Cubit.close`, `ChangeNotifier.dispose`, `ref.onDispose`, `State.dispose`, etc.
+3. Cancel the subscription in whatever disposal hook the library provides: `Cubit.close`, `ChangeNotifier.dispose`, `ref.onDispose`, `State.dispose`, etc.
 
 The bridge does NOT cache resolved services and does NOT subscribe inside `build`. Both decisions matter and are explained below.
 
@@ -112,7 +112,7 @@ Source: [`set_state_chat_screen.dart`](https://github.com/SaadArdati/plugin_kit/
 
 ### With flutter_plugin_kit
 
-If `flutter_plugin_kit` is in your pubspec, the same screen is the mixin call plus a `setState` inside the handler. The mixin owns the subscription field, the cancel-on-dispose, and the re-attach across session swaps. `listen` is callable from `initState` directly — no `_wired` flag, no `didChangeDependencies` deferral.
+If `flutter_plugin_kit` is in your pubspec, the same screen is the mixin call plus a `setState` inside the handler. The mixin owns the subscription field, the cancel-on-dispose, and the re-attach across session swaps. `listen` is callable from `initState` directly, with no `_wired` flag and no `didChangeDependencies` deferral.
 
 ```dart
 class _SetStateChatScreenState extends State<SetStateChatScreen>
@@ -140,7 +140,7 @@ class _SetStateChatScreenState extends State<SetStateChatScreen>
 }
 ```
 
-If the session lives in an ambient `PluginSessionScope` instead of a `widget.session` parameter, drop the `session` override entirely — the mixin reads the scope by default.
+If the session lives in an ambient `PluginSessionScope` instead of a `widget.session` parameter, drop the `session` override entirely; the mixin reads the scope by default.
 
 ## Recipe: ChangeNotifier + provider
 
@@ -185,7 +185,7 @@ Wrap with `ChangeNotifierProvider` and read in widgets through `context.watch<Ch
 
 ### With flutter_plugin_kit
 
-If you only need "the latest event of type `T`," `flutter_plugin_kit` ships `PluginEventNotifier<E>` — a `ChangeNotifier` / `ValueListenable<E?>` that already does the subscribe / store-latest / cancel-on-dispose dance. There is no custom subclass to write.
+If you only need "the latest event of type `T`," `flutter_plugin_kit` ships `PluginEventNotifier<E>`: a `ChangeNotifier` / `ValueListenable<E?>` that already does the subscribe / store-latest / cancel-on-dispose dance. There is no custom subclass to write.
 
 ```dart
 ChangeNotifierProvider(
@@ -258,7 +258,7 @@ class ChatCubit extends Cubit<ChatBlocState> {
 `ChatBlocState` implements value equality so `BlocBuilder` does not rebuild when an identical snapshot is re-emitted. Source: [`bloc_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/bloc_chat.dart).
 
 <Aside type="note" title="The Cubit-as-bridge is the most redundant of these recipes">
-Read the body of `_onMessagesChanged`: it takes a bus event and re-emits it as widget state. That is exactly what a `setState` call inside a `StatefulWidget` listener would do off the same `session.on<ChatMessagesChanged>` subscription. Keep the Cubit if you already have one and value the `state.copyWith` ergonomics or `BlocBuilder`'s rebuild filtering — those are real wins. If you don't, the bus is already a state-update channel and the Cubit is one bridge too many.
+Read the body of `_onMessagesChanged`: it takes a bus event and re-emits it as widget state. That is exactly what a `setState` call inside a `StatefulWidget` listener would do off the same `session.on<ChatMessagesChanged>` subscription. Keep the Cubit if you already have one and value the `state.copyWith` ergonomics or `BlocBuilder`'s rebuild filtering. Those are real wins. If you don't, the bus is already a state-update channel and the Cubit is one bridge too many.
 </Aside>
 
 ## Recipe: Riverpod
@@ -314,7 +314,7 @@ ProviderScope(
 Source: [`riverpod_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/riverpod_chat.dart).
 
 <Aside type="caution" title="Do not create the session inside a FutureProvider">
-A `FutureProvider` that calls `manager.createSession()` inside its build leaks the previous session when the provider invalidates, because `ref.onDispose` is the only thing that would dispose it. Either register `ref.onDispose(() => session.dispose())` inside that provider, or do what the recipe above does and inject an already-built session via override. The override pattern is cleaner: it keeps session lifetime visible at the app boot site instead of buried in a Riverpod provider closure.
+A `FutureProvider` that calls `runtime.createSession()` inside its build leaks the previous session when the provider invalidates, because `ref.onDispose` is the only thing that would dispose it. Either register `ref.onDispose(() => session.dispose())` inside that provider, or do what the recipe above does and inject an already-built session via override. The override pattern is cleaner: it keeps session lifetime visible at the app boot site instead of buried in a Riverpod provider closure.
 </Aside>
 
 ## Recipe: signals_flutter
@@ -426,8 +426,8 @@ These come up often in early drafts. Each is a real failure mode, not a stylisti
 
 - **Caching `final svc = session.resolve<T>(...)` in a state holder.** A higher-priority registrant or a settings-driven priority change will not be visible to the cached reference. Resolve at point of use unless the resolved object is genuinely owned by the state holder.
 - **Subscribing in `build`.** Every rebuild registers a new handler and nothing cancels them. Subscribe in the holder's constructor or in Riverpod's `build` (which IS a constructor-equivalent that runs once per holder lifetime).
-- **Putting the manager inside an `InheritedWidget`.** The manager outlives the widget tree (route changes, hot restart, deep nav). Hold it outside the tree (top-level final, GetIt singleton, Riverpod Provider with single-shot create) and expose the session into the tree.
-- **Calling both `session.dispose()` and `manager.dispose()`.** `manager.dispose()` already iterates and disposes live sessions. Calling both races on stateful service detach. One disposal call: the manager.
+- **Putting the runtime inside an `InheritedWidget`.** The runtime outlives the widget tree (route changes, hot restart, deep nav). Hold it outside the tree (top-level final, GetIt singleton, Riverpod Provider with single-shot create) and expose the session into the tree.
+- **Calling both `session.dispose()` and `runtime.dispose()`.** `runtime.dispose()` already iterates and disposes live sessions. Calling both races on stateful service detach. One disposal call: the runtime.
 - **Treating the handler parameter as the payload.** `session.on<T>` calls back with `EventEnvelope<T>`. The payload is at `envelope.event`.
 
 ## Lifecycle hazards worth knowing

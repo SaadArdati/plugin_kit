@@ -63,34 +63,34 @@ class TestSessionPlugin extends SessionPlugin {
 }
 
 void main() {
-  late PluginRuntimeManager manager;
+  late PluginRuntime runtime;
 
   setUp(() {
-    manager = PluginRuntimeManager();
+    runtime = PluginRuntime();
   });
 
   tearDown(() async {
-    await manager.dispose();
+    await runtime.dispose();
   });
 
   group('Plugin registration', () {
     test('addPlugin delegates to runtime', () {
       final plugin = TestGlobalPlugin('g1');
-      manager.addPlugin(plugin);
-      expect(manager.runtime.plugins, contains(plugin));
+      runtime.addPlugin(plugin);
+      expect(runtime.plugins, contains(plugin));
     });
 
     test('addPlugins registers multiple plugins', () {
       final g = TestGlobalPlugin('g1');
       final s = TestSessionPlugin('s1');
-      manager.addPlugins([g, s]);
-      expect(manager.runtime.plugins, hasLength(2));
+      runtime.addPlugins([g, s]);
+      expect(runtime.plugins, hasLength(2));
     });
 
     test('addPlugin rejects duplicate pluginIds', () {
-      manager.addPlugin(TestGlobalPlugin('dup'));
+      runtime.addPlugin(TestGlobalPlugin('dup'));
       expect(
-        () => manager.addPlugin(TestSessionPlugin('dup')),
+        () => runtime.addPlugin(TestSessionPlugin('dup')),
         throwsStateError,
       );
     });
@@ -98,44 +98,44 @@ void main() {
     test('inline plugins parameter registers the list', () {
       final g = TestGlobalPlugin('g1');
       final s = TestSessionPlugin('s1');
-      final inlineManager = PluginRuntimeManager(plugins: [g, s]);
-      expect(inlineManager.runtime.plugins, containsAll([g, s]));
+      final inlineRuntime = PluginRuntime(plugins: [g, s]);
+      expect(inlineRuntime.plugins, containsAll([g, s]));
     });
   });
 
   group('Initialization', () {
     test('init initializes runtime', () {
-      manager.addPlugin(TestGlobalPlugin('g1'));
-      manager.init();
-      expect(manager.runtime.globalContext, isA<GlobalPluginContext>());
+      runtime.addPlugin(TestGlobalPlugin('g1'));
+      runtime.init();
+      expect(runtime.globalContext, isA<GlobalPluginContext>());
     });
 
-    test('init with initialSettings applies settings before runtime init', () {
+    test('init with explicit settings applies them before runtime init', () {
       final settings = RuntimeSettings(
         plugins: {const PluginId('g1'): const PluginConfig(enabled: false)},
       );
       final plugin = TestGlobalPlugin('g1');
-      manager.addPlugin(plugin);
-      manager.init(initialSettings: settings);
+      runtime.addPlugin(plugin);
+      runtime.init(settings: settings);
 
-      expect(manager.settings, equals(settings));
+      expect(runtime.settings, equals(settings));
       expect(plugin.lifecycleCalls, isEmpty); // disabled
     });
 
-    test('init without initialSettings uses empty default', () {
+    test('init without explicit settings uses empty default', () {
       final plugin = TestGlobalPlugin('g1');
-      manager.addPlugin(plugin);
-      manager.init();
+      runtime.addPlugin(plugin);
+      runtime.init();
       expect(plugin.lifecycleCalls, ['register', 'attach']);
     });
 
     test(
       'init with globalContextFactory builds custom global context',
       () async {
-        final customManager =
-            PluginRuntimeManager<_CustomGlobalContext, SessionPluginContext>();
+        final customRuntime =
+            PluginRuntime<_CustomGlobalContext, SessionPluginContext>();
 
-        customManager.init(
+        customRuntime.init(
           globalContextFactory: (registry, bus, sessions) =>
               _CustomGlobalContext(
                 registry: registry,
@@ -145,48 +145,48 @@ void main() {
               ),
         );
 
-        expect(customManager.runtime.globalContext.label, 'custom-global');
+        expect(customRuntime.globalContext.label, 'custom-global');
 
-        await customManager.dispose();
+        await customRuntime.dispose();
       },
     );
 
     test(
       'init without globalContextFactory throws when G is a custom type',
       () {
-        final customManager =
-            PluginRuntimeManager<_CustomGlobalContext, SessionPluginContext>();
+        final customRuntime =
+            PluginRuntime<_CustomGlobalContext, SessionPluginContext>();
 
-        expect(() => customManager.init(), throwsStateError);
+        expect(() => customRuntime.init(), throwsStateError);
       },
     );
   });
 
   group('Session creation', () {
     test('createSession delegates to runtime', () async {
-      manager.addPlugin(TestSessionPlugin('s1'));
-      manager.init();
+      runtime.addPlugin(TestSessionPlugin('s1'));
+      runtime.init();
 
-      final session = await manager.createSession();
-      expect(manager.runtime.sessions, hasLength(1));
+      final session = await runtime.createSession();
+      expect(runtime.sessions, hasLength(1));
       expect(session.context, isA<SessionPluginContext>());
     });
 
-    test('createSession uses manager settings by default', () async {
+    test('createSession uses runtime settings by default', () async {
       final plugin = TestSessionPlugin('s1');
-      manager.addPlugin(plugin);
-      manager.init();
+      runtime.addPlugin(plugin);
+      runtime.init();
 
-      await manager.createSession();
+      await runtime.createSession();
       expect(plugin.lifecycleCalls, ['register', 'attach']);
     });
 
     test('createSession accepts explicit settings', () async {
       final plugin = TestSessionPlugin('s1');
-      manager.addPlugin(plugin);
-      manager.init();
+      runtime.addPlugin(plugin);
+      runtime.init();
 
-      await manager.createSession(
+      await runtime.createSession(
         settings: RuntimeSettings(
           plugins: {const PluginId('s1'): const PluginConfig(enabled: false)},
         ),
@@ -197,10 +197,10 @@ void main() {
     });
 
     test('createSession with contextFactory', () async {
-      manager.addPlugin(TestSessionPlugin('s1'));
-      manager.init();
+      runtime.addPlugin(TestSessionPlugin('s1'));
+      runtime.init();
 
-      final session = await manager.createSession(
+      final session = await runtime.createSession(
         contextFactory: (registry, sessionBus, globalBus) {
           return SessionPluginContext(
             registry: registry,
@@ -217,16 +217,16 @@ void main() {
 
   group('Settings', () {
     test('settings stream emits on updateSettings', () async {
-      manager.addPlugin(TestGlobalPlugin('g1'));
-      manager.init();
+      runtime.addPlugin(TestGlobalPlugin('g1'));
+      runtime.init();
 
       final emissions = <RuntimeSettings>[];
-      manager.settingsStream.listen(emissions.add);
+      runtime.settingsStream.listen(emissions.add);
 
       final newSettings = RuntimeSettings(
         plugins: {const PluginId('g1'): const PluginConfig(enabled: true)},
       );
-      await manager.updateSettings(newSettings);
+      await runtime.updateSettings(newSettings);
 
       expect(emissions, hasLength(1));
       expect(emissions.first, equals(newSettings));
@@ -234,21 +234,21 @@ void main() {
 
     test('updateSettingsSnapshot updates settings without reconciliation', () {
       final plugin = TestGlobalPlugin('g1');
-      manager.addPlugin(plugin);
-      manager.init();
+      runtime.addPlugin(plugin);
+      runtime.init();
       plugin.lifecycleCalls.clear();
 
       final emissions = <RuntimeSettings>[];
-      manager.settingsStream.listen(emissions.add);
+      runtime.settingsStream.listen(emissions.add);
 
       final newSettings = RuntimeSettings(
         services: {
           Pin('g1', ['some_svc']): ServiceSettings(config: {'key': 'val'}),
         },
       );
-      manager.updateSettingsSnapshot(newSettings);
+      runtime.updateSettingsSnapshot(newSettings);
 
-      expect(manager.settings, equals(newSettings));
+      expect(runtime.settings, equals(newSettings));
       expect(
         emissions,
         [newSettings],
@@ -260,26 +260,26 @@ void main() {
     });
 
     test('updateSettingsSnapshot is no-op for identical settings', () {
-      manager.init();
+      runtime.init();
       final emissions = <RuntimeSettings>[];
-      manager.settingsStream.listen(emissions.add);
+      runtime.settingsStream.listen(emissions.add);
 
-      manager.updateSettingsSnapshot(manager.settings);
+      runtime.updateSettingsSnapshot(runtime.settings);
       expect(emissions, isEmpty);
     });
 
     test('resetSettings returns to empty default', () async {
-      manager.init();
+      runtime.init();
 
       final customSettings = RuntimeSettings(
         plugins: {const PluginId('x'): const PluginConfig(enabled: false)},
       );
-      manager.updateSettingsSnapshot(customSettings);
-      expect(manager.settings, equals(customSettings));
+      runtime.updateSettingsSnapshot(customSettings);
+      expect(runtime.settings, equals(customSettings));
 
-      manager.resetSettings();
-      expect(manager.settings.plugins, isEmpty);
-      expect(manager.settings.services, isEmpty);
+      runtime.resetSettings();
+      expect(runtime.settings.plugins, isEmpty);
+      expect(runtime.settings.services, isEmpty);
     });
   });
 
@@ -287,47 +287,47 @@ void main() {
     test('enabledPlugins returns only enabled plugins', () {
       final g1 = TestGlobalPlugin('g1');
       final s1 = TestSessionPlugin('s1');
-      manager.addPlugins([g1, s1]);
-      manager.init(
-        initialSettings: RuntimeSettings(
+      runtime.addPlugins([g1, s1]);
+      runtime.init(
+        settings: RuntimeSettings(
           plugins: {const PluginId('s1'): const PluginConfig(enabled: false)},
         ),
       );
 
-      expect(manager.enabledPlugins.map((p) => p.pluginId), [
+      expect(runtime.enabledPlugins.map((p) => p.pluginId), [
         const PluginId('g1'),
       ]);
     });
 
     test('enabledPluginIds returns set of IDs', () {
-      manager.addPlugins([TestGlobalPlugin('g1'), TestSessionPlugin('s1')]);
-      manager.init();
-      expect(manager.enabledPluginIds, {
+      runtime.addPlugins([TestGlobalPlugin('g1'), TestSessionPlugin('s1')]);
+      runtime.init();
+      expect(runtime.enabledPluginIds, {
         const PluginId('g1'),
         const PluginId('s1'),
       });
     });
 
     test('isPluginEnabled checks individual plugin', () {
-      manager.addPlugin(TestGlobalPlugin('g1'));
-      manager.init(
-        initialSettings: RuntimeSettings(
+      runtime.addPlugin(TestGlobalPlugin('g1'));
+      runtime.init(
+        settings: RuntimeSettings(
           plugins: {const PluginId('g1'): const PluginConfig(enabled: false)},
         ),
       );
-      expect(manager.isPluginEnabled(const PluginId('g1')), isFalse);
+      expect(runtime.isPluginEnabled(const PluginId('g1')), isFalse);
     });
   });
 
   group('Settings reconciliation', () {
     test('updateSettings reconciles global plugins', () async {
       final plugin = TestGlobalPlugin('g1');
-      manager.addPlugin(plugin);
-      manager.init();
+      runtime.addPlugin(plugin);
+      runtime.init();
       plugin.lifecycleCalls.clear();
 
       // Disable the plugin
-      await manager.updateSettings(
+      await runtime.updateSettings(
         RuntimeSettings(
           plugins: {const PluginId('g1'): const PluginConfig(enabled: false)},
         ),
@@ -338,14 +338,14 @@ void main() {
 
     test('updateSettings reconciles session plugins', () async {
       final plugin = TestSessionPlugin('s1');
-      manager.addPlugin(plugin);
-      manager.init();
+      runtime.addPlugin(plugin);
+      runtime.init();
 
-      await manager.createSession();
+      await runtime.createSession();
       expect(plugin.lifecycleCalls, ['register', 'attach']);
 
       // Disable the session plugin
-      await manager.updateSettings(
+      await runtime.updateSettings(
         RuntimeSettings(
           plugins: {const PluginId('s1'): const PluginConfig(enabled: false)},
         ),
@@ -354,7 +354,7 @@ void main() {
 
       // Re-enable to verify lifecycle-driven reconciliation, not just
       // settings map mutation.
-      await manager.updateSettings(
+      await runtime.updateSettings(
         RuntimeSettings(
           plugins: {const PluginId('s1'): const PluginConfig(enabled: true)},
         ),
@@ -376,13 +376,13 @@ void main() {
         // subscriptions in attach leaked on disable. See
         // PluginRuntime._reconcilePluginsOnSettingsUpdate.
         final plugin = TestSessionPlugin('s1');
-        manager.addPlugin(plugin);
-        manager.init();
+        runtime.addPlugin(plugin);
+        runtime.init();
 
-        await manager.createSession();
+        await runtime.createSession();
         plugin.lifecycleCalls.clear();
 
-        await manager.updateSettings(
+        await runtime.updateSettings(
           RuntimeSettings(
             plugins: {const PluginId('s1'): const PluginConfig(enabled: false)},
           ),
@@ -399,17 +399,17 @@ void main() {
         // the plugin but skip plugin.attach, so direct bus subscriptions
         // were never set up.
         final plugin = TestSessionPlugin('s1');
-        manager.addPlugin(plugin);
-        manager.init(
-          initialSettings: RuntimeSettings(
+        runtime.addPlugin(plugin);
+        runtime.init(
+          settings: RuntimeSettings(
             plugins: {const PluginId('s1'): const PluginConfig(enabled: false)},
           ),
         );
 
-        await manager.createSession();
+        await runtime.createSession();
         plugin.lifecycleCalls.clear();
 
-        await manager.updateSettings(
+        await runtime.updateSettings(
           RuntimeSettings(
             plugins: {const PluginId('s1'): const PluginConfig(enabled: true)},
           ),
@@ -422,10 +422,10 @@ void main() {
 
   group('Dispose', () {
     test('dispose closes settings stream', () async {
-      manager.init();
+      runtime.init();
 
       final doneCompleter = Completer<void>();
-      manager.settingsStream.listen(
+      runtime.settingsStream.listen(
         (_) {},
         onDone: () {
           if (!doneCompleter.isCompleted) {
@@ -434,7 +434,7 @@ void main() {
         },
       );
 
-      await manager.dispose();
+      await runtime.dispose();
 
       await expectLater(
         doneCompleter.future.timeout(const Duration(milliseconds: 250)),
@@ -444,11 +444,11 @@ void main() {
 
     test('dispose disposes runtime', () async {
       final plugin = TestGlobalPlugin('g1');
-      manager.addPlugin(plugin);
-      manager.init();
+      runtime.addPlugin(plugin);
+      runtime.init();
       plugin.lifecycleCalls.clear();
 
-      await manager.dispose();
+      await runtime.dispose();
       expect(plugin.lifecycleCalls, ['detach']);
     });
   });

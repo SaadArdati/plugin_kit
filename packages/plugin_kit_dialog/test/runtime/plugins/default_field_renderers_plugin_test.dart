@@ -7,7 +7,7 @@ import 'package:plugin_kit_dialog/src/widgets/services/fields/text_field_input.d
 
 void main() {
   test(
-    'all default field renderers resolve from the runtime manager at default priority',
+    'all default field renderers resolve from the runtime at default priority',
     () {
       const serviceIds = <ServiceId>[
         ServiceId('config_field_renderer.text'),
@@ -19,14 +19,16 @@ void main() {
         ServiceId('config_field_renderer.group'),
       ];
 
-      final manager = _createDialogRuntimeManager();
-      addTearDown(manager.dispose);
+      final runtime = _createDialogRuntime();
+      addTearDown(runtime.dispose);
 
       for (final serviceId in serviceIds) {
-        final renderer = manager.runtime.globalRegistry
-            .resolve<ConfigFieldRenderer>(serviceId);
-        final wrapper = manager.runtime.globalRegistry
-            .resolveRaw<ConfigFieldRenderer>(serviceId);
+        final renderer = runtime.globalRegistry.resolve<ConfigFieldRenderer>(
+          serviceId,
+        );
+        final wrapper = runtime.globalRegistry.resolveRaw<ConfigFieldRenderer>(
+          serviceId,
+        );
 
         expect(renderer, isNotNull, reason: 'expected renderer for $serviceId');
         expect(
@@ -41,10 +43,10 @@ void main() {
   testWidgets(
     'group renderer builds child text inputs and writes through nested handle',
     (tester) async {
-      final manager = _createDialogRuntimeManager();
-      addTearDown(manager.dispose);
+      final runtime = _createDialogRuntime();
+      addTearDown(runtime.dispose);
 
-      final registry = manager.runtime.globalRegistry;
+      final registry = runtime.globalRegistry;
       final handle = _MutableHandle();
       final field = const GroupConfigField(
         key: 'rules',
@@ -101,8 +103,8 @@ void main() {
   );
 }
 
-PluginRuntimeManager<DialogGlobalContext, SessionPluginContext>
-_createDialogRuntimeManager() {
+PluginRuntime<DialogGlobalContext, SessionPluginContext>
+_createDialogRuntime() {
   final targetRuntime = PluginRuntime();
   targetRuntime.init(settings: RuntimeSettings.empty());
 
@@ -111,7 +113,7 @@ _createDialogRuntimeManager() {
     initialSettings: RuntimeSettings.empty(),
   );
 
-  return PluginRuntimeManager<DialogGlobalContext, SessionPluginContext>(
+  return PluginRuntime<DialogGlobalContext, SessionPluginContext>(
     plugins: [FieldRenderersPlugin()],
   )..init(
     globalContextFactory: (registry, bus, sessions) => DialogGlobalContext(

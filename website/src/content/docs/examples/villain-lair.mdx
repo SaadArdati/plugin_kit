@@ -1,13 +1,13 @@
 ---
-title: The villain_lair examples
-description: Fifteen runnable Dart scenarios in example/villain_lair/, each isolating one piece of the runtime. Use this page as an index, then read or modify the file that matches what you are trying to learn.
+title: The villain_lair scenarios
+description: Fifteen runnable Dart scenarios in example/villain_lair/, each isolating one piece of the runtime. This page maps each scenario to the concept it demonstrates.
 ---
 
 import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
 `example/villain_lair/` is fifteen runnable Dart programs, one per file, each isolating one piece of the runtime. The cast (Dr. Nefarious, Gary, Janet, Mr. Whiskers, Doug) is window dressing that helps the file read; the substance is in the API calls and the plugin shapes.
 
-This page is not a tour. It is an index. Each scenario file is short enough (~100-200 lines) that reading it directly is faster than wrapping prose around it. Use the entries below to pick the right file.
+This page is an index. Each scenario file is short enough (~100-200 lines) that reading it directly is faster than wrapping prose around it. Use the entries below to pick the file that matches what you are trying to learn.
 
 ## Run a scenario
 
@@ -95,7 +95,7 @@ Concepts: [Plugins](/concepts/plugins/#declaring-dependencies).
 
 ### 13. Settings Reconciliation ([`bin/13_settings_reconciliation.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/13_settings_reconciliation.dart))
 
-`PluginRuntimeManager` reconciling settings mid-session. Disabled plugins detach; survivors receive `onPluginSettingsChanged`. The contrast between full `updateSettings` (lifecycle-aware) and `updateSettingsSnapshot` (config-only) lands here.
+`PluginRuntime` reconciling settings mid-session. Disabled plugins detach; survivors receive `onPluginSettingsChanged`. The contrast between full `updateSettings` (lifecycle-aware) and `updateSettingsSnapshot` (config-only) lands here.
 
 Concepts: [Runtime](/concepts/runtime/#settings-reconciliation), [Settings & Overrides](/guides/settings/).
 

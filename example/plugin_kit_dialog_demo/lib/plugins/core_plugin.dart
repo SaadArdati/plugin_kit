@@ -5,7 +5,7 @@ import 'package:plugin_kit/plugin_kit.dart';
 /// Owns slots in two namespaces (`agent` and `system`), demonstrating a single
 /// plugin spanning multiple namespaces. Other plugins co-define their own
 /// slots in `agent` by redeclaring `Namespace('agent')` independently - see
-/// `ChatManagerPlugin.temperature` and `ResearchAgentPlugin.researchPolicy`.
+/// `ChatPlugin.temperature` and `ResearchAgentPlugin.researchPolicy`.
 class CorePlugin extends GlobalPlugin {
   /// Stable plugin id used by the registry and overrides.
   static const id = PluginId('core');

@@ -17,7 +17,7 @@ Three primitives carry the whole library:
 - **Event bus**: typed envelope cascade with mutation and stop, plus typed request/response. Handlers can mutate the payload, halt the cascade with a value, or chain through priorities.
 - **Plugin lifecycle**: `register` → `attach` → `detach`. Scope is `GlobalPlugin` (one instance per runtime) or `SessionPlugin` (one instance shared across sessions, with per-session service instances).
 
-Plugins are wiring; services are the meat. The plugin class declares an id, registers services, and stays small. Real behavior — anything stateful, configurable, or replaceable — lives in services.
+Plugins are wiring; services are the meat. The plugin class declares an id, registers services, and stays small. Real behavior, anything stateful or configurable or replaceable, lives in services.
 
 Pure Dart. No Flutter. Depends only on `collection` and `meta`.
 
@@ -81,7 +81,7 @@ Future<void> main() async {
 }
 ```
 
-That move — features owning slots and slots resolving to the current winner — is the vocabulary the rest of the library is built on. Drop a plugin from the list, lower its priority, or disable it via settings, and the call site never changes.
+That move, where features own slots and slots resolve to the current winner, is the vocabulary the rest of the library is built on. Drop a plugin from the list, lower its priority, or disable it via settings, and the call site never changes.
 
 ## Plugins
 
@@ -109,8 +109,8 @@ abstract class Plugin {
 
 Two scopes:
 
-- **`GlobalPlugin`** — registered once during `PluginRuntime.init`, shared across every session.
-- **`SessionPlugin`** — registered per session; constructor expressions evaluate fresh each time `register` runs, so each session gets its own state by default.
+- **`GlobalPlugin`**: registered once during `PluginRuntime.init`, shared across every session.
+- **`SessionPlugin`**: registered per session; constructor expressions evaluate fresh each time `register` runs, so each session gets its own state by default.
 
 Both default-context generics are inferred. Write `extends GlobalPlugin` / `extends SessionPlugin` without type arguments unless you need a [custom context subclass](https://plugin-kit-docs.saadodi44.workers.dev/concepts/custom-context/).
 
@@ -122,10 +122,10 @@ Behavior another plugin should override, settings-tune, or disable belongs in a 
 |---|---|---|
 | No settings, no events, no lifecycle. | Plain Dart class. | `registerFactory` / `registerSingleton` / `registerLazySingleton` |
 | Settings injection from `RuntimeSettings.services`. | `PluginService`. | All three. Override `injectSettings` only to react to changes; **must** call `super.injectSettings(settings, hash: hash)`. |
-| Lifecycle, events, or session-bound state. | `StatefulPluginService` (or aliases `SessionStatefulPluginService` / `GlobalStatefulPluginService`). | `registerSingleton` / `registerLazySingleton` only — factories rejected. `attach()` and `detach()` are pure user hooks (no `super`). Auto-tracked event helpers (`on`, `onRequest`, `bind`, `emit`) read `this.context` implicitly. |
+| Lifecycle, events, or session-bound state. | `StatefulPluginService` (or aliases `SessionStatefulPluginService` / `GlobalStatefulPluginService`). | `registerSingleton` / `registerLazySingleton` only; factories rejected. `attach()` and `detach()` are pure user hooks (no `super`). Auto-tracked event helpers (`on`, `onRequest`, `bind`, `emit`) read `this.context` implicitly. |
 
 ```dart
-class ChatManager extends SessionStatefulPluginService {
+class ChatThread extends SessionStatefulPluginService {
   final List<Message> messages = [];
 
   @override
@@ -138,6 +138,10 @@ class ChatManager extends SessionStatefulPluginService {
     messages.clear();
   }
 }
+
+// Registered by ChatPlugin under ServiceId('thread'). Pin: chat:thread.
+// Service ids name the role inside the plugin's domain. The plugin id
+// already says "chat", so the service id stays specific and short.
 ```
 
 ## Service registry
@@ -256,7 +260,7 @@ final json = settings.toJson();
 final back = RuntimeSettings.fromJson(json);
 ```
 
-Hand the manager a new `RuntimeSettings` and reconciliation runs serialized: newly-enabled plugins `register` then `attach`; staying-enabled plugins receive `onPluginSettingsChanged(oldContext, newContext)`; newly-disabled plugins `detach` and unregister. Plugin instances persist across reconciliation; service instances are recreated. Settings persist only after every reconcile succeeds.
+Hand the runtime a new `RuntimeSettings` and reconciliation runs serialized: newly-enabled plugins `register` then `attach`; staying-enabled plugins receive `onPluginSettingsChanged(oldContext, newContext)`; newly-disabled plugins `detach` and unregister. Plugin instances persist across reconciliation; service instances are recreated. Settings persist only after every reconcile succeeds.
 
 ## Capabilities
 
@@ -313,7 +317,7 @@ SessionStatefulPluginService   // alias for StatefulPluginService<SessionPluginC
 GlobalStatefulPluginService    // alias for StatefulPluginService<GlobalPluginContext>
 
 // Runtime
-PluginRuntime, PluginSession, PluginRuntimeManager
+PluginRuntime, PluginSession, PluginRuntime
 
 // Service registry
 ServiceRegistry, ScopedServiceRegistry
@@ -337,7 +341,7 @@ ConfigField (sealed)           // Text, Multiline, Password, Number, Dropdown<T>
 
 ## Documentation
 
-- **Full docs**: [plugin-kit-docs.saadodi44.workers.dev](https://plugin-kit-docs.saadodi44.workers.dev) — concepts, guides, tutorials, reference.
+- **Full docs**: [plugin-kit-docs.saadodi44.workers.dev](https://plugin-kit-docs.saadodi44.workers.dev). Concepts, guides, tutorials, reference.
 - **Source**: [github.com/SaadArdati/plugin_kit](https://github.com/SaadArdati/plugin_kit)
 - **Examples**: [`example/`](https://github.com/SaadArdati/plugin_kit/tree/main/example) in the repo. `villain_lair/` is a numbered-bin tour through every primitive; `model_embassy/` walks competing providers, capabilities, and reconciliation; `state_garden/` shows the same chat pattern bridged to seven Flutter state-management libraries; `code_editor/` is a full Flutter capstone.
 

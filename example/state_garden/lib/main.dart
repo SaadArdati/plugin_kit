@@ -8,7 +8,7 @@ import 'package:state_garden/state_garden.dart';
 
 void main() => runApp(const PluginKitStateProofsApp());
 
-/// Boots a single [PluginRuntimeManager] and one [PluginSession], wires
+/// Boots a single [PluginRuntime] and one [PluginSession], wires
 /// them into the three locators each integration expects (Provider override
 /// for Riverpod, GetIt for the GetIt screen, direct injection for the
 /// rest), and renders the launcher.

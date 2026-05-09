@@ -25,7 +25,7 @@ Both Flutter packages are optional. The runtime is the part you build on.
 Plugin Kit is a plain Dart package. Add it to your `pubspec.yaml`.
 
 <Tabs>
-  <TabItem label="Local path">
+  <TabItem label="pub.dev">
 
   ```yaml
   dependencies:
@@ -232,7 +232,7 @@ The library only earns its weight when things change. Three quick experiments to
   final runtime = PluginRuntime(
     plugins: [CasualPlugin(), FormalPlugin()],
   )..init(
-      // Can be user-driven via json config, a settings UI, or any other config system you build on top. Hard-coded here for demo purposes.
+      // Can be user-driven via JSON config, a settings UI, or any other config system you build on top. Hard-coded here for demo purposes.
       settings: const RuntimeSettings(
         plugins: {
           PluginId('formal'): PluginConfig(enabled: false),

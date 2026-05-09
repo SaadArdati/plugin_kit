@@ -15,7 +15,7 @@ The **service registry** is where competition happens. Two plugins can register 
 
 The **event bus** is how plugins coordinate without holding references to each other. Typed events flow in priority order; typed requests fall through handlers until one returns a non-null response. **Event Patterns**, the page next to event bus, covers the patterns for using all of this from inside plugin code rather than the model itself.
 
-The **runtime** owns the global scope and spawns **sessions**. A session is an isolated execution scope with its own registry and bus; opening a second session never disturbs the first. The manager wraps the runtime with a settings snapshot and a change stream so the host can hand it new `RuntimeSettings` and have it converge.
+The **runtime** owns the global scope and spawns **sessions**. A session is an isolated execution scope with its own registry and bus; opening a second session never disturbs the first. The runtime holds a settings snapshot and exposes a change stream so the host can hand it new `RuntimeSettings` and have it converge.
 
 **Custom contexts** are the optional extension point: when your domain has fields that every plugin in a session should see (the current document, the active user, a tool registry), you subclass `SessionPluginContext` and supply a factory.
 
@@ -59,7 +59,7 @@ The **runtime** owns the global scope and spawns **sessions**. A session is an i
   />
   <LinkCard
     title="Runtime"
-    description="The lifecycle engine. `PluginRuntime`, `PluginRuntimeManager`, settings reconciliation, enablement precedence."
+    description="The lifecycle engine. `PluginRuntime`, `PluginRuntime`, settings reconciliation, enablement precedence."
     href="/concepts/runtime/"
   />
   <LinkCard

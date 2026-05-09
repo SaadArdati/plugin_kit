@@ -1,14 +1,14 @@
 ---
 title: Migrating a Flutter App
-description: Add Plugin Kit to a Flutter app that already uses Provider, Riverpod, BLoC, GetIt, injectors, or plain services.
+description: Add Plugin Kit to a Flutter app that already uses Provider, Riverpod, Bloc, GetIt, injectors, or plain services.
 ---
 
 import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
 Most Flutter apps already have architecture. Good.
 
-You might have Provider, Riverpod, BLoC, GetIt, an injector package, or a
-manager class that slowly became the local government. Plugin Kit is not asking
+You might have Provider, Riverpod, Bloc, GetIt, an injector package, or a
+service class that slowly became the local government. Plugin Kit is not asking
 you to throw that away. It is the thing you add when a feature wants runtime
 identity: maybe it should be replaceable, isolated per session, user-toggleable,
 or handled by whichever plugin currently wins.
@@ -16,7 +16,7 @@ or handled by whichever plugin currently wins.
 If you need the widget-side shell itself, read [Flutter Integration](/guides/flutter-integration/).
 For library-by-library bridge code that is verified by widget tests in the
 example workspace, read
-[State Management Integrations](/guides/state-management-integrations/). This
+[State Management Bridges](/reference/state-management-bridges/). This
 page is about where Plugin Kit should touch an app that already exists.
 
 ## Start with one seam
@@ -103,7 +103,7 @@ The first good migration seams are usually visible in the product.
 |---|---|---|
 | a widget or controller branching between concrete providers | one slot or request type | switching implementations stops requiring UI rewrites |
 | a model selector manually filtered by feature flags and provider checks | runtime-backed winner slot plus live settings | available models follow enabled plugins automatically |
-| a chat manager calling "gather context", then "pick model", then "send", then "stream progress" | one outgoing action plus typed events around it | plugins can join the turn without the screen owning every phase |
+| a chat orchestrator calling "gather context", then "pick model", then "send", then "stream progress" | one outgoing action plus typed events around it | plugins can join the turn without the screen owning every phase |
 | a customization dialog flipping booleans and then manually tearing services down | `updateSettings(...)` | features can turn on and off mid-session without weird leftovers |
 
 That is the kind of result worth aiming for. The architecture matters because
@@ -117,11 +117,11 @@ Plugin Kit can sit beside or above your state-management library, depending on h
 |---|---|---|
 | `Provider` / `ChangeNotifier` | exposing state to widgets | feature boundaries and plugin events |
 | `Riverpod` | app state, derived state, async UI state | runtime/session ownership and plugin protocols |
-| `BLoC` / `Cubit` | screen state transitions, `BlocBuilder` rebuild filtering | cross-feature events, request/response, plugin lifecycle |
+| `Bloc` / `Cubit` | screen state transitions, `BlocBuilder` rebuild filtering | cross-feature events, request/response, plugin lifecycle |
 | `GetIt` / injectors | existing app services and legacy dependencies | replaceable plugin services and runtime overrides |
 | Plain managers | orchestration your app already depends on | extensibility seams that other features can join |
 
-We don't bill Plugin Kit as a state manager, but the runtime, registry, and event bus do enough that it can pass for one in a small app. The interesting question is which redundancy you want to pay for: a Cubit that listens to a bus event and re-emits it as widget state is doing the same job twice. We have no opinion either way — we just don't want the docs pretending the overlap isn't there.
+Plugin Kit isn't billed as a state-management library, but the runtime, registry, and event bus do enough that it can pass for one in a small app. The interesting question is which redundancy you want to pay for: a Cubit that listens to a bus event and re-emits it as widget state is doing the same job twice. There's no opinion either way; the docs just don't want to pretend the overlap isn't there.
 
 ## Put the runtime at a real boundary
 
@@ -144,14 +144,14 @@ class EditorScreen extends StatefulWidget {
 }
 
 class _EditorScreenState extends State<EditorScreen> {
-  late final PluginRuntimeManager _plugins;
+  late final PluginRuntime _plugins;
 
   PluginSession? _session;
 
   @override
   void initState() {
     super.initState();
-    _plugins = PluginRuntimeManager(
+    _plugins = PluginRuntime(
       plugins: [
         ChatPlugin(),
         FilesPlugin(),
@@ -186,7 +186,7 @@ class _EditorScreenState extends State<EditorScreen> {
 ```
 
 That gives you one session-scoped registry and one session bus for the screen.
-Your Provider, Riverpod, or BLoC layer can wrap that session however it wants.
+Your Provider, Riverpod, or Bloc layer can wrap that session however it wants.
 
 ## Direct access vs event contracts
 
@@ -273,7 +273,7 @@ If events cross a server boundary, make them serializable. For requests where
 you want more than one handler to get a chance, declare the response type as
 nullable. Handlers run in ascending priority order; a non-null return claims
 the call and stops dispatch, while returning `null` concedes to the next
-handler. With a non-nullable response there is no cascade — the first handler
+handler. With a non-nullable response there is no cascade; the first handler
 in priority order always wins.
 
 ## Provider and ChangeNotifier
@@ -342,27 +342,27 @@ Riverpod is a clean fit when you want the plugin runtime to be app-scoped and
 the session to be route-scoped or workspace-scoped.
 
 ```dart
-final pluginManagerProvider = Provider<PluginRuntimeManager>((ref) {
-  final manager = PluginRuntimeManager(
+final pluginRuntimeProvider = Provider<PluginRuntime>((ref) {
+  final runtime = PluginRuntime(
     plugins: [
       ChatPlugin(),
       FilesPlugin(),
       AnalysisPlugin(),
     ],
   );
-  manager.init();
+  runtime.init();
 
   ref.onDispose(() {
-    manager.dispose();
+    runtime.dispose();
   });
 
-  return manager;
+  return runtime;
 });
 
 final pluginSessionProvider =
     FutureProvider<PluginSession>((ref) async {
-  final manager = ref.watch(pluginManagerProvider);
-  final session = await manager.createSession();
+  final runtime = ref.watch(pluginRuntimeProvider);
+  final session = await runtime.createSession();
   ref.onDispose(() => session.dispose());
   return session;
 });
@@ -399,9 +399,9 @@ class ChatController extends AsyncNotifier<List<ChatMessage>> {
 Riverpod still does what Riverpod is good at: exposing async state and derived
 state to widgets. Plugin Kit handles feature participation behind that state.
 
-## BLoC and Cubit
+## Bloc and Cubit
 
-BLoC should stay focused on screen state.
+Bloc should stay focused on screen state.
 
 The Cubit listens to plugin events, emits UI state, and sends user intents back
 to the plugin session.
@@ -445,7 +445,7 @@ This keeps the boundary clean:
 No widget has to resolve `ChatMessagesService`. No Cubit has to know which
 plugin owns message storage.
 
-That said, the Cubit-as-bridge is the most redundant of the integrations on the [State Management Integrations](/guides/state-management-integrations/) page. Read `_messagesSub`'s callback: it takes a bus event and re-emits it as widget state. The bus already shipped that event; the Cubit is forwarding it. Keep the Cubit if `state.copyWith` ergonomics or `BlocBuilder` rebuild filtering pay for themselves; reach past it if not.
+That said, the Cubit-as-bridge is the most redundant of the integrations on the [State Management Bridges](/reference/state-management-bridges/) page. Read `_messagesSub`'s callback: it takes a bus event and re-emits it as widget state. The bus already shipped that event; the Cubit is forwarding it. Keep the Cubit if `state.copyWith` ergonomics or `BlocBuilder` rebuild filtering pay for themselves; reach past it if not.
 
 ## Waiting for readiness
 
@@ -513,7 +513,7 @@ if (assistant == null) {
 ```
 
 This still hides which plugin creates the assistant from the host, but the
-caller is now the one driving timing — exactly the symptom that an
+caller is now the one driving timing, exactly the symptom that an
 `AssistantReady` event would let you delete.
 
 ## Streaming through the bus
@@ -668,7 +668,7 @@ Move these toward Plugin Kit:
 - protocols that should work across local, remote, and test implementations
 
 Plugin Kit is most valuable where the app has started asking, "How do I let
-something else participate here without hard-coding it into this manager?"
+something else participate here without hard-coding it into this orchestrator?"
 
 ## A migration checklist
 
@@ -679,13 +679,13 @@ something else participate here without hard-coding it into this manager?"
    Good seams sound like events: "message sent," "file changed," "analysis
    requested," "preview became ready," "assistant response chunk received."
 
-2. Add a `PluginRuntimeManager` at the app, workspace, or route boundary.
+2. Add a `PluginRuntime` at the app, workspace, or route boundary.
 
    Do not scatter runtimes through child widgets.
 
 3. Wrap the session in your existing state-management library.
 
-   Provider, Riverpod, BLoC, and GetIt can all hold or expose the session while
+   Provider, Riverpod, Bloc, and GetIt can all hold or expose the session while
    you migrate.
 
 4. Start with direct service access only where it is obviously stable.

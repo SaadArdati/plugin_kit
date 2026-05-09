@@ -8,7 +8,7 @@ A Dart plugin runtime for apps that have grown into platforms: replaceable servi
 
 It has no opinion about what your app does. It does not know about Flutter, servers, agents, editors, or any particular settings backend. You build those on top. The runtime stays the same.
 
-Plugins are wiring; services are the meat. The plugin class declares an id, registers services, and stays small. Real behavior — anything stateful, configurable, or replaceable — lives in services.
+Plugins are wiring; services are the meat. The plugin class declares an id, registers services, and stays small. Real behavior, anything stateful or configurable or replaceable, lives in services.
 
 ![Plugin Kit Dialog showing the Plugins tab with toggleable enable/disable controls for each registered plugin](https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/example/plugin_kit_dialog_demo/test/goldens/plugins_tab_dark.png)
 
@@ -93,7 +93,7 @@ Future<void> main() async {
 }
 ```
 
-Drop a plugin, lower its priority, or disable it through `RuntimeSettings`, and the call site never changes. That move — features owning slots, slots resolving to the current winner — is the vocabulary the rest of the library is built on.
+Drop a plugin, lower its priority, or disable it through `RuntimeSettings`, and the call site never changes. That move, where features own slots and slots resolve to the current winner, is the vocabulary the rest of the library is built on.
 
 ## What's in plugin_kit
 
@@ -103,10 +103,10 @@ For the per-API breakdown with examples, see [`packages/plugin_kit/README.md`](p
 
 ## Documentation
 
-- **Full docs**: [plugin-kit-docs.saadodi44.workers.dev](https://plugin-kit-docs.saadodi44.workers.dev) — concepts, guides, tutorials, reference.
-- **Examples**: [`example/`](example) — `villain_lair/` is a numbered-bin tour through every primitive; `model_embassy/` walks competing providers, capabilities, and reconciliation; `state_garden/` shows the same chat pattern bridged to seven Flutter state-management libraries; `code_editor/` is a full Flutter capstone; `plugin_kit_dialog_demo/` runs the dialog over a 21-plugin runtime.
+- **Full docs**: [plugin-kit-docs.saadodi44.workers.dev](https://plugin-kit-docs.saadodi44.workers.dev). Concepts, guides, tutorials, reference.
+- **Examples**: [`example/`](example). `villain_lair/` is a numbered-bin tour through every primitive; `model_embassy/` walks competing providers, capabilities, and reconciliation; `state_garden/` shows the same chat pattern bridged to seven Flutter state-management libraries; `code_editor/` is a full Flutter capstone; `plugin_kit_dialog_demo/` runs the dialog over a 21-plugin runtime.
 - **Source**: this repo. Issues and discussions on [GitHub](https://github.com/SaadArdati/plugin_kit).
 
 ## License
 
-Copyright (c) 2026, Saad Ardati. Released under the BSD 3-Clause License — see [LICENSE](LICENSE).
+Copyright (c) 2026, Saad Ardati. Released under the BSD 3-Clause License. See [LICENSE](LICENSE).

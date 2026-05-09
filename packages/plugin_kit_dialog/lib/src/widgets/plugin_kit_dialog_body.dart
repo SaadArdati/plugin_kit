@@ -39,11 +39,7 @@ class PluginKitDialogBody extends StatefulWidget {
 }
 
 class _PluginKitDialogBodyState extends State<PluginKitDialogBody> {
-  late final PluginRuntimeManager<DialogGlobalContext, SessionPluginContext>
-  _manager;
-
-  PluginRuntime<DialogGlobalContext, SessionPluginContext> get _runtime =>
-      _manager.runtime;
+  late final PluginRuntime<DialogGlobalContext, SessionPluginContext> _runtime;
 
   EventBus get _bus => _runtime.globalBus;
 
@@ -64,7 +60,7 @@ class _PluginKitDialogBodyState extends State<PluginKitDialogBody> {
   void initState() {
     super.initState();
 
-    _manager = PluginRuntimeManager<DialogGlobalContext, SessionPluginContext>(
+    _runtime = PluginRuntime<DialogGlobalContext, SessionPluginContext>(
       plugins: [
         PluginsTabPlugin(),
         FieldRenderersPlugin(),
@@ -73,7 +69,7 @@ class _PluginKitDialogBodyState extends State<PluginKitDialogBody> {
       ],
     );
 
-    _manager.init(
+    _runtime.init(
       globalContextFactory: (registry, bus, sessions) => DialogGlobalContext(
         registry: registry,
         bus: bus,
@@ -97,15 +93,15 @@ class _PluginKitDialogBodyState extends State<PluginKitDialogBody> {
 
   @override
   void dispose() {
-    // Flutter's State.dispose is sync; the manager's dispose is async.
+    // Flutter's State.dispose is sync; the runtime's dispose is async.
     // Route any error -- sync OR async -- through FlutterError.reportError
     // via the package-local helper so a plugin throwing during detach
     // surfaces in tester.takeException() and in production logs, instead
     // of escaping as an uncaught zone error.
     disposeAndReport(
-      _manager.dispose,
+      _runtime.dispose,
       contextDescription:
-          'disposing PluginRuntimeManager on PluginKitDialogBody unmount',
+          'disposing PluginRuntime on PluginKitDialogBody unmount',
     );
     super.dispose();
   }

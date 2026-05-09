@@ -81,26 +81,26 @@ This is the sweet spot for most plugin tests. Fast, no runtime setup, and it exe
 
 ## Level 3: Through the runtime
 
-When your test cares about runtime concerns (enablement precedence, settings reconciliation, session lifecycle), reach for `PluginRuntimeManager`.
+When your test cares about runtime concerns (enablement precedence, settings reconciliation, session lifecycle), reach for `PluginRuntime`.
 
 ```dart
 void main() {
-  late PluginRuntimeManager manager;
+  late PluginRuntime runtime;
 
   setUp(() {
-    manager = PluginRuntimeManager();
+    runtime = PluginRuntime();
   });
 
   tearDown(() async {
-    await manager.dispose();
+    await runtime.dispose();
   });
 
   test('session plugin attaches on session creation', () async {
     final plugin = NotificationPlugin();
-    manager.addPlugin(plugin);
-    manager.init();
+    runtime.addPlugin(plugin);
+    runtime.init();
 
-    final session = await manager.createSession();
+    final session = await runtime.createSession();
 
     expect(session.isPluginEnabled(const PluginId('notification')), isTrue);
   });
@@ -137,10 +137,10 @@ class TrackingPlugin extends SessionPlugin {
 
 test('session lifecycle runs in the expected order', () async {
   final plugin = TrackingPlugin(const PluginId('trackee'));
-  manager.addPlugin(plugin);
-  manager.init();
+  runtime.addPlugin(plugin);
+  runtime.init();
 
-  final session = await manager.createSession();
+  final session = await runtime.createSession();
   await session.dispose();
 
   expect(plugin.calls, ['register', 'attach', 'detach']);
@@ -154,11 +154,11 @@ Pass `initialSettings` on init, or call `updateSettings` later.
 ```dart
 test('plugin disables after updateSettings', () async {
   final plugin = TrackingPlugin(const PluginId('toggle_me'));
-  manager.addPlugin(plugin);
-  manager.init();
-  final session = await manager.createSession();
+  runtime.addPlugin(plugin);
+  runtime.init();
+  final session = await runtime.createSession();
 
-  await manager.updateSettings(
+  await runtime.updateSettings(
     const RuntimeSettings(
       plugins: {PluginId('toggle_me'): PluginConfig(enabled: false)},
     ),
@@ -218,7 +218,7 @@ When a lifecycle phase produces errors, the runtime aggregates them into `Plugin
 
 ```dart
 expect(
-  () => manager.init(),
+  () => runtime.init(),
   throwsA(isA<PluginLifecycleException>()),
 );
 ```
@@ -227,10 +227,10 @@ The exception carries a `phase` string (`'attachGlobal'`, `'attachSession'`, `'d
 
 ```dart
 test('bad plugin surfaces in PluginLifecycleException', () async {
-  manager.addPlugin(CrashingPlugin());
+  runtime.addPlugin(CrashingPlugin());
 
   try {
-    manager.init();
+    runtime.init();
     fail('expected PluginLifecycleException');
   } on PluginLifecycleException catch (e) {
     expect(e.phase, 'attachGlobal');

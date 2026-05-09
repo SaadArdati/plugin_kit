@@ -35,7 +35,7 @@ Plus two orchestration types.
 | Type | Role |
 |---|---|
 | `PluginRuntime<G, S>` | The lifecycle engine. Owns the global scope. Creates and reconciles sessions. |
-| `PluginRuntimeManager<G, S>` | Convenience wrapper: stores current settings, streams updates, applies reconciliation across the runtime and all sessions. |
+| `PluginRuntime<G, S>` | Convenience wrapper: stores current settings, streams updates, applies reconciliation across the runtime and all sessions. |
 
 ## Registration, attachment, disposal
 
@@ -107,7 +107,7 @@ Overrides from `RuntimeSettings` are applied at registration time. When settings
   │ slot 'agent.model' (priority desc.)  │
   ├──────────────────────────────────────┤
   │ enterprise_chat | priority 120  ◄────┼── winner
-  │ chat_manager    | priority 100       │
+  │ chat            | priority 100       │
   │ legacy_anthropic| priority  50       │
   └──────────────────────────────────────┘
         │
@@ -201,18 +201,6 @@ Direct subscriptions from `attach` tear down on disable without additional plumb
 
 An earlier version of the runtime ran session reconciliation at service granularity, skipping the plugin's own `attach` and `detach` on toggle. That shipped with a subtle footgun: direct bus subscriptions from `attach` leaked on disable. The current design resolves both scopes symmetrically through the plugin's own lifecycle methods.
 
-## Key design decisions
-
-**Domain-agnostic core.** The runtime knows nothing about Flutter, servers, editors, agents, or any specific UI framework. Client code extends `PluginContext`, `Plugin`, and `PluginService` to model domain concepts.
-
-**Competing implementations are a first-class idea.** Most DI containers treat override as a special case. Plugin Kit treats it as the normal case. That is why priority is on the registration, not on the slot.
-
-**Metadata without instantiation.** Capabilities live on registration wrappers, so host code can discover what a service claims to support without paying construction cost. This is how dynamic settings UIs, extension manifests, and slot inspectors stay fast.
-
-**Settings as reconciliation input, not instruction.** Handing the runtime a new `RuntimeSettings` is a statement of intent ("this is the world as it should be"), not a script. The runtime figures out what has to attach, detach, or reconfigure to converge on the new state. Plugin authors write lifecycle hooks; they do not write "on settings change" handlers for every configurable knob.
-
-**Errors surface.** The bus does not swallow handler exceptions. The runtime's lifecycle phases aggregate failures and throw `PluginLifecycleException`, naming the phase that failed. Silent failure in a plugin system is a debugging nightmare a year later.
-
 ## Related reading
 
 <CardGrid>
@@ -235,5 +223,10 @@ An earlier version of the runtime ran session reconciliation at service granular
     title="Runtime"
     description="User-facing view of the lifecycle engine."
     href="/concepts/runtime/"
+  />
+  <LinkCard
+    title="Why Plugin Kit?"
+    description="The values and design decisions that motivate the architecture above."
+    href="/why-plugin-kit/"
   />
 </CardGrid>

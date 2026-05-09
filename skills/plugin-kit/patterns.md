@@ -148,10 +148,10 @@ Within-session disable then enable resets state. Settings reconciliation that fl
 
 State that must outlive reconciliation: persist externally (file, database, in-memory map keyed by session id). Load during `attach()`. The plugin owns the wire-up to a durable store, not the state itself.
 
-The session id comes from `context.extras`. `PluginRuntime.createSession` and `PluginRuntimeManager.createSession` thread a `Map<String, Object>` through to the context's `extras` field; convention is to write a session id there when state needs to outlive a session lifecycle.
+The session id comes from `context.extras`. `PluginRuntime.createSession` and `PluginRuntime.createSession` thread a `Map<String, Object>` through to the context's `extras` field; convention is to write a session id there when state needs to outlive a session lifecycle.
 
 ```dart
-final session = await manager.createSession(
+final session = await runtime.createSession(
   contextFactory: (registry, sessionBus, globalBus) => SessionPluginContext(
     registry: registry,
     bus: sessionBus,

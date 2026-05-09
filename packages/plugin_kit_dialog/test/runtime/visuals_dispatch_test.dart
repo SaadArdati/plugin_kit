@@ -103,14 +103,14 @@ void main() {
   group('PluginChipsBuilder', () {
     test('label falls back to raw pluginId when no override is registered', () {
       final runtime = PluginRuntime()
-        ..addPlugin(_Plain('chat_manager'))
+        ..addPlugin(_Plain('chat'))
         ..init(settings: RuntimeSettings.empty());
       addTearDown(runtime.dispose);
 
       final rows = const PluginChipsBuilder()
           .build(runtime, RuntimeSettings.empty())
           .all;
-      expect(rows.single.label, 'chat_manager');
+      expect(rows.single.label, 'chat');
       expect(rows.single.description, isNull);
       expect(rows.single.icon, isNull);
       expect(rows.single.color, isNull);
@@ -142,12 +142,12 @@ void main() {
 
     test('override fields beat derived defaults', () {
       final runtime = PluginRuntime()
-        ..addPlugin(_Plain('chat_manager'))
+        ..addPlugin(_Plain('chat'))
         ..addPlugin(
           PluginKitVisualsPlugin(
             pluginVisuals: const {
-              PluginId('chat_manager'): PluginKitVisual(
-                label: 'Chat Manager',
+              PluginId('chat'): PluginKitVisual(
+                label: 'Chat',
                 description: 'Override description.',
                 icon: Icon(Icons.chat),
                 color: Color(0xFF2196F3),
@@ -161,8 +161,8 @@ void main() {
       final row = const PluginChipsBuilder()
           .build(runtime, RuntimeSettings.empty())
           .all
-          .firstWhere((r) => r.pluginId == const PluginId('chat_manager'));
-      expect(row.label, 'Chat Manager');
+          .firstWhere((r) => r.pluginId == const PluginId('chat'));
+      expect(row.label, 'Chat');
       expect(row.description, 'Override description.');
       expect((row.icon as Icon).icon, Icons.chat);
       expect(row.color, const Color(0xFF2196F3));
@@ -278,8 +278,8 @@ void main() {
         ..addPlugin(
           PluginKitVisualsPlugin(
             pluginVisuals: const {
-              PluginId('chat_manager'): PluginKitVisual(
-                label: 'Chat Manager',
+              PluginId('chat'): PluginKitVisual(
+                label: 'Chat',
                 color: Color(0xFF2196F3),
               ),
             },
@@ -301,10 +301,10 @@ void main() {
       expect(
         runtime.globalRegistry
             .maybeResolve<PluginKitVisual>(
-              PluginKitVisualsPlugin.visualFor(const PluginId('chat_manager')),
+              PluginKitVisualsPlugin.visualFor(const PluginId('chat')),
             )
             ?.label,
-        'Chat Manager',
+        'Chat',
       );
       expect(
         runtime.globalRegistry
@@ -455,7 +455,7 @@ class _OverridingChipsBuilderPlugin extends GlobalPlugin {
 /// existence checks in the validator have a target.
 class _RegistersAgentModel extends GlobalPlugin {
   @override
-  PluginId get pluginId => const PluginId('chat_manager');
+  PluginId get pluginId => const PluginId('chat');
 
   @override
   void register(ScopedServiceRegistry registry) {

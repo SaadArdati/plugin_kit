@@ -38,7 +38,7 @@ Things that should be true of every plugin id:
 | Good | Why |
 |---|---|
 | `core` | One-word foundational plugin |
-| `chat_manager` | Two words, snake_case |
+| `model_router` | Two words, snake_case |
 | `legacy_anthropic` | Modifier plus scope |
 | `firebase_mcp` | Vendor plus capability |
 | `web_search_explorer` | Domain-shaped name |
@@ -47,12 +47,36 @@ Things that should be true of every plugin id:
 |---|---|
 | `mk` | Unreadable abbreviation |
 | `MyPlugin` | PascalCase clashes with the class name itself |
-| `chatManager` | camelCase reads inconsistently next to the snake_case rest of the runtime |
-| `chat-manager` | Hyphens are not the convention; the entire codebase uses underscores |
+| `modelRouter` | camelCase reads inconsistently next to the snake_case rest of the runtime |
+| `model-router` | Hyphens are not the convention; the entire codebase uses underscores |
 
 ## Service IDs and namespaces
 
 Service ids are how plugins claim slots in the registry. Two shapes ship with the library: root and namespaced. The registry only knows about `ServiceId`; the difference between "root" and "namespaced" is just whether the dotted key has a prefix.
+
+### The principle
+
+Plugin id and service id sit on different axes. The plugin id is the **domain** ("chat", "search", "auth"). The service id is the **role inside that domain** ("thread", "engine", "store"). Two ways to break this and what they cost:
+
+| Bad service id | Why it fails |
+|---|---|
+| `chat:chat` | Duplicates the domain; the service id contributes no information |
+| `chat:service`, `chat:manager` | Generic words. Says it is a Plugin Kit slot. Says nothing about which slot |
+| `chat:chat_service` | Repeats both the domain and the framework type suffix |
+
+What works instead is a noun that narrows the role. The role can be:
+
+| Plugin id | Role naming style | Example service id |
+|---|---|---|
+| `chat` | Entity noun (the thing being held) | `chat:thread` |
+| `editor` | Entity noun | `editor:document` |
+| `auth` | Entity noun | `auth:session` |
+| `linter` | Functional role | `linter:engine` |
+| `search` | Functional role | `search:index` |
+| `cache` | Functional role | `cache:store` |
+| `telemetry` | Functional role | `telemetry:reporter` |
+
+When the domain has a clean entity noun, use it. When it does not, use a specific functional noun (`engine`, `store`, `index`, `reporter`, `provider`). The reader of `cache:store` knows the slot stores cache entries. The reader of `cache:service` knows nothing.
 
 ### Anatomy: root services
 
@@ -310,8 +334,7 @@ For hygiene, since these names appear repeatedly in the docs and example code:
 
 | Variable | Refers to |
 |---|---|
-| `manager` | A `PluginRuntimeManager` |
-| `runtime` | A `PluginRuntime`, often via `manager.runtime` |
+| `runtime` | A `PluginRuntime` |
 | `session` | A `PluginSession` |
 | `registry` | A `ServiceRegistry` or `ScopedServiceRegistry`, depending on context |
 | `bus` | An `EventBus`, usually `context.bus` |

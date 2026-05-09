@@ -5,7 +5,7 @@ import 'package:plugin_kit_dialog/plugin_kit_dialog.dart';
 import 'plugins/auto_retry_plugin.dart';
 import 'plugins/base_mcp_plugin.dart';
 import 'plugins/brave_search_plugin.dart';
-import 'plugins/chat_manager_plugin.dart';
+import 'plugins/chat_plugin.dart';
 import 'plugins/circuit_breaker_plugin.dart';
 import 'plugins/context_injector_plugin.dart';
 import 'plugins/core_plugin.dart';
@@ -42,8 +42,8 @@ Plugin visualsPlugin() => PluginKitVisualsPlugin(
       icon: Icon(Icons.hub_outlined),
       color: Color(0xFF455A64),
     ),
-    ChatManagerPlugin.id: const PluginKitVisual(
-      label: 'Chat Manager',
+    ChatPlugin.id: const PluginKitVisual(
+      label: 'Chat',
       description:
           'Provides main agent model, temperature, and system message demo controls.',
       icon: Icon(Icons.psychology),
@@ -189,7 +189,7 @@ Plugin visualsPlugin() => PluginKitVisualsPlugin(
       label: 'Model & Provider',
       icon: Icon(Icons.tune),
     ),
-    ChatManagerPlugin.temperature: const PluginKitVisual(
+    ChatPlugin.temperature: const PluginKitVisual(
       label: 'Temperature',
       icon: Icon(Icons.thermostat),
     ),

@@ -16,7 +16,7 @@ flows through them, see [Runtime](/concepts/runtime/).
 
 ```dart
 // Editor opens a new document
-final session = await manager.createSession(
+final session = await runtime.createSession(
   // Optional.
   contextFactory: (registry, sessionBus, globalBus) => EditorSessionContext(
     registry: registry,

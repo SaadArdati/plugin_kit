@@ -7,7 +7,7 @@ import 'package:plugin_kit_dialog/src/runtime/plugins/plugins_tab_plugin.dart';
 import 'package:plugin_kit_dialog/src/runtime/plugins/services_tab_plugin.dart';
 
 void main() {
-  test('dialog runtime manager constructs and disposes cleanly', () async {
+  test('dialog runtime constructs and disposes cleanly', () async {
     final target = PluginRuntime();
     target.init(settings: RuntimeSettings.empty());
     addTearDown(target.dispose);
@@ -17,8 +17,8 @@ void main() {
       initialSettings: RuntimeSettings.empty(),
     );
 
-    final manager =
-        PluginRuntimeManager<DialogGlobalContext, SessionPluginContext>(
+    final runtime =
+        PluginRuntime<DialogGlobalContext, SessionPluginContext>(
           plugins: [
             PluginsTabPlugin(),
             FieldRenderersPlugin(),
@@ -38,7 +38,7 @@ void main() {
               ),
         );
 
-    expect(manager.runtime.globalContext, isA<DialogGlobalContext>());
-    await manager.dispose();
+    expect(runtime.globalContext, isA<DialogGlobalContext>());
+    await runtime.dispose();
   });
 }

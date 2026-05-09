@@ -48,7 +48,7 @@ written against pure plugin_kit APIs with no widgets:
   session's service is frozen after `session.dispose`.
 - Two live sessions stay isolated: messages emitted on one session never
   reach the other session's resolved `ChatService`.
-- Canonical dispose: `manager.dispose()` alone tears down session buses
+- Canonical dispose: `runtime.dispose()` alone tears down session buses
   and drains the sessions list, with no need to call `session.dispose()`
   separately.
 - Hot-swap: a higher-priority registrant wins resolution; disabling it
@@ -75,7 +75,7 @@ API surface. Then:
 - [`lib/src/runtime_holder.dart`](lib/src/runtime_holder.dart) is the
   test fixture and example boot path.
 - [`lib/main.dart`](lib/main.dart) is the runnable demo: boots the
-  manager, wires the locators each integration expects, and renders the
+  runtime, wires the locators each integration expects, and renders the
   launcher.
 
 ## Running

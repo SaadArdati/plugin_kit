@@ -1,12 +1,11 @@
 ---
 title: Why Plugin Kit?
-description: A short take on what Plugin Kit is for, the symptoms that motivate it, and the design values behind it.
+description: "When apps grow into platforms, the same plumbing keeps reappearing. Plugin Kit packages it once: real feature lifecycles, replaceable services, sealed sessions, typed events."
 ---
 
-Plugin Kit makes it easier to ship apps that have grown into platforms: apps with real feature lifecycles,
-replaceable services, isolated sessions, and typed events between parts that have never been formally introduced.
+Plugin Kit reduces the manual lifecycle wiring and override branching that build up in apps that have grown into platforms: apps with real feature lifecycles, replaceable services, isolated sessions, and typed events between parts that have never been formally introduced.
 
-When an app grows past a few features, the same primitives keep showing up:
+When an app grows past a few features, the same patterns keep showing up:
 
 - A feature wants its own lifecycle (set up, run, tear down) instead of leaning on `initState`.
 - Two implementations want to compete for the same slot, and the loser should still be reachable as a fallback.
@@ -16,29 +15,22 @@ When an app grows past a few features, the same primitives keep showing up:
 - You want to prototype a third-party service integration without disrupting the original third-party service.
 - Your boss wants a new feature you hate, but you want to build it in a way that does not mess with the code you like.
 
-Most teams build that runtime by accident. A DI container learns priorities. A feature flag service learns to
-disable subsystems. A controller learns request and response. Somewhere around the fourth piece, a team has shipped
-roughly forty percent of a plugin framework without noticing.
+Most teams build that runtime by accident. A DI container learns priorities. A feature flag service learns to disable subsystems. A controller learns request and response. After enough additions, a team has rebuilt a substantial slice of a plugin framework without noticing.
 
 Plugin Kit packages all of that into one runtime with explicit rules. You write plugins; it does the choreography.
 
-There are many ways to structure a Dart or Flutter app, and there is no single right answer. What matters is whether
-the structure helps you ship the kind of app you actually want to ship. If you are wiring features by hand and noticing
-the same scaffolding for the third time, this library is probably worth a look.
+There are many ways to structure a Dart or Flutter app, and there is no single right answer. What matters is whether the structure helps you ship the kind of app you actually want to ship. If you are wiring features by hand and noticing the same scaffolding for the third time, Plugin Kit is built for that case.
 
 The value shines when you want to develop features in complete isolation, systems that may collide with each other,
 or features that can be turned on and off at runtime.
 
-Example:
-- I built the chat agent with the system prompt as an independent service piece of the chat agent plugin.
-- My colleague said he had an idea to improve the system prompt. Instead of modifying my system prompt destructively,
-he builds a new plugin that claims the same registration slot with a higher priority. He can test and iterate on his
-version without touching mine. If we end up enjoying it, we keep the plugin enabled!
-- My Boss then says he has a fun system prompt idea he wants to experiment with, but doesn't write code and needs a UI
-to modify it. He creates the json config via a nice settings page from `plugin_kit_dialog` and applies it to
-override the default system prompt dynamically.
-- One of our app users comes along and disables the "experimental" system prompt toggle because they prefer the original.
-- Everyone is happy, and the original system prompt is still there as a fallback if we want to go back to it.
+Worked example:
+
+- A chat agent plugin ships a system prompt as an independent service inside the plugin.
+- A teammate wants to iterate on the system prompt without touching the original. Instead of editing the existing service, the teammate writes a new plugin that claims the same registration slot at a higher priority. The teammate iterates in isolation; if the variant pays off, the plugin stays enabled.
+- A non-coder on the team wants their own system-prompt experiment. They edit the JSON config through a settings page from `plugin_kit_dialog` and override the active system prompt at runtime.
+- An end user disables the "experimental" system prompt because they prefer the original. The toggle takes effect live.
+- The original system prompt is still registered the whole time, ready as a fallback whenever someone wants it back.
 
 Plugin Kit is designed around three values:
 
@@ -54,3 +46,17 @@ do not leak into each other; close one and everything session-scoped cleans up o
 
 Overall, Plugin Kit makes feature lifecycles explicit, so you can compose, override, and reconfigure features without
 writing teardown code by hand each time.
+
+## Design decisions that follow from those values
+
+Five trade-offs the library makes deliberately. Each one is a consequence of one or more of the three values above; together they explain why the API looks the way it does.
+
+**Domain-agnostic core.** The runtime knows nothing about Flutter, servers, editors, agents, or any specific UI framework. Client code extends `PluginContext`, `Plugin`, and `PluginService` to model domain concepts. The same runtime drops into a CLI, a server, or a Flutter app unchanged.
+
+**Competing implementations are a first-class idea.** Most DI containers treat override as a special case. Plugin Kit treats it as the normal case. That is why priority is on the registration, not on the slot: the slot is just a name, and any plugin that registers there is a candidate to win.
+
+**Metadata without instantiation.** Capabilities live on registration wrappers, so host code can discover what a service claims to support without paying construction cost. This is how dynamic settings UIs, extension manifests, and slot inspectors stay fast.
+
+**Settings as reconciliation input, not instruction.** Handing the runtime a new `RuntimeSettings` is a statement of intent ("this is the world as it should be"), not a script. The runtime figures out what has to attach, detach, or reconfigure to converge on the new state. Plugin authors write lifecycle hooks; they do not write "on settings change" handlers for every configurable knob.
+
+**Errors surface.** The bus does not swallow handler exceptions. The runtime's lifecycle phases aggregate failures and throw `PluginLifecycleException`, naming the phase that failed. Silent failure in a plugin system is a debugging nightmare a year later.

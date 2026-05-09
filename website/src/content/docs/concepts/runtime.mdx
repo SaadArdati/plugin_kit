@@ -1,34 +1,29 @@
 ---
 title: Runtime
-description: The lifecycle engine, the manager wrapper, settings reconciliation, and enablement precedence.
+description: The lifecycle engine that owns the global scope, spawns sessions, holds the current settings snapshot, and reconciles updates across every scope.
 ---
 
 import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-The `PluginRuntime` is the lifecycle engine. It owns the global scope, spawns sessions, and reconciles settings changes across both. Most apps reach it through `PluginRuntimeManager`, a thin wrapper that holds the current settings snapshot, exposes a change stream, and applies updates across the runtime and its active sessions in one call.
+The `PluginRuntime` is the lifecycle engine. It owns the global scope, spawns sessions, holds the current `RuntimeSettings` snapshot, exposes a change stream, and applies updates across the runtime and its active sessions in one call.
 
-This page covers the runtime and the manager. For session-specific concerns (isolation, cross-scope routing, per-session contexts), see [Sessions](/concepts/sessions/).
+This page covers `PluginRuntime`. For session-specific concerns (isolation, cross-scope routing, per-session contexts), see [Sessions](/concepts/sessions/).
 
-## Runtime vs Manager
-
-| Type | Role |
-|---|---|
-| `PluginRuntime<G, S>` | Low-level engine: init, create sessions, update global or session settings, dispose. |
-| `PluginRuntimeManager<G, S>` | Convenience wrapper: holds the current settings snapshot, exposes `settingsStream`, applies updates to the runtime and every active session in one call. |
+## Constructing and initializing
 
 ```dart
-final manager = PluginRuntimeManager(plugins: [
+final runtime = PluginRuntime(plugins: [
   CorePlugin(),
   SqlLanguagePlugin(),
   MarkdownLanguagePlugin(),
 ]);
 
-manager.init(initialSettings: savedSettings);
+runtime.init(settings: savedSettings);
 
-final session = await manager.createSession();
+final session = await runtime.createSession();
 ```
 
-Use the manager unless you are writing a framework on top of Plugin Kit. The runtime is still reachable as `manager.runtime` if you need it.
+`PluginRuntime` is generic over the global and session context types: `PluginRuntime<G extends GlobalPluginContext, S extends SessionPluginContext>`. Bare `PluginRuntime` infers the defaults; supply your own subtypes only when you need a [custom context](/concepts/custom-context/).
 
 ## What `init` does
 
@@ -44,15 +39,15 @@ When you call `runtime.init(...)`, this happens in order:
 4. Each enabled global plugin runs `register` against a `ScopedServiceRegistry` that already knows its `pluginId`.
 5. The global context is built (default, or via your `globalContextFactory`).
 6. Wildcard winner-scoped overrides get materialized onto the winners.
-7. Each enabled global plugin runs `attach(context)` in registration order.
+7. Each enabled global plugin runs `attach(context)`. The runtime currently visits plugins in the order they were added, but this ordering is not part of the contract; plugin code must not rely on a particular peer being attached first. Resolve services at point of use, and use events or `resolveAfter` to coordinate between plugins.
 
 </Steps>
 
 After that, the runtime is ready to spawn sessions. You can open one per user action, keep one long-lived session, or mix the two.
 
 ```dart
-manager.init(
-  initialSettings: savedSettings,
+runtime.init(
+  settings: savedSettings,
   defaultEnabledPluginIds: const {
     PluginId('core'),
     PluginId('search'),
@@ -71,14 +66,14 @@ Users toggle features. Config values change. Priorities shift. You want the runt
 
 ```dart
 // User turns off analytics in a settings screen
-final next = manager.settings.copyWith(
+final next = runtime.settings.copyWith(
   plugins: {
-    ...manager.settings.plugins,
+    ...runtime.settings.plugins,
     const PluginId('analytics'): const PluginConfig(enabled: false),
   },
 );
 
-await manager.updateSettings(next);
+await runtime.updateSettings(next);
 ```
 
 That reconciles the global scope, reconciles every active session, and publishes the new snapshot on `settingsStream`. If the `analytics` plugin was attached, it gets detached. If something was waiting on a capability that `analytics` provided, the ripples show up during this call.
@@ -87,10 +82,10 @@ That reconciles the global scope, reconciles every active session, and publishes
 
 ```dart
 // Optimistic UI wants settingsStream to emit immediately
-manager.updateSettingsSnapshot(pendingSettings);
+runtime.updateSettingsSnapshot(pendingSettings);
 
 // Later, if the user confirms, run the real reconciliation
-await manager.updateSettings(pendingSettings);
+await runtime.updateSettings(pendingSettings);
 ```
 
 `updateSettingsSnapshot` replaces the stored settings and emits on the stream. It does not run reconciliation, and it does not inject new config into already-resolved services. Think of it as "tell listeners, leave the runtime alone."

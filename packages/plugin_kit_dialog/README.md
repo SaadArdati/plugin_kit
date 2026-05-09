@@ -99,7 +99,7 @@ Each field carries `key`, `label`, `helperText`, and `defaultValue`. Dotted keys
 
 ## Visuals (icons, colors, labels)
 
-Visuals are a Flutter-only concern, so the canonical attachment path is one locked `GlobalPlugin` — `PluginKitVisualsPlugin` — that the host app adds to the runtime alongside its other plugins. It carries three independent maps for the three things the dialog renders: plugin tiles, namespace section headers, and individual service cards.
+Visuals are a Flutter-only concern, so the canonical attachment path is one locked `GlobalPlugin` (`PluginKitVisualsPlugin`) that the host app adds to the runtime alongside its other plugins. It carries three independent maps for the three things the dialog renders: plugin tiles, namespace section headers, and individual service cards.
 
 ```dart
 runtime
@@ -214,7 +214,7 @@ The dialog is **non-destructive**. Edits accumulate in a working draft; nothing 
 
 ## Example app
 
-Run [`example/plugin_kit_dialog_demo`](https://github.com/SaadArdati/plugin_kit/tree/main/example/plugin_kit_dialog_demo) to see priorities, tiers, and visuals in a full app — 20 competing plugins (priority towers on `agent.model`, `agent.system_message`, `retry.policy`, `search.provider`, plus locked and experimental tiers) plus a `PluginKitVisualsPlugin` decorating every plugin, namespace, and service.
+Run [`example/plugin_kit_dialog_demo`](https://github.com/SaadArdati/plugin_kit/tree/main/example/plugin_kit_dialog_demo) to see priorities, tiers, and visuals in a full app: 20 competing plugins (priority towers on `agent.model`, `agent.system_message`, `retry.policy`, `search.provider`, plus locked and experimental tiers) plus a `PluginKitVisualsPlugin` decorating every plugin, namespace, and service.
 
 ## Public API
 
@@ -261,8 +261,8 @@ ConfigFieldHandle                    // value/reset handle for renderers
 
 ## Related packages
 
-- [`plugin_kit`](https://pub.dev/packages/plugin_kit) — the dart-only runtime this dialog inspects. Required.
-- [`flutter_plugin_kit`](https://pub.dev/packages/flutter_plugin_kit) — Flutter ergonomics (scope widgets, `State` mixin) for plumbing the runtime through your widget tree. The dialog composes naturally with its `PluginRuntimeScope`.
+- [`plugin_kit`](https://pub.dev/packages/plugin_kit): the dart-only runtime this dialog inspects. Required.
+- [`flutter_plugin_kit`](https://pub.dev/packages/flutter_plugin_kit): Flutter ergonomics (scope widgets, `State` mixin) for plumbing the runtime through your widget tree. The dialog composes naturally with its `PluginRuntimeScope`.
 
 ## Documentation
 

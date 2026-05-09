@@ -55,16 +55,11 @@ void main() {
     () {
       final runtime = PluginRuntime(
         plugins: [
-          _TestGlobalPlugin(
-            'chat_manager',
-            featureFlags: [FeatureFlag.experimental],
-          ),
+          _TestGlobalPlugin('chat', featureFlags: [FeatureFlag.experimental]),
           _TestGlobalPlugin('core_tools', featureFlags: [FeatureFlag.locked]),
           PluginKitVisualsPlugin(
             pluginVisuals: const {
-              PluginId('chat_manager'): PluginKitVisual(
-                description: 'Routes chats.',
-              ),
+              PluginId('chat'): PluginKitVisual(description: 'Routes chats.'),
             },
           ),
         ],
@@ -76,9 +71,9 @@ void main() {
           .all;
       expect(rows, hasLength(3));
 
-      expect(rows[0].pluginId, 'chat_manager');
+      expect(rows[0].pluginId, 'chat');
       // No prettification: raw pluginId is the label fallback.
-      expect(rows[0].label, 'chat_manager');
+      expect(rows[0].label, 'chat');
       expect(rows[0].description, 'Routes chats.');
       expect(rows[0].experimental, isTrue);
       expect(rows[0].locked, isFalse);

@@ -31,10 +31,10 @@ extension type const PluginId(String value) {
   /// when the receiver is obviously a [PluginId]:
   ///
   /// ```dart
-  /// final pin = const PluginId('chat_manager').service(
+  /// final pin = const PluginId('chat').service(
   ///   const ServiceId('agent.model'),
   /// );
-  /// // pin.wire == 'chat_manager:agent.model'
+  /// // pin.wire == 'chat:agent.model'
   /// ```
   ///
   /// Works with [PluginId.wildcard] to produce a wildcard pin
@@ -245,8 +245,8 @@ extension type const ServiceId(String value) {
   }
 }
 
-/// A typed key identifying "the [serviceId] registered by [pluginId]" —
-/// the map key type used by `RuntimeSettings.services` and any other
+/// A typed key identifying "the [serviceId] registered by [pluginId]".
+/// The map key type used by `RuntimeSettings.services` and any other
 /// place that needs to address a single plugin's service slot.
 ///
 /// At runtime, `Pin` IS the canonical wire string `'<pluginId>:<serviceId>'`
@@ -266,7 +266,7 @@ extension type const ServiceId(String value) {
 /// // Parse the wire format (used by RuntimeSettings.fromJson).
 /// Pin.fromWire('chat:agent.model');
 ///
-/// // From the typed chain on PluginId — same Pin under the hood.
+/// // From the typed chain on PluginId. Same Pin under the hood.
 /// const PluginId('chat').service(const ServiceId('agent.model'));
 /// const PluginId('chat').namespace('agent').service('model');
 /// PluginId.wildcard.service(const ServiceId('agent.tools'));
