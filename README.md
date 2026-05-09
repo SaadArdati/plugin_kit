@@ -121,7 +121,7 @@ Both base classes accept a generic context parameter that defaults to the standa
 context for that scope (`GlobalPluginContext` and `SessionPluginContext`). Write
 `extends SessionPlugin`, `extends GlobalPlugin`, `PluginRuntime`,
 `PluginRuntimeManager`, and `PluginSession` without type arguments unless your app
-uses a custom context subclass (see [Custom Context](https://saadardati.github.io/plugin_kit/concepts/custom-context/)).
+uses a custom context subclass (see [Custom Context](https://plugin-kit-docs.saadodi44.workers.dev/concepts/custom-context/)).
 
 `StatefulPluginService` ships with two ergonomic typedef aliases:
 `SessionStatefulPluginService` (for session-scoped services) and

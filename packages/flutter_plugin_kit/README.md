@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="../../assets/logo-256.png" width="160" alt="Plugin Kit logo" />
+  <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/logo-256.png" width="160" alt="Plugin Kit logo" />
 </p>
 
 # flutter_plugin_kit
 
-Flutter ergonomics on top of [`plugin_kit`](../plugin_kit). Scope widgets that carry the runtime and session through the tree, a `State` mixin that handles bus subscriptions, a `ChangeNotifier` adapter for state-management libraries, and `BuildContext` extensions for reading the latest event of a given type.
+Flutter ergonomics on top of [`plugin_kit`](https://pub.dev/packages/plugin_kit). Scope widgets that carry the runtime and session through the tree, a `State` mixin that handles bus subscriptions, a `ChangeNotifier` adapter for state-management libraries, and `BuildContext` extensions for reading the latest event of a given type.
 
 Pulls in only `flutter` and `plugin_kit`. The exposed types implement standard Flutter `ChangeNotifier` / `ValueListenable` / `Stream` interfaces, so they drop into `provider`, `flutter_bloc`, `riverpod`, signals, etc. as ordinary values — wire them through whatever you already have, or skip a state library entirely and use the bus directly. Pick the combination that pays for itself.
 

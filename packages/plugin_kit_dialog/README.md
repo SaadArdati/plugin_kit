@@ -1,29 +1,24 @@
 <p align="center">
-  <img src="../../assets/logo-256.png" width="160" alt="Plugin Kit logo" />
+  <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/logo-256.png" width="160" alt="Plugin Kit logo" />
 </p>
 
 # plugin_kit_dialog
 
-A Flutter dialog that inspects and edits any [`plugin_kit`](../plugin_kit) `PluginRuntime` at runtime. Drop it in once
+A Flutter dialog that inspects and edits any [`plugin_kit`](https://pub.dev/packages/plugin_kit) `PluginRuntime` at runtime. Drop it in once
 and your users get a three-tab UI for toggling plugins, editing service fields, and inspecting the registry, without
 you writing a settings screen per plugin set.
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│  Plugins   Services    Advanced              Cancel   Save  │
-├──────────────────────────────────────────────────────────────┤
-│  ○ chat_manager · stable                                ●   │
-│  ○ enterprise_chat · stable                             ●   │
-│  ○ debug_overrides · experimental                       ○   │
-│  ...                                                         │
-└──────────────────────────────────────────────────────────────┘
-```
 
 - **Plugins tab**: enable/disable each plugin; locked entries can't be toggled, experimental ones are flagged.
 - **Services tab**: every service that ships a `UiConfigurableCapability` becomes an editable card. Edit text,
   numbers, dropdowns, switches, multiline, password, grouped, or custom fields.
 - **Advanced tab**: registry inspector with priority chains, winners, shadowed contenders, plus a JSON view of the
   working settings.
+
+![Plugin Kit Dialog Plugins tab showing a grid of registered plugins with enable/disable toggles, stable/experimental tiers, and per-plugin icons and colors](https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/example/plugin_kit_dialog_demo/test/goldens/plugins_tab_dark.png)
+
+![Plugin Kit Dialog Services tab showing expanded service cards grouped by namespace, with capability chips and configuration fields](https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/example/plugin_kit_dialog_demo/test/goldens/services_tab_dark.png)
+
+![Plugin Kit Dialog Advanced tab showing the service registry inspector with namespaces, competing registrations, priority badges, and the current winner picked out](https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/example/plugin_kit_dialog_demo/test/goldens/advanced_tab_dark.png)
 
 The dialog is wholly **dogfooded**: it builds itself out of `plugin_kit` plugins, so every tab, header action,
 and field renderer is a real plugin you can shadow or replace from your host app.
@@ -225,7 +220,7 @@ The dialog is **non-destructive**. Edits accumulate in a working draft; nothing 
 
 ## Example app
 
-A runnable demo with 20 competing plugins (priority towers on `agent.model`, `agent.system_message`, `retry.policy`, `search.provider`, plus locked and experimental tiers) plus one `PluginKitVisualsPlugin` decorating every plugin, namespace, and service (21 total runtime plugins) lives at [`example/plugin_kit_dialog_demo`](../../example/plugin_kit_dialog_demo). Run it with `flutter run` from that directory.
+A runnable demo with 20 competing plugins (priority towers on `agent.model`, `agent.system_message`, `retry.policy`, `search.provider`, plus locked and experimental tiers) plus one `PluginKitVisualsPlugin` decorating every plugin, namespace, and service (21 total runtime plugins) lives at [`example/plugin_kit_dialog_demo`](https://github.com/SaadArdati/plugin_kit/tree/main/example/plugin_kit_dialog_demo). Run it with `flutter run` from that directory.
 
 ## Public API
 
@@ -270,4 +265,4 @@ ConfigFieldHandle                    // value/reset handle for renderers
 
 ## Design spec
 
-Full architectural notes: [`docs/superpowers/specs/2026-04-24-plugin-kit-dialog-design.md`](../../docs/superpowers/specs/2026-04-24-plugin-kit-dialog-design.md).
+Full architectural notes: [`docs/superpowers/specs/2026-04-24-plugin-kit-dialog-design.md`](https://github.com/SaadArdati/plugin_kit/blob/main/docs/superpowers/specs/2026-04-24-plugin-kit-dialog-design.md).

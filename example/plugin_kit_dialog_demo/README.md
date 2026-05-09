@@ -34,8 +34,8 @@ flutter run --target example/plugin_kit_dialog_demo/lib/main.dart
 ## Companion documentation
 
 - [`plugin_kit_dialog` README](../../packages/plugin_kit_dialog/README.md)
-- [Plugin Kit Dialog guide](https://saadardati.github.io/plugin_kit/guides/plugin-kit-dialog/)
-- [Dialog API reference](https://saadardati.github.io/plugin_kit/reference/dialog-api/)
+- [Plugin Kit Dialog guide](https://plugin-kit-docs.saadodi44.workers.dev/guides/plugin-kit-dialog/)
+- [Dialog API reference](https://plugin-kit-docs.saadodi44.workers.dev/reference/dialog-api/)
 
 The screenshots that ship with the dialog docs are golden-tested against
 this demo, so what you see in the docs is exactly what `flutter run` here
