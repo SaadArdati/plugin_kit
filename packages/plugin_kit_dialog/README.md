@@ -20,8 +20,7 @@ you writing a settings screen per plugin set.
 
 ![Plugin Kit Dialog Advanced tab showing the service registry inspector with namespaces, competing registrations, priority badges, and the current winner picked out](https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/example/plugin_kit_dialog_demo/test/goldens/advanced_tab_dark.png)
 
-The dialog is wholly **dogfooded**: it builds itself out of `plugin_kit` plugins, so every tab, header action,
-and field renderer is a real plugin you can shadow or replace from your host app.
+The dialog is built from `plugin_kit` plugins itself. Every tab, header action, and field renderer is a real plugin you can shadow or replace from your host app.
 
 ## Install
 
@@ -31,7 +30,7 @@ dependencies:
   plugin_kit_dialog: ^0.1.0
 ```
 
-`plugin_kit` carries the dart-only declaration types (`UiConfigurableCapability`, `ConfigField`, etc). `plugin_kit_dialog` adds the Flutter UI.
+`plugin_kit` carries the dart-only declaration types (`UiConfigurableCapability`, `ConfigField`, etc). `plugin_kit_dialog` adds the Flutter UI. Requires Flutter `>=3.27.0` and Dart `>=3.10.0`.
 
 ## Quick start
 
@@ -220,9 +219,11 @@ The dialog is **non-destructive**. Edits accumulate in a working draft; nothing 
 
 ## Example app
 
-A runnable demo with 20 competing plugins (priority towers on `agent.model`, `agent.system_message`, `retry.policy`, `search.provider`, plus locked and experimental tiers) plus one `PluginKitVisualsPlugin` decorating every plugin, namespace, and service (21 total runtime plugins) lives at [`example/plugin_kit_dialog_demo`](https://github.com/SaadArdati/plugin_kit/tree/main/example/plugin_kit_dialog_demo). Run it with `flutter run` from that directory.
+Run [`example/plugin_kit_dialog_demo`](https://github.com/SaadArdati/plugin_kit/tree/main/example/plugin_kit_dialog_demo) to see priorities, tiers, and visuals in a full app — 20 competing plugins (priority towers on `agent.model`, `agent.system_message`, `retry.policy`, `search.provider`, plus locked and experimental tiers) plus a `PluginKitVisualsPlugin` decorating every plugin, namespace, and service.
 
 ## Public API
+
+The canonical surface lives in [dartdoc on pub.dev](https://pub.dev/documentation/plugin_kit_dialog/latest/). What follows is a curated index by concern.
 
 ```dart
 import 'package:plugin_kit_dialog/plugin_kit_dialog.dart';
@@ -263,6 +264,18 @@ ConfigField                          // sealed base
 ConfigFieldHandle                    // value/reset handle for renderers
 ```
 
-## Design spec
+## Related packages
 
-Full architectural notes: [`docs/superpowers/specs/2026-04-24-plugin-kit-dialog-design.md`](https://github.com/SaadArdati/plugin_kit/blob/main/docs/superpowers/specs/2026-04-24-plugin-kit-dialog-design.md).
+- [`plugin_kit`](https://pub.dev/packages/plugin_kit) — the dart-only runtime this dialog inspects. Required.
+- [`flutter_plugin_kit`](https://pub.dev/packages/flutter_plugin_kit) — Flutter ergonomics (scope widgets, `State` mixin) for plumbing the runtime through your widget tree. The dialog composes naturally with its `PluginRuntimeScope`.
+
+## Documentation
+
+- **Full guide**: [plugin-kit-docs.saadodi44.workers.dev/guides/plugin-kit-dialog/](https://plugin-kit-docs.saadodi44.workers.dev/guides/plugin-kit-dialog/).
+- **Dialog API reference**: [plugin-kit-docs.saadodi44.workers.dev/reference/dialog-api/](https://plugin-kit-docs.saadodi44.workers.dev/reference/dialog-api/) and [pub.dev dartdoc](https://pub.dev/documentation/plugin_kit_dialog/latest/).
+- **Architecture notes** (advanced): [`docs/superpowers/specs/2026-04-24-plugin-kit-dialog-design.md`](https://github.com/SaadArdati/plugin_kit/blob/main/docs/superpowers/specs/2026-04-24-plugin-kit-dialog-design.md).
+- **Source and issues**: [github.com/SaadArdati/plugin_kit](https://github.com/SaadArdati/plugin_kit).
+
+## License
+
+BSD 3-Clause. See [LICENSE](https://github.com/SaadArdati/plugin_kit/blob/main/packages/plugin_kit_dialog/LICENSE).

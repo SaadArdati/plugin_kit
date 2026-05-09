@@ -4,19 +4,30 @@
 
 # flutter_plugin_kit
 
-Flutter ergonomics on top of [`plugin_kit`](https://pub.dev/packages/plugin_kit). Scope widgets that carry the runtime and session through the tree, a `State` mixin that handles bus subscriptions, a `ChangeNotifier` adapter for state-management libraries, and `BuildContext` extensions for reading the latest event of a given type.
+Skip the boilerplate of plumbing [`plugin_kit`](https://pub.dev/packages/plugin_kit) through your widget tree. `flutter_plugin_kit` adds scope widgets that carry the runtime and session, a `State` mixin that auto-cancels event subscriptions, a `ChangeNotifier` adapter, and `BuildContext` extensions for reading the latest event of any type.
 
-Pulls in only `flutter` and `plugin_kit`. The exposed types implement standard Flutter `ChangeNotifier` / `ValueListenable` / `Stream` interfaces, so they drop into `provider`, `flutter_bloc`, `riverpod`, signals, etc. as ordinary values — wire them through whatever you already have, or skip a state library entirely and use the bus directly. Pick the combination that pays for itself.
+The exposed types implement standard Flutter `ChangeNotifier` / `ValueListenable` / `Stream` interfaces, so they drop into `provider`, `flutter_bloc`, `riverpod`, signals, and others as ordinary values. Use only the adapters your app already needs — or skip a state library entirely and use the bus directly.
+
+## Install
+
+```yaml
+dependencies:
+  flutter_plugin_kit: ^0.1.0
+```
+
+Pulls in only `flutter` and `plugin_kit`. Requires Flutter `>=3.27.0` and Dart `>=3.10.0`.
 
 ## What's in the box
 
 - `PluginRuntimeScope` — `InheritedWidget` carrying a `PluginRuntimeManager`. Either pass an externally-owned manager via `.value`, or pass a list of plugins and let the scope construct, init, and dispose one for you.
 - `PluginSessionScope` — `InheritedWidget` carrying a `PluginSession`. Three modes: explicit session, runtime + auto-create session, or derive both from an ambient `PluginRuntimeScope`. Async session creation is handled with optional `loading` and `error` builders.
-- `PluginSessionStateListener<W>` — mixin on `State<W>`. `listen<E>(handler)` and `rebuildOn<E>([when])` register subscriptions that auto-cancel on dispose and re-attach automatically across session swaps. Both are callable from `initState` (and any later lifecycle callback) — no `_wired` guard needed. By default the mixin reads the active session from the ambient `PluginSessionScope`; override `PluginSession? get session` only when the session lives elsewhere (typically `=> widget.session`).
+- `PluginSessionStateListener<W>` — mixin on `State<W>`. `listen<E>(handler)` and `rebuildOn<E>([when])` register subscriptions that auto-cancel on dispose and re-attach automatically across session swaps. Both are callable from `initState` (and any later lifecycle callback). By default the mixin reads the active session from the ambient `PluginSessionScope`; override `PluginSession? get session` only when the session lives elsewhere (typically `=> widget.session`).
 - `PluginEventNotifier<E>` — `ChangeNotifier` / `ValueListenable<E?>`. Subscribes to a session and exposes the latest event of type `E` as `.value`. Drops directly into `ChangeNotifierProvider`, `ValueListenableProvider`, `ValueListenableBuilder`, or any other foundation-listenable consumer.
 - `BuildContext.watchEvent<E>()` / `readEvent<E>()` — convenience extensions. `watchEvent` subscribes the calling element to rebuilds on the next `E`; `readEvent` returns the latest without subscribing.
 
 ## Quick tour
+
+`ChatPlugin`, `AssistantPlugin`, and `ChatMessageReceived` below are stand-ins for plugins and events you write in your own app. A complete runnable version of this pattern (plus six other state-library variants) lives in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden).
 
 ```dart
 import 'package:flutter/material.dart';
@@ -95,7 +106,7 @@ It also implements `ValueListenable<E?>`, so `ValueListenableProvider`, `ValueLi
 
 ### flutter_bloc
 
-There's no shipped Cubit adapter — it's eight lines you write yourself, parameterised by whatever `Bloc` shape your app prefers:
+No Cubit adapter is bundled; create one by subscribing to `session.on<E>`:
 
 ```dart
 class PluginEventCubit<E> extends Cubit<E?> {
@@ -114,14 +125,29 @@ class PluginEventCubit<E> extends Cubit<E?> {
 }
 ```
 
-Wrap with `BlocProvider` and read with `context.watch<PluginEventCubit<ChatMessageReceived>>().state`. See `example/state_garden` for the full recipe with state classes and value equality.
+Wrap with `BlocProvider` and read with `context.watch<PluginEventCubit<ChatMessageReceived>>().state`. The full recipe (with value-equality state classes) lives in [`example/state_garden/lib/src/integrations/bloc_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/bloc_chat.dart).
 
 ### riverpod / signals / mobx
 
-Same shape: subscribe in a notifier or store, expose the latest event, dispose cancels. Each library's recipe lives in `example/state_garden/`.
+The same pattern applies: subscribe in a notifier or store, expose the latest event, dispose cancels. Each library's recipe lives in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden).
 
 ## Lifecycle notes
 
 `PluginRuntimeScope` and `PluginSessionScope` only own the runtime/session when they constructed it themselves. Pass an external one via `.value` or the `session:` / `runtime:` arguments and the caller keeps lifecycle control — same contract as `Provider.value`.
 
-`PluginRuntimeManager` and `PluginSession` are designed to outlive the widget tree (hot restart, route stack resets, deep navigation). For long-lived runtimes, hold the manager outside the tree (top-level final, GetIt singleton, Riverpod provider with one-shot create) and pass it into `PluginRuntimeScope.value` / `PluginSessionScope(session: ...)`. The auto-create variants are convenient when the scope's lifetime really does match the runtime's, e.g. inside a per-route `StatefulWidget`.
+`PluginRuntimeManager` and `PluginSession` are designed to outlive the widget tree (hot restart, route stack resets, deep navigation). For long-lived runtimes, hold the manager outside the tree (top-level final, GetIt singleton, Riverpod provider with one-shot create) and pass it into `PluginRuntimeScope.value` / `PluginSessionScope(session: ...)`. Use the auto-create variants only when the scope's lifetime is the runtime's lifetime — e.g., a per-route `StatefulWidget`.
+
+## Related packages
+
+- [`plugin_kit`](https://pub.dev/packages/plugin_kit) — the dart-only runtime this package layers on top of. Required.
+- [`plugin_kit_dialog`](https://pub.dev/packages/plugin_kit_dialog) — drop-in three-tab Flutter UI for inspecting and editing any `PluginRuntime`. Composes naturally with the scopes shipped here.
+
+## Documentation
+
+- **Full docs**: [plugin-kit-docs.saadodi44.workers.dev/guides/flutter-plugin-kit/](https://plugin-kit-docs.saadodi44.workers.dev/guides/flutter-plugin-kit/) — the dedicated guide.
+- **API reference**: [pub.dev dartdoc](https://pub.dev/documentation/flutter_plugin_kit/latest/).
+- **Source and issues**: [github.com/SaadArdati/plugin_kit](https://github.com/SaadArdati/plugin_kit).
+
+## License
+
+BSD 3-Clause. See [LICENSE](https://github.com/SaadArdati/plugin_kit/blob/main/packages/flutter_plugin_kit/LICENSE).
