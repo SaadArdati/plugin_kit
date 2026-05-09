@@ -3,16 +3,9 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightPageActions from 'starlight-page-actions';
 
-// Only apply the GitHub Pages subpath for production builds.
-// Dev serves at `/` so http://localhost:4321/ works directly.
-const isProd = process.env.NODE_ENV === 'production';
-
 // https://astro.build/config
 export default defineConfig({
-	// Update this after creating the repo. Format: https://<user>.github.io/<repo>
-	// If using a custom domain, set that instead.
-	site: 'https://SaadArdati.github.io/plugin_kit',
-	base: isProd ? '/plugin_kit' : '/',
+	site: 'https://plugin-kit-docs.saadodi44.workers.dev',
 	integrations: [
 		starlight({
 			title: 'Plugin Kit',
