@@ -1,0 +1,8 @@
+{
+  "name": "plugin-kit-docs",
+  "compatibility_date": "2025-05-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  }
+}
