@@ -18,50 +18,62 @@ Dense reference. Source pointers at the end.
 
 Zero-cost extension types over `String`. At runtime they are the underlying String.
 
+<!-- code-excerpt "website/snippets/lib/api_reference.dart (api-cheatsheet-typed-handles-index)" -->
 ```dart
-const PluginId         chatId    = PluginId('chat');
-const Namespace        agent     = Namespace('agent');
-const ServiceId        modelId   = ServiceId('agent.model');
+/// Full typed-handles index: PluginId, Namespace, ServiceId, and Pin.
+void demonstrateTypedHandlesIndex() {
+  const PluginId chatId = PluginId('chat');
+  const Namespace agent = Namespace('agent');
+  const ServiceId modelId = ServiceId('agent.model');
 
-PluginId.wildcard;        // const PluginId('__pk_wildcard__'); pluginId sentinel for wildcard keys
-PluginId.winnerScoped;    // const PluginId('__pk_winner__'); winner-scoped override sentinel
+  // Sentinels.
+  const wildcard = PluginId.wildcard;
+  const winnerScoped = PluginId.winnerScoped;
 
-// PluginId values starting with '__pk_' are reserved for sentinels.
-// PluginRuntime.addPlugin rejects user-supplied ids with that prefix.
+  // Namespace members.
+  final agentValue = agent.value;
+  final systemPromptNs = agent.child('system_prompt');
+  final modelIdFromNs = agent.service('model');
+  final modelIdShorthand = agent('model');
 
-agent.value;                       // 'agent'
-agent.child('system_prompt');      // Namespace('agent.system_prompt'), runtime, final
-agent.service('model');            // ServiceId('agent.model'), runtime, final
-agent('model');                    // shorthand for .service(...)
+  // ServiceId members.
+  final modelValue = modelId.value;
+  final modelNs = modelId.namespace;
+  final modelLeaf = modelId.id;
+  final modelTopNs = modelId.topNamespace;
+  const modelNamespaced = ServiceId.namespaced(agent, 'model');
 
-modelId.value;                     // 'agent.model'
-modelId.namespace;                 // Namespace('agent'), full prefix via lastIndexOf
-modelId.id;                        // 'model', leaf
-modelId.topNamespace;              // Namespace('agent'), first segment via indexOf
-ServiceId.namespaced(agent, 'model');  // const-friendly composition
+  // Pin construction via typed chain.
+  final pin1 = chatId.service(modelId);
+  final pin2 = PluginId.wildcard.service(modelId);
+  final pin3 = const PluginId('chat').namespace('agent').service('model');
+  final pin4 = const PluginId('chat').namespace('agent')('model');
 
-// Pin is the map-key type used by RuntimeSettings.services. Build via the
-// typed chain (preserves PluginId / ServiceId types) or directly with strings.
-chatId.service(modelId);                                  // wire 'chat:agent.model'
-PluginId.wildcard.service(modelId);                       // wire '*:agent.model'
-PluginId('chat').namespace('agent').service('model');     // wire 'chat:agent.model'
-PluginId('chat').namespace('agent')('model');             // shorthand for .service('model')
-PluginId('chat').namespace('agent').child('system_prompt').service('scope');  // wire 'chat:agent.system_prompt.scope'
+  // Pin construction directly.
+  final pin5 = Pin('chat', ['agent', 'model']);
+  final pin6 = Pin('chat', ['greeter']);
+  final pin7 = Pin.wildcard(['agent', 'tools']);
 
-// Direct (string) construction:
-Pin('chat', ['agent', 'model']);          // wire 'chat:agent.model'
-Pin('chat', ['greeter']);                 // wire 'chat:greeter' (single segment)
-Pin.wildcard(['agent', 'tools']);         // wire '*:agent.tools'
+  // Pin inspection.
+  final pin = Pin('chat', ['agent', 'model']);
+  final pluginId = pin.pluginId;
+  final serviceId = pin.serviceId;
+  final isWildcard = pin.isWildcard;
+  final wire = pin.wire;
 
-final pin = Pin('chat', ['agent', 'model']);
-pin.pluginId;                             // PluginId('chat')
-pin.serviceId;                            // ServiceId('agent.model')
-pin.isWildcard;                           // false
-pin.wire;                                 // 'chat:agent.model'
+  // Const-friendly wire parse.
+  const constPin1 = Pin.fromWire('chat:agent.model');
+  const constPin2 = Pin.fromWire('*:agent.tools');
 
-// Wire-format parse side (used by RuntimeSettings.fromJson; const-evaluable):
-const Pin.fromWire('chat:agent.model');
-const Pin.fromWire('*:agent.tools');
+  print(
+    '$chatId $agent $modelId $wildcard $winnerScoped '
+    '$agentValue $systemPromptNs $modelIdFromNs $modelIdShorthand '
+    '$modelValue $modelNs $modelLeaf $modelTopNs $modelNamespaced '
+    '$pin1 $pin2 $pin3 $pin4 $pin5 $pin6 $pin7 '
+    '$pluginId $serviceId $isWildcard $wire '
+    '$constPin1 $constPin2',
+  );
+}
 ```
 
 `Namespace.call`, `.service`, `.child` and `PluginId.service`, `PluginId.namespace`, `PluginNamespaced.service`, `.child`, `.call` are runtime helpers. `Pin(plugin, segments)` and `Pin.wildcard(segments)` join segments with `'.'` so both are non-const. `Pin.fromWire(String)` is the only const-friendly constructor. Use it for fully-literal const settings, or accept `final` for typical runtime construction.
@@ -142,18 +154,22 @@ StatefulPluginService helpers (no context arg, reads `this.context`, auto-tracke
 Services registered against a `ServiceId` with a priority. Resolution returns highest-priority enabled wrapper.
 
 Registration from `Plugin.register`:
+<!-- code-excerpt "website/snippets/lib/capabilities.dart (capability-in-plugin-register)" -->
 ```dart
-registry.registerSingleton<MyService>(serviceId, MyService(), priority: 50);
-registry.registerLazySingleton<MyService>(serviceId, MyService.new, priority: 50);
-registry.registerFactory<MyService>(serviceId, MyService.new, priority: 50);
+void registerCapabilityInPlugin(ScopedServiceRegistry registry) {
+  registry.registerSingleton<MyService>(
+    const ServiceId('my_service'),
+    const MyService(),
+    capabilities: const {ConfigurableCapability()},
+  );
+}
 
-// Raw (cross-plugin registration):
-registry.raw.registerSingleton<MyService>(
-  pluginId: someOtherPluginId,
-  serviceId: serviceId,
-  instance: MyService(),
-  priority: 50,
-);
+bool checkConfigurable(ServiceRegistry registry) {
+  return registry
+      .resolveRaw<MyService>(const ServiceId('my_service'))
+      .capabilities
+      .hasType<ConfigurableCapability>();
+}
 ```
 
 `ServiceRegistry.defaultPriority` is 50. Conventional priorities: 25 soft fallback, 50 default, 100 overrides default, 200 authoritative.
@@ -166,19 +182,27 @@ Factory:        constructor runs on every resolve. Takes Factory<T>. Cannot regi
 ```
 
 Resolution from a context:
+<!-- code-excerpt "website/snippets/lib/api_reference.dart (api-reference-request-patterns)" -->
 ```dart
-context.resolve<T>(serviceId);            // throws if missing/disabled
-context.maybeResolve<T>(serviceId);       // null if missing/disabled
-context.resolveAfter<T>(pluginId: ..., serviceId: ...);  // chain skip-self; throws if no fallback
-```
+/// Demonstrates request/response patterns on a standalone bus.
+Future<void> demonstrateRequestPatterns(PluginContext context) async {
+  // Nullable Response enables fall-through.
+  context.bus.onRequest<SearchQuery, SearchResults?>((env) async {
+    if (env.event.q.isEmpty) return null; // concede
+    return const SearchResults(results: ['result']);
+  });
 
-Resolution from raw `ServiceRegistry`:
-```dart
-registry.raw.resolve<T>(serviceId);
-registry.raw.maybeResolve<T>(serviceId);
-registry.raw.resolveRaw<T>(serviceId);          // returns RegistrationWrapper, no instantiation
-registry.raw.maybeResolveRaw<T>(serviceId);
-registry.raw.resolveAfter<T>(pluginId: ..., serviceId: ...);
+  final response =
+      await context.bus.request<SearchQuery, SearchResults?>(const SearchQuery());
+  final maybe =
+      await context.bus.maybeRequest<SearchQuery, SearchResults?>(const SearchQuery());
+  final sync =
+      context.bus.requestSync<SearchQuery, SearchResults?>(const SearchQuery());
+  final maybeSync =
+      context.bus.maybeRequestSync<SearchQuery, SearchResults?>(const SearchQuery());
+
+  print('$response $maybe $sync $maybeSync');
+}
 ```
 
 Inspection:
@@ -297,26 +321,29 @@ context.globalBus.emit(...);             // session plugin: reach the global bus
 
 ## RuntimeSettings (`settings.dart`)
 
+<!-- code-excerpt "website/snippets/lib/runtime_settings.dart (runtime-settings-json)" -->
 ```dart
-final settings = RuntimeSettings(
+final settingsForJson = RuntimeSettings(
   plugins: {
     const PluginId('chat'): const PluginConfig(enabled: true, config: {'api_key': 'xxx'}),
     const PluginId('legacy'): const PluginConfig(enabled: false),
   },
   services: {
     Pin('chat', ['agent', 'model']):
-        ServiceSettings(config: {'temperature': 0.7}),
-
+        const ServiceSettings(config: {'temperature': 0.7}),
     Pin.wildcard(['agent', 'tools']):
-        ServiceSettings(priority: 200, config: {'verbose': true}),
-
+        const ServiceSettings(priority: 200, config: {'verbose': true}),
     Pin('legacy', ['search', 'engine']):
-        ServiceSettings(enabled: false),
+        const ServiceSettings(enabled: false),
   },
 );
 
-final json = settings.toJson();
-final back = RuntimeSettings.fromJson(json);
+Map<String, dynamic> roundTripJson() {
+  final json = settingsForJson.toJson();
+  final back = RuntimeSettings.fromJson(json);
+  assert(back.plugins.length == settingsForJson.plugins.length);
+  return json;
+}
 ```
 
 `ServiceSettings`: `enabled` (default true), `priority` (overrides registration priority), `config` (`Map<String, dynamic>` injected via `PluginService.injectSettings`).

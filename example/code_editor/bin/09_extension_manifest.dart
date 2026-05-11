@@ -18,10 +18,12 @@ import 'package:plugin_kit/plugin_kit.dart';
 const _namespace = Namespace('tooling');
 
 /// Declares the languages a formatter service supports.
+// #docregion 09-extension-manifest-formatter-capability
 class FormatterCapability extends Capability {
   final List<String> supportedLanguages;
   const FormatterCapability(this.supportedLanguages);
 }
+// #enddocregion 09-extension-manifest-formatter-capability
 
 /// Declares the lint rules a linter service enforces.
 class LinterCapability extends Capability {

@@ -14,7 +14,9 @@ typedef Factory<T> = T Function();
 /// slot the host app cares about (supported formats, priority hints, audit
 /// flags, etc.) and read them via [RegistrationWrapper.capabilities] without
 /// ever calling [RegistrationWrapper.provide].
+// #docregion service-registry-capability-set
 typedef CapabilitySet = Set<Capability>;
+// #enddocregion service-registry-capability-set
 
 /// Sealed base class for service registration wrappers.
 ///
@@ -502,10 +504,12 @@ class ServiceRegistry {
   /// Throws [StateError] if [serviceId] has no registrations, if [pluginId]
   /// is not found, or if every registration after [pluginId] is either
   /// absent or disabled.
+  // #docregion service-registry-resolve-after
   T resolveAfter<T>({
     required PluginId pluginId,
     required ServiceId serviceId,
   }) {
+  // #enddocregion service-registry-resolve-after
     final list =
         _registry[serviceId] ??
         (throw StateError('No service registered for "$serviceId"'));
@@ -693,6 +697,7 @@ class ServiceRegistry {
   /// a closure runs on every resolve, and [registerLazySingleton], where a
   /// closure runs once on first resolve. Replaces any existing registration
   /// from the same [pluginId].
+  // #docregion service-registry-register-singleton
   void registerSingleton<T extends Object>({
     required PluginId pluginId,
     required ServiceId serviceId,
@@ -700,6 +705,7 @@ class ServiceRegistry {
     int priority = ServiceRegistry.defaultPriority,
     CapabilitySet capabilities = const {},
   }) {
+  // #enddocregion service-registry-register-singleton
     // Guard against the most common shape mistake from the previous
     // factory-shape API: `registerSingleton<Object>(instance: Object.new,
     // ...)` (or any tear-off through the scoped positional form,
@@ -778,10 +784,12 @@ class ServiceRegistry {
   /// was found. If the removal empties the list for [serviceId], the entire
   /// key is removed from the registry. Used during settings reconciliation
   /// to unregister services from disabled plugins.
+  // #docregion service-registry-unregister
   RegistrationWrapper? unregister({
     required PluginId pluginId,
     required ServiceId serviceId,
   }) {
+  // #enddocregion service-registry-unregister
     final list = _registry[serviceId];
     if (list == null) return null;
 
@@ -982,7 +990,9 @@ class LocalPluginOverride {
 class ScopedServiceRegistry {
   /// The underlying registry. Use this for operations that aren't tied to
   /// the owning plugin (cross-plugin queries, etc.).
+  // #docregion service-registry-final
   final ServiceRegistry raw;
+  // #enddocregion service-registry-final
 
   /// The plugin id this scope belongs to. Every registration call below
   /// forwards this as the `pluginId` argument.
@@ -1023,6 +1033,7 @@ class ScopedServiceRegistry {
   /// (`registry.registerSingleton(id, MyService())`). For session plugins,
   /// `register` runs once per session, so each session gets its own
   /// instance and there is no cross-session sharing.
+  // #docregion service-registry-register-singleton-2
   void registerSingleton<T extends Object>(
     ServiceId service,
     T instance, {
@@ -1035,6 +1046,7 @@ class ScopedServiceRegistry {
     priority: priority ?? defaultPriority ?? ServiceRegistry.defaultPriority,
     capabilities: capabilities,
   );
+  // #enddocregion service-registry-register-singleton-2
 
   /// Register a lazy singleton service using a typed [ServiceId] handle.
   void registerLazySingleton<T extends Object>(

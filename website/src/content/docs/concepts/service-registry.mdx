@@ -4,6 +4,11 @@ description: Priority-based dependency injection, settings injection, and capabi
 ---
 
 import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import serviceRegistrySnippets from '../../../../../website/snippets/lib/service_registry.dart?raw';
+import pluginServicesSnippets from '../../../../../website/snippets/lib/plugin_services.dart?raw';
+import capabilitiesSnippets from '../../../../../website/snippets/lib/capabilities.dart?raw';
 
 The `ServiceRegistry` lets multiple plugins compete for the same slot. Plugins register services 
 under a `ServiceId`. When someone asks for that id, the highest-priority registration wins. The loser
@@ -31,25 +36,7 @@ A slot is not a class. It is a contract the registry recognizes, and multiple im
 | `registerLazySingleton` | creates on first resolve, then caches | setup is expensive but shared state is fine |
 | `registerSingleton` | stores a prebuilt instance | you already have it, or want eager creation |
 
-```dart
-@override
-void register(ScopedServiceRegistry registry) {
-  registry.registerFactory<QueryBuilder>(
-    const ServiceId('query_builder'),
-    QueryBuilder.new,
-  );
-
-  registry.registerLazySingleton<Database>(
-    const ServiceId('main_db'),
-    () => Database.connect(),
-  );
-
-  registry.registerSingleton<AppConfig>(
-    const ServiceId('config'),
-    AppConfig.load(),
-  );
-}
-```
+<Code code={extractRegion(serviceRegistrySnippets, 'service-registry-register-all-three')} lang="dart" />
 
 <Aside type="caution" title="Stateful services cannot be factories">
 `StatefulPluginService`s must be singletons or lazy singletons. Factory registration is
@@ -62,10 +49,7 @@ If the same plugin registers the same slot twice, the second call replaces the f
 
 Resolve from a `PluginContext`, a `PluginSession`, or the registry directly. They all forward to the same underlying lookup.
 
-```dart
-final db = context.resolve<Database>(const ServiceId('main_db'));
-final maybeLogger = context.maybeResolve<Logger>(const ServiceId('logger'));
-```
+<Code code={extractRegion(serviceRegistrySnippets, 'service-registry-resolve-basic')} lang="dart" />
 
 | Method | Behavior |
 |---|---|
@@ -78,21 +62,7 @@ final maybeLogger = context.maybeResolve<Logger>(const ServiceId('logger'));
 
 If multiple plugins register the same `serviceId`, the registry sorts them in descending priority order. Higher number wins. The default is `50`.
 
-```dart
-// plugin: core
-registry.registerSingleton<Formatter>(
-  const ServiceId('code_formatter'),
-  DefaultFormatter(),
-  priority: 50,
-);
-
-// plugin: my_better_formatter
-registry.registerSingleton<Formatter>(
-  const ServiceId('code_formatter'),
-  PrettierFormatter(),
-  priority: 100,
-);
-```
+<Code code={extractRegion(serviceRegistrySnippets, 'service-registry-priority-competing')} lang="dart" />
 
 `resolve(const ServiceId('code_formatter'))` now returns `PrettierFormatter`. `DefaultFormatter` is still in the registry. It is just not the winner.
 
@@ -110,25 +80,14 @@ current winner picked out. This is the same data the runtime uses to resolve.*
 
 Say your plugin provides a smart formatter for `.dart` files, but the user just opened a `.txt` file that the previous formatter already handled well.
 
-```dart
-Future<void> formatFile(File file) async {
-  if (file.extension == '.dart') {
-    await myDartFormatter.format(file);
-    return;
-  }
+<Code code={extractRegion(serviceRegistrySnippets, 'service-registry-resolve-after')} lang="dart" />
 
-  final fallback = context.resolveAfter<Formatter>(
-    pluginId: pluginId, // My current dart formatter plugin id.
-    serviceId: const ServiceId('code_formatter'),
-  );
-  await fallback.format(file);
-}
-```
+The wrapper plugin wins the slot completely in the session but quietly defers to the runner-up winner implementation
+for anything it does not want to touch.
 
-The wrapper plugin wins the slot globally but quietly defers to the original implementation for anything it does not want to touch.
 This is the clean way to extend behavior without forking the plugin you are extending.
 
-<Aside type="note" title="If you're using `resolveAfter` a lot">
+<Aside type="caution" title="If you're using `resolveAfter` a lot">
 If you find yourself calling `resolveAfter` repeatedly to get the next implementation, that is a code smell. It means you are
 trying to build a chain of responsibility, which the system has more elegant solutions for. Consider refactoring your plugin to
 depend on event-driven decision points instead of trying to wrap an entire service end-to-end.
@@ -141,18 +100,7 @@ See [Events](/concepts/events/).
 For related families of slots, the registry supports namespaces. Under the hood, a namespace is just a prefix: `namespace.serviceId`.
 The registry itself only knows about `ServiceId`; `Namespace` is a tiny helper for composing dotted ids.
 
-```dart
-static const panel = Namespace('panel');
-
-// Build the namespaced ServiceId via call() shorthand and pass it to the
-// regular register / resolve methods.
-registry.registerSingleton<PanelFactory>(
-  panel('console'), // ServiceId('panel.console')
-  ConsolePanelFactory(),
-);
-
-final factory = context.resolve<PanelFactory>(panel('console'));
-```
+<Code code={extractRegion(serviceRegistrySnippets, 'service-registry-namespace-panel')} lang="dart" />
 
 Namespaces are only useful for semantic grouping. Entirely stylistic. You can also register `const ServiceId('panel.console')` directly as a flat id and nothing breaks.
 
@@ -161,12 +109,7 @@ Namespaces are only useful for semantic grouping. Entirely stylistic. You can al
 If the resolved instance extends `PluginService`, the registry injects its settings automatically during resolution. The service reads
 them through a typed `config` wrapper instead of parsing raw maps.
 
-```dart
-class AnthropicService extends PluginService {
-  String get apiKey => config.getString('api_key') ?? '';
-  double get temperature => config.getDouble('temperature') ?? 0.7;
-}
-```
+<Code code={extractRegion(pluginServicesSnippets, 'plugin-service-settings-inject')} lang="dart" />
 
 For singletons and lazy singletons, the registry hashes the effective settings and only re-injects when they actually change.
 Reading from `config` repeatedly does not trigger re-parsing.
@@ -184,14 +127,7 @@ Wildcard settings are not "always beaten by plugin-specific settings." They are 
 
 The registry stores `RegistrationWrapper`s, not service instances directly. `resolveRaw` gives you the wrapper without instantiating anything.
 
-```dart
-const tooling = Namespace('tooling');
-final wrapper = session.registry.resolveRaw(tooling('formatter'));
-
-print(wrapper.pluginId);
-print(wrapper.priority);
-print(wrapper.capabilities);
-```
+<Code code={extractRegion(serviceRegistrySnippets, 'service-registry-resolve-raw')} lang="dart" />
 
 That matters when you want discovery instead of execution. Maybe you are building a settings UI that lists every configurable service without paying the cost of building them all. Maybe you want to show the user which plugin currently wins a slot. `resolveRaw` is how you do that without side effects.
 
@@ -201,17 +137,7 @@ Capabilities are metadata tags attached to the registration wrapper, not to the 
 This allows for introspection and discovery without instantiation. The registry does not care about the content of capabilities,
 only that they exist on the wrapper.
 
-```dart
-registry.registerSingleton<CodeLinter>(
-  const ServiceId('linter'),
-  CodeLinter(),
-  capabilities: {
-    SupportsLanguages(['dart', 'js']),
-    PartOfASuiteOfTools('super_suite'),
-    CanBeSlow(true, reason: 'network round-trip per call'),
-  },
-);
-```
+<Code code={extractRegion(capabilitiesSnippets, 'capability-register-multiple')} lang="dart" />
 
 Capabilities answer questions you would otherwise have to build the service to ask: does this support Dart? Is this part of a suite?
 You can define your own capability types. The system does not care about the set of tags, only that they exist on the wrapper.

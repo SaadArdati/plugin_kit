@@ -67,6 +67,39 @@ API surface. Then:
 - [`lib/src/chat/`](lib/src/chat/) holds the chat protocol: `ChatMessage`,
   the two events, `ChatService` and `AltChatService`, and the two plugins
   that register them.
+
+The chat service:
+
+<!-- code-excerpt "example/state_garden/lib/src/chat/chat_service.dart (chat-service)" -->
+```dart
+class ChatService extends StatefulPluginService {
+  ChatService();
+
+  final List<ChatMessage> _messages = <ChatMessage>[];
+
+  /// Read-only view of accumulated messages. Test fixtures use this to
+  /// verify per-session state isolation without going through the bus.
+  List<ChatMessage> get messages => List.unmodifiable(_messages);
+
+  /// Bot reply prefix. Subclasses override to differentiate concrete
+  /// services for hot-swap proofs without rewriting the subscription wiring.
+  String get replyPrefix => 'echo: ';
+
+  @override
+  void attach() {
+    on<SendMessageRequested>(_handleSend);
+  }
+
+  Future<void> _handleSend(EventEnvelope<SendMessageRequested> envelope) async {
+    _messages.add(ChatMessage(author: 'user', text: envelope.event.text));
+    _messages.add(
+      ChatMessage(author: 'bot', text: '$replyPrefix${envelope.event.text}'),
+    );
+    await emit(ChatMessagesChanged(List<ChatMessage>.of(_messages)));
+  }
+}
+```
+
 - [`lib/src/widgets/`](lib/src/widgets/) holds the shared UI: a
   `MessageList`, a `MessageInput`, and a `ChatView` that composes them.
   No widget-returning helper methods anywhere.

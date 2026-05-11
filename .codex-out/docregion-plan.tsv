@@ -1,0 +1,127 @@
+doc_file	start_line	end_line	candidate_source	region_name	source_first_line	source_last_line	notes
+README.md	40	94	example/villain_lair/bin/12_dependencies.dart	(orphan)			(orphan)
+example/state_garden/README.md	74	101	example/state_garden/lib/src/chat/chat_service.dart	chat-service	13	40	(already-marked)
+packages/flutter_plugin_kit/README.md	28	68	packages/flutter_plugin_kit/example/lib/main.dart	(orphan)			(orphan)
+packages/flutter_plugin_kit/README.md	107	122	example/state_garden/lib/src/integrations/bloc_chat.dart	(orphan)			(orphan)
+packages/plugin_kit/README.md	28	82	example/villain_lair/bin/04_service_registry.dart	(orphan)			(orphan)
+packages/plugin_kit/README.md	90	108	packages/plugin_kit/lib/src/plugin/core.dart	core-plugin	105	392	ok
+packages/plugin_kit/README.md	127	145	example/code_editor/lib/app/plugins/ai_assist_plugin.dart	(orphan)			(orphan)
+packages/plugin_kit_dialog/README.md	55	79	example/plugin_kit_dialog_demo/lib/plugins/chat_plugin.dart	(orphan)			(orphan)
+packages/plugin_kit_dialog/README.md	104	131	example/plugin_kit_dialog_demo/lib/plugin_visuals.dart	(orphan)			(orphan)
+packages/plugin_kit_dialog/README.md	151	179	packages/plugin_kit_dialog/test/runtime/config_field_dispatch_test.dart	(orphan)			(orphan)
+skills/plugin-kit/anti-patterns.md	25	34	packages/plugin_kit/test/multi_session_isolation_test.dart	(orphan)			(orphan)
+skills/plugin-kit/anti-patterns.md	151	163	example/state_garden/lib/src/chat/chat_plugin.dart	chat-plugin-chat-plugin	10	23	ok
+skills/plugin-kit/api-cheatsheet.md	300	320	example/villain_lair/bin/08_config_and_settings.dart	(orphan)			(orphan)
+skills/plugin-kit/patterns.md	27	60	example/state_garden/lib/src/chat/chat_plugin.dart	(orphan)			(orphan)
+skills/plugin-kit/patterns.md	74	107	example/plugin_kit_dialog_demo/lib/plugins/web_search_explorer_plugin.dart	(orphan)			(orphan)
+skills/plugin-kit/patterns.md	120	145	packages/plugin_kit_dialog/test/runtime/visuals_dispatch_test.dart	(orphan)			(orphan)
+skills/plugin-kit/patterns.md	153	177	packages/plugin_kit/test/runtime_test.dart	(orphan)			(orphan)
+skills/plugin-kit/patterns.md	259	270	packages/plugin_kit/lib/src/event_bus.dart	(orphan)			(orphan)
+website/src/content/docs/concepts/capabilities.mdx	64	78	example/code_editor/bin/09_extension_manifest.dart	09-extension-manifest-formatter-capability	21	26	ok
+website/src/content/docs/concepts/configuration.mdx	89	103	example/villain_lair/bin/08_config_and_settings.dart	(orphan)			(orphan)
+website/src/content/docs/concepts/custom-context.mdx	26	39	packages/plugin_kit/test/runtime_routing_test.dart	(orphan)			(orphan)
+website/src/content/docs/concepts/custom-context.mdx	43	55	example/code_editor/lib/app/plugins/minimap_plugin.dart	(orphan)			(orphan)
+website/src/content/docs/concepts/custom-context.mdx	68	87	packages/plugin_kit/test/runtime_test.dart	runtime-test-session	205	216	ok
+website/src/content/docs/concepts/custom-context.mdx	97	110	packages/plugin_kit/test/runtime_test.dart	(orphan)			(orphan)
+website/src/content/docs/concepts/custom-context.mdx	114	126	packages/plugin_kit/lib/src/event_bus.dart	(orphan)			(orphan)
+website/src/content/docs/concepts/custom-context.mdx	136	158	packages/plugin_kit/test/runtime_test.dart	runtime-test-runtime	66	68	ok
+website/src/content/docs/concepts/events.mdx	62	77	example/code_editor/lib/app/plugins/terminal_plugin.dart	(orphan)			(orphan)
+website/src/content/docs/concepts/events.mdx	156	194	example/code_editor/lib/app/plugins/ai_assist_plugin.dart	(orphan)			(orphan)
+website/src/content/docs/concepts/events.mdx	216	234	packages/plugin_kit/test/multi_session_isolation_test.dart	(orphan)			(orphan)
+website/src/content/docs/concepts/plugin-services.mdx	50	64	example/code_editor/lib/plugins/debugger.dart	(orphan)			(orphan)
+website/src/content/docs/concepts/plugin-services.mdx	78	88	packages/plugin_kit/test/wildcard_pipeline_test.dart	(orphan)			(orphan)
+website/src/content/docs/concepts/plugin-services.mdx	120	131	example/villain_lair/bin/15_the_grand_heist.dart	(orphan)			(orphan)
+website/src/content/docs/concepts/plugin-services.mdx	156	165	example/villain_lair/bin/08_config_and_settings.dart	(orphan)			(orphan)
+website/src/content/docs/concepts/plugins.mdx	49	70	example/villain_lair/bin/07_sessions.dart	(orphan)			(orphan)
+website/src/content/docs/concepts/sessions.mdx	17	31	packages/plugin_kit/test/runtime_test.dart	runtime-test-session	205	216	(reused)
+website/src/content/docs/concepts/sessions.mdx	92	129	example/villain_lair/bin/09_global_vs_session.dart	(orphan)			(orphan)
+website/src/content/docs/getting-started.mdx	64	118	example/villain_lair/bin/12_dependencies.dart	(orphan)			(orphan)
+website/src/content/docs/guides/adding-a-plugin.mdx	15	48	example/code_editor/bin/10_full_editor_cli.dart	(orphan)			(orphan)
+website/src/content/docs/guides/adding-a-plugin.mdx	83	98	packages/flutter_plugin_kit/example/lib/plugins.dart	(orphan)			(orphan)
+website/src/content/docs/guides/adding-a-plugin.mdx	177	213	example/villain_lair/bin/05_stateful_services.dart	(orphan)			(orphan)
+website/src/content/docs/guides/adding-a-plugin.mdx	275	285	example/villain_lair/bin/08_config_and_settings.dart	(orphan)			(orphan)
+website/src/content/docs/guides/adding-a-plugin.mdx	339	358	example/villain_lair/bin/13_settings_reconciliation.dart	(orphan)			(orphan)
+website/src/content/docs/guides/flutter-integration.mdx	68	132	example/code_editor/lib/app/editor_app.dart	editor-app-editor-screen-state	104	613	ok
+website/src/content/docs/guides/flutter-integration.mdx	142	146	example/code_editor/lib/app/factories.dart	factories-panel-widget-factory	15	19	(already-marked)
+website/src/content/docs/guides/flutter-integration.mdx	150	179	example/code_editor/lib/app/plugins/terminal_plugin.dart	(orphan)			(orphan)
+website/src/content/docs/guides/flutter-integration.mdx	189	209	example/code_editor/lib/app/contributions.dart	contributions-collect-panels	82	86	ok
+website/src/content/docs/guides/flutter-integration.mdx	239	249	example/code_editor/lib/app/editor_app.dart	(orphan)			(orphan)
+website/src/content/docs/guides/flutter-integration.mdx	296	310	packages/plugin_kit_dialog/lib/src/runtime/plugins/plugin_kit_visuals_plugin.dart	(orphan)			(orphan)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	38	78	packages/flutter_plugin_kit/example/lib/main.dart	(orphan)			(orphan)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	284	299	example/state_garden/lib/src/integrations/bloc_chat.dart	(orphan)			(orphan)
+website/src/content/docs/guides/migrating-flutter-app.mdx	40	56	example/code_editor/lib/plugins/linter_suite.dart	(orphan)			(orphan)
+website/src/content/docs/guides/migrating-flutter-app.mdx	66	93	packages/plugin_kit/test/multi_session_isolation_test.dart	(orphan)			(orphan)
+website/src/content/docs/guides/migrating-flutter-app.mdx	133	186	packages/flutter_plugin_kit/lib/src/session_scope.dart	(orphan)			(orphan)
+website/src/content/docs/guides/migrating-flutter-app.mdx	286	324	example/state_garden/lib/src/integrations/change_notifier_chat.dart	(orphan)			(orphan)
+website/src/content/docs/guides/migrating-flutter-app.mdx	330	337	example/state_garden/lib/src/integrations/plugin_kit_session_listener_chat.dart	(orphan)			(orphan)
+website/src/content/docs/guides/migrating-flutter-app.mdx	409	437	example/state_garden/lib/src/integrations/bloc_chat.dart	bloc-chat-chat-cubit	53	81	ok
+website/src/content/docs/guides/migrating-flutter-app.mdx	457	477	example/code_editor/lib/app/plugins/ai_assist_plugin.dart	(orphan)			(orphan)
+website/src/content/docs/guides/migrating-flutter-app.mdx	489	513	example/code_editor/lib/app/plugins/ai_assist_plugin.dart	(orphan)			(orphan)
+website/src/content/docs/guides/migrating-flutter-app.mdx	556	598	example/code_editor/lib/app/plugins/ai_assist_plugin.dart	(orphan)			(orphan)
+website/src/content/docs/guides/migrating-flutter-app.mdx	626	640	packages/plugin_kit/test/multi_session_isolation_test.dart	(orphan)			(orphan)
+website/src/content/docs/guides/plugin-kit-dialog.mdx	76	100	example/plugin_kit_dialog_demo/lib/plugins/chat_plugin.dart	(orphan)			(orphan)
+website/src/content/docs/guides/plugin-kit-dialog.mdx	125	153	example/plugin_kit_dialog_demo/lib/plugin_visuals.dart	(orphan)			(orphan)
+website/src/content/docs/guides/plugin-kit-dialog.mdx	175	203	packages/plugin_kit_dialog/test/runtime/config_field_dispatch_test.dart	(orphan)			(orphan)
+website/src/content/docs/guides/settings.mdx	30	47	example/villain_lair/bin/08_config_and_settings.dart	(orphan)			(orphan)
+website/src/content/docs/guides/settings.mdx	123	132	example/code_editor/bin/08_editor_settings.dart	08-editor-settings-settings	6	18	ok
+website/src/content/docs/guides/settings.mdx	205	208	example/villain_lair/bin/08_config_and_settings.dart	(orphan)			(orphan)
+website/src/content/docs/guides/testing.mdx	39	54	packages/plugin_kit/test/service_registry_test.dart	service-registry-test-registry	105	107	ok
+website/src/content/docs/guides/testing.mdx	86	108	packages/plugin_kit/test/runtime_test.dart	runtime-test-runtime	66	68	(reused)
+website/src/content/docs/guides/testing.mdx	114	148	packages/plugin_kit/test/runtime_test.dart	(orphan)			(orphan)
+website/src/content/docs/introduction.mdx	45	72	example/villain_lair/bin/04_service_registry.dart	(orphan)			(orphan)
+website/src/content/docs/reference/dialog-api.mdx	30	42	packages/plugin_kit/lib/src/dialog/ui_configurable_capability.dart	ui-configurable-capability-ui-configurable-capability	20	38	ok
+website/src/content/docs/reference/dialog-api.mdx	48	71	example/plugin_kit_dialog_demo/lib/plugins/chat_plugin.dart	(orphan)			(orphan)
+website/src/content/docs/reference/dialog-api.mdx	75	89	packages/plugin_kit/lib/src/dialog/config_field.dart	config-field-config-field	9	32	ok
+website/src/content/docs/reference/dialog-api.mdx	97	109	packages/plugin_kit/lib/src/dialog/config_field.dart	config-field-text-config-field	35	49	ok
+website/src/content/docs/reference/dialog-api.mdx	115	131	packages/plugin_kit/lib/src/dialog/config_field.dart	config-field-multiline-config-field	52	74	ok
+website/src/content/docs/reference/dialog-api.mdx	137	149	packages/plugin_kit/lib/src/dialog/config_field.dart	config-field-password-config-field	77	91	ok
+website/src/content/docs/reference/dialog-api.mdx	155	175	packages/plugin_kit/lib/src/dialog/config_field.dart	config-field-number-config-field	113	144	ok
+website/src/content/docs/reference/dialog-api.mdx	183	188	packages/plugin_kit/lib/src/dialog/config_field.dart	config-field-number-field-style	94	103	ok
+website/src/content/docs/reference/dialog-api.mdx	194	206	packages/plugin_kit/lib/src/dialog/config_field.dart	config-field-dropdown-config-field	147	161	ok
+website/src/content/docs/reference/dialog-api.mdx	212	219	packages/plugin_kit/lib/src/dialog/config_field.dart	config-field-dropdown-option	164	175	ok
+website/src/content/docs/reference/dialog-api.mdx	225	234	packages/plugin_kit/lib/src/dialog/config_field.dart	config-field-bool-config-field	178	188	ok
+website/src/content/docs/reference/dialog-api.mdx	240	251	packages/plugin_kit/lib/src/dialog/config_field.dart	config-field-group-config-field	191	204	ok
+website/src/content/docs/reference/dialog-api.mdx	259	273	packages/plugin_kit/lib/src/dialog/config_field.dart	config-field-extension-config-field	212	230	ok
+website/src/content/docs/reference/dialog-api.mdx	279	286	packages/plugin_kit/lib/src/dialog/config_field.dart	config-field-config-field-handle	234	248	ok
+website/src/content/docs/reference/dialog-api.mdx	298	308	packages/plugin_kit_dialog/lib/src/widgets/plugin_kit_dialog.dart	plugin-kit-dialog-show-plugin-kit-dialog	65	75	ok
+website/src/content/docs/reference/dialog-api.mdx	314	316	packages/plugin_kit_dialog/lib/src/utils.dart	utils-save-callback	9	11	(already-marked)
+website/src/content/docs/reference/dialog-api.mdx	326	339	packages/plugin_kit_dialog/lib/src/widgets/plugin_kit_dialog.dart	plugin-kit-dialog-plugin-kit-dialog	12	62	ok
+website/src/content/docs/reference/dialog-api.mdx	345	360	packages/plugin_kit_dialog/lib/src/widgets/plugin_kit_dialog_body.dart	plugin-kit-dialog-body-plugin-kit-dialog-body	15	41	ok
+website/src/content/docs/reference/dialog-api.mdx	366	396	packages/plugin_kit_dialog/lib/src/controller/plugin_kit_dialog_controller.dart	plugin-kit-dialog-controller-plugin-kit-dialog-controller	7	217	ok
+website/src/content/docs/reference/dialog-api.mdx	418	436	packages/plugin_kit_dialog/lib/src/runtime/plugins/plugin_kit_visuals_plugin.dart	plugin-kit-visuals-plugin-plugin-kit-visuals-plugin	38	127	ok
+website/src/content/docs/reference/dialog-api.mdx	466	484	packages/plugin_kit_dialog/test/runtime/visuals_dispatch_test.dart	(orphan)			(orphan)
+website/src/content/docs/reference/dialog-api.mdx	492	520	packages/plugin_kit_dialog/lib/src/theme/plugin_kit_dialog_theme.dart	plugin-kit-dialog-theme-plugin-kit-dialog-theme	35	150	ok
+website/src/content/docs/reference/dialog-api.mdx	552	563	packages/plugin_kit_dialog/lib/src/runtime/plugins/default_field_renderers_plugin.dart	default-field-renderers-plugin-config-field-renderer	22	35	ok
+website/src/content/docs/reference/dialog-api.mdx	569	597	packages/plugin_kit_dialog/test/runtime/config_field_dispatch_test.dart	(orphan)			(orphan)
+website/src/content/docs/reference/event-bus-and-events.mdx	53	65	packages/plugin_kit/lib/src/event_bus.dart	event-bus-on-sync	245	540	ok
+website/src/content/docs/reference/event-bus-and-events.mdx	103	120	packages/plugin_kit/lib/src/event_bus.dart	event-bus-emit	548	554	ok
+website/src/content/docs/reference/event-bus-and-events.mdx	138	154	packages/plugin_kit/lib/src/event_bus.dart	event-bus-on-sync	245	540	(reused)
+website/src/content/docs/reference/event-bus-and-events.mdx	162	178	packages/plugin_kit/lib/src/event_bus.dart	event-bus-on-sync	245	540	(reused)
+website/src/content/docs/reference/event-bus-and-events.mdx	208	235	packages/plugin_kit/lib/src/plugin/extensions.dart	extensions-plugin-helper	15	101	ok
+website/src/content/docs/reference/event-bus-and-events.mdx	245	259	packages/plugin_kit/lib/src/event_bus.dart	event-bus-on-sync	245	540	(reused)
+website/src/content/docs/reference/event-bus-and-events.mdx	267	293	packages/plugin_kit/lib/src/plugin/extensions.dart	extensions-session-helper	239	340	ok
+website/src/content/docs/reference/naming-conventions.mdx	18	25	example/plugin_kit_dialog_demo/lib/plugins/core_plugin.dart	core-plugin-core-plugin	9	79	ok
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	27	44	packages/plugin_kit/lib/src/plugin/core.dart	core-plugin	105	392	(reused)
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	99	104	packages/plugin_kit/lib/src/plugin/core.dart	core-feature-flag	47	63	ok
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	222	276	packages/plugin_kit/lib/src/plugin/runtime.dart	runtime-plugin-runtime	59	1148	ok
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	335	340	packages/plugin_kit/lib/src/plugin/exceptions.dart	exceptions-plugin-lifecycle-exception	67	92	ok
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	106	130	packages/plugin_kit/lib/src/service_registry.dart	service-registry-register-singleton	702	710	ok
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	156	161	packages/plugin_kit/lib/src/service_registry.dart	service-registry-resolve-after	509	514	ok
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	186	195	packages/plugin_kit/lib/src/service_registry.dart	service-registry-unregister	789	794	ok
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	237	258	packages/plugin_kit/lib/src/service_registry.dart	service-registry-register-singleton-2	1038	1051	ok
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	316	318	packages/plugin_kit/lib/src/service_registry.dart	service-registry-final	995	997	(already-marked)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	326	335	packages/plugin_kit/lib/src/service_registry.dart	service-registry-registration-wrapper	32	95	ok
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	430	448	packages/plugin_kit/lib/src/event_bus.dart	event-bus-on-sync	245	540	(reused)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	492	494	packages/plugin_kit/lib/src/service_registry.dart	service-registry-capability-set	17	19	(already-marked)
+website/src/content/docs/reference/settings-and-configuration.mdx	98	103	packages/plugin_kit/lib/src/settings.dart	settings-copy-with-2	283	288	ok
+website/src/content/docs/reference/settings-and-configuration.mdx	209	221	packages/plugin_kit/lib/src/settings.dart	settings-service-settings	24	98	ok
+website/src/content/docs/reference/state-management-bridges.mdx	73	109	example/state_garden/lib/src/integrations/set_state_chat_screen.dart	set-state-chat-screen-set-state-chat-screen	15	24	ok
+website/src/content/docs/reference/state-management-bridges.mdx	117	141	example/state_garden/lib/src/integrations/flutter_plugin_kit_chat_screen.dart	(orphan)			(orphan)
+website/src/content/docs/reference/state-management-bridges.mdx	149	178	example/state_garden/lib/src/integrations/change_notifier_chat.dart	change-notifier-chat-chat-change-notifier	20	49	ok
+website/src/content/docs/reference/state-management-bridges.mdx	214	256	example/state_garden/lib/src/integrations/bloc_chat.dart	bloc-chat-chat-bloc-state	18	46	ok
+website/src/content/docs/reference/state-management-bridges.mdx	268	303	example/state_garden/lib/src/integrations/riverpod_chat.dart	riverpod-chat-chat-notifier	43	71	ok
+website/src/content/docs/reference/state-management-bridges.mdx	324	349	example/state_garden/lib/src/integrations/signals_chat.dart	signals-chat-signals-chat-bridge	17	42	ok
+website/src/content/docs/reference/state-management-bridges.mdx	357	383	example/state_garden/lib/src/integrations/mobx_chat.dart	mobx-chat-mobx-chat-bridge	19	46	ok
+website/src/content/docs/troubleshooting.mdx	62	72	example/code_editor/lib/app/editor_app.dart	(orphan)			(orphan)
+website/src/content/docs/troubleshooting.mdx	190	202	packages/plugin_kit/lib/src/settings.dart	settings-copy-with	63	75	(already-marked)
+website/src/content/docs/troubleshooting.mdx	226	236	example/code_editor/test/golden_test.dart	golden-test-main	53	209	ok

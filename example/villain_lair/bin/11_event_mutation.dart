@@ -34,6 +34,7 @@ class EvilPlan {
 /// brand-protected terms.
 class PressRelease {
   final String headline;
+
   const PressRelease(this.headline);
 
   @override
@@ -48,6 +49,7 @@ class PressRelease {
 class CoffeeOrder {
   final String who;
   final String drink;
+
   const CoffeeOrder({required this.who, required this.drink});
 
   @override
@@ -58,6 +60,7 @@ class CoffeeOrder {
 class OrderRejected {
   final String who;
   final String reason;
+
   const OrderRejected({required this.who, required this.reason});
 }
 

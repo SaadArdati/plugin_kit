@@ -4,6 +4,15 @@ description: API reference for Plugin Kit Dialog. Covers the dart-only declarati
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import uiConfigurableCapabilitySource from '../../../../../packages/plugin_kit/lib/src/dialog/ui_configurable_capability.dart?raw';
+import configFieldSource from '../../../../../packages/plugin_kit/lib/src/dialog/config_field.dart?raw';
+import pluginKitDialogSource from '../../../../../packages/plugin_kit_dialog/lib/src/widgets/plugin_kit_dialog.dart?raw';
+import pluginKitDialogUtilsSource from '../../../../../packages/plugin_kit_dialog/lib/src/utils.dart?raw';
+import pluginKitDialogBodySource from '../../../../../packages/plugin_kit_dialog/lib/src/widgets/plugin_kit_dialog_body.dart?raw';
+import defaultFieldRenderersPluginSource from '../../../../../packages/plugin_kit_dialog/lib/src/runtime/plugins/default_field_renderers_plugin.dart?raw';
+import dialogSnippets from '../../../../snippets/lib/dialog.dart?raw';
 
 This page is the curated reference for Plugin Kit Dialog. It covers two packages and the line between them is the architectural point of the dialog: declaration types live in `plugin_kit` (Dart-only) so non-Flutter packages can declare configurable services without taking a Flutter dependency, while the actual UI, controller, theme, and visuals live in `plugin_kit_dialog` (Flutter).
 
@@ -27,66 +36,17 @@ These four exports are everything you need to declare a configurable service. No
 
 ### `UiConfigurableCapability`
 
-```dart
-class UiConfigurableCapability extends Capability {
-  final String label;
-  final String? description;
-  final List<ConfigField> fields;
-
-  const UiConfigurableCapability({
-    required this.label,
-    required this.fields,
-    this.description,
-  });
-}
-```
+<Code code={extractRegion(uiConfigurableCapabilitySource, 'ui-configurable-capability-ui-configurable-capability')} lang="dart" />
 
 Attach this capability to a service registration to make it editable in the Services tab. `label` is the section title rendered above the fields; `description` is an optional one-line subtitle; `fields` is rendered top-to-bottom in the card.
 
 A service may attach multiple `UiConfigurableCapability` instances; each becomes its own sub-section under the same service card. Capability resolution otherwise follows the rules described on the [Capability](/reference/service-registry-and-capabilities/) reference page.
 
-```dart
-const agent = Namespace('agent');
-
-registry.registerSingleton<TemperatureService>(
-  agent('temperature'),                  // ServiceId('agent.temperature')
-  TemperatureService(),
-  capabilities: const {
-    UiConfigurableCapability(
-      label: 'Temperature',
-      description: 'Controls randomness in responses.',
-      fields: [
-        NumberConfigField(
-          key: 'temperature',
-          label: 'Temperature',
-          min: 0,
-          max: 2,
-          step: 0.1,
-          defaultValue: 1.0,
-        ),
-      ],
-    ),
-  },
-);
-```
+<Code code={extractRegion(dialogSnippets, 'dialog-reference-service-namespace')} lang="dart" />
 
 ### `ConfigField` (sealed base)
 
-```dart
-sealed class ConfigField {
-  final String key;
-  final String label;
-  final String? helperText;
-  final Object? defaultValue;
-
-  const ConfigField({
-    required this.key,
-    required this.label,
-    this.helperText,
-    this.defaultValue,
-  });
-}
-```
+<Code code={extractRegion(configFieldSource, 'config-field-config-field')} lang="dart" />
 
 Every field carries the same four slots. `key` is a dotted path under `ServiceSettings.config` (`'model'`, `'provider.name'`, `'limits.max_tokens'`); the dotted form writes to nested maps when the dialog saves. `defaultValue` is what the per-field reset button restores to and what `ConfigNode` returns when the value is absent. See [`ConfigNode`](/concepts/configuration/) for the read-side contract.
 
@@ -94,85 +54,25 @@ The `sealed` modifier means the dialog's renderer dispatch is exhaustive; you ca
 
 ### `TextConfigField`
 
-```dart
-final class TextConfigField extends ConfigField {
-  final String? placeholder;
-
-  const TextConfigField({
-    required super.key,
-    required super.label,
-    super.helperText,
-    super.defaultValue,
-    this.placeholder,
-  });
-}
-```
+<Code code={extractRegion(configFieldSource, 'config-field-text-config-field')} lang="dart" />
 
 Single-line text input. `placeholder` shows when no value is set.
 
 ### `MultilineConfigField`
 
-```dart
-final class MultilineConfigField extends ConfigField {
-  final List<String> moustacheTags;
-  final int? minLines;
-  final int? maxLines;
-
-  const MultilineConfigField({
-    required super.key,
-    required super.label,
-    super.helperText,
-    super.defaultValue,
-    this.moustacheTags = const [],
-    this.minLines = 6,
-    this.maxLines = 14,
-  });
-}
-```
+<Code code={extractRegion(configFieldSource, 'config-field-multiline-config-field')} lang="dart" />
 
 Multi-line editor sized between `minLines` and `maxLines`. `moustacheTags` declares insertable tag chips shown under the editor; tapping a chip inserts the tag at the caret. Useful for system-prompt fields that accept template variables like `{{user_name}}` or `{{tool_list}}`.
 
 ### `PasswordConfigField`
 
-```dart
-final class PasswordConfigField extends ConfigField {
-  final String? placeholder;
-
-  const PasswordConfigField({
-    required super.key,
-    required super.label,
-    super.helperText,
-    super.defaultValue,
-    this.placeholder,
-  });
-}
-```
+<Code code={extractRegion(configFieldSource, 'config-field-password-config-field')} lang="dart" />
 
 Obscured input with a show/hide toggle. Same shape as `TextConfigField`; rendered with the entry hidden by default.
 
 ### `NumberConfigField`
 
-```dart
-final class NumberConfigField extends ConfigField {
-  final double? min;
-  final double? max;
-  final double? step;
-  final NumberFieldStyle? style;
-  final bool isInteger;
-
-  const NumberConfigField({
-    required super.key,
-    required super.label,
-    super.helperText,
-    super.defaultValue,
-    this.min,
-    this.max,
-    this.step,
-    this.style,
-    this.isInteger = false,
-  });
-}
-```
+<Code code={extractRegion(configFieldSource, 'config-field-number-config-field')} lang="dart" />
 
 Numeric input with two render modes. When `style` is null (the default), the dialog auto-picks: slider when both `min` and `max` are non-null, otherwise text input. Set `style` explicitly to force a mode.
 
@@ -180,75 +80,31 @@ When `isInteger` is true, values are stored as `int`, parsing strips decimals, a
 
 ### `NumberFieldStyle`
 
-```dart
-enum NumberFieldStyle {
-  slider,
-  textInput,
-}
-```
+<Code code={extractRegion(configFieldSource, 'config-field-number-field-style')} lang="dart" />
 
 Forces one render mode for `NumberConfigField`. With `textInput`, any `min`/`max` clamp the parsed value rather than constraining a slider track.
 
 ### `DropdownConfigField<T>`
 
-```dart
-final class DropdownConfigField<T> extends ConfigField {
-  final List<DropdownOption<T>> options;
-
-  const DropdownConfigField({
-    required super.key,
-    required super.label,
-    required this.options,
-    super.helperText,
-    super.defaultValue,
-  });
-}
-```
+<Code code={extractRegion(configFieldSource, 'config-field-dropdown-config-field')} lang="dart" />
 
 Typed dropdown over `List<DropdownOption<T>>`. The generic flows through to the saved value: a `DropdownConfigField<String>` stores `String` in the config map.
 
 ### `DropdownOption<T>`
 
-```dart
-class DropdownOption<T> {
-  final T value;
-  final String label;
-
-  const DropdownOption(this.value, this.label);
-}
-```
+<Code code={extractRegion(configFieldSource, 'config-field-dropdown-option')} lang="dart" />
 
 A single selectable option. Positional constructor, value first, label second.
 
 ### `BoolConfigField`
 
-```dart
-final class BoolConfigField extends ConfigField {
-  const BoolConfigField({
-    required super.key,
-    required super.label,
-    super.helperText,
-    super.defaultValue,
-  });
-}
-```
+<Code code={extractRegion(configFieldSource, 'config-field-bool-config-field')} lang="dart" />
 
 Switch input. Carries no extra state beyond the four base slots.
 
 ### `GroupConfigField`
 
-```dart
-final class GroupConfigField extends ConfigField {
-  final List<ConfigField> children;
-
-  const GroupConfigField({
-    required super.key,
-    required super.label,
-    required this.children,
-    super.helperText,
-  });
-}
-```
+<Code code={extractRegion(configFieldSource, 'config-field-group-config-field')} lang="dart" />
 
 Visual sub-section. Renders `label` as a sub-heading and indents `children` beneath it. `key` is a sub-section identifier, not a write target; nested fields keep their own dotted keys.
 
@@ -256,34 +112,13 @@ Visual sub-section. Renders `label` as a sub-heading and indents `children` bene
 
 ### `ExtensionConfigField`
 
-```dart
-final class ExtensionConfigField extends ConfigField {
-  final String rendererKey;
-  final Map<String, Object?> args;
-
-  const ExtensionConfigField({
-    required super.key,
-    required super.label,
-    required this.rendererKey,
-    this.args = const {},
-    super.helperText,
-    super.defaultValue,
-  });
-}
-```
+<Code code={extractRegion(configFieldSource, 'config-field-extension-config-field')} lang="dart" />
 
 Escape hatch for custom renderers without taking a Flutter dependency at the declaration site. The dialog looks up a Flutter-side renderer registered under `rendererKey` and forwards `args` to it. See [Custom renderers](#custom-renderers) below.
 
 ### `ConfigFieldHandle`
 
-```dart
-abstract class ConfigFieldHandle {
-  Object? get value;
-  set value(Object? next);
-  bool get isOverridden;
-  void reset();
-}
-```
+<Code code={extractRegion(configFieldSource, 'config-field-config-field-handle')} lang="dart" />
 
 The opaque value handle a renderer receives. `value` reads and writes the current working value; setting it dirties the draft. `isOverridden` is true when the working value differs from the field's declared default. `reset()` restores the value to `defaultValue`.
 
@@ -295,25 +130,13 @@ Three widgets and one controller. Pick the entry point that matches how much chr
 
 ### `showPluginKitDialog`
 
-```dart
-Future<RuntimeSettings?> showPluginKitDialog({
-  required BuildContext context,
-  required PluginRuntime runtime,
-  required RuntimeSettings initialSettings,
-  required SaveCallback onSave,
-  String title = 'Plugin Kit',
-  PluginKitDialogTheme? theme,
-  bool barrierDismissible = true,
-});
-```
+<Code code={extractRegion(pluginKitDialogSource, 'plugin-kit-dialog-show-plugin-kit-dialog')} lang="dart" />
 
 The default entry point: opens a Material `Dialog` containing a `PluginKitDialog`, awaits user interaction, and resolves with the saved `RuntimeSettings` or `null` on cancel. The function builds its own `PluginKitDialogController` internally; you do not need to manage one.
 
 `onSave` is the host-side persistence callback. It runs *before* the dialog closes, so the dialog can reflect any error you choose to surface and so you can write to disk or push to `runtime.updateSettings(...)` while the user is still looking at the spinner.
 
-```dart
-typedef SaveCallback = FutureOr<void> Function(RuntimeSettings);
-```
+<Code code={extractRegion(pluginKitDialogUtilsSource, 'utils-save-callback')} lang="dart" />
 
 The `Future` return is awaited end-to-end; throwing from `onSave` surfaces a SnackBar inside the dialog and leaves the dialog open with the draft intact.
 
@@ -323,41 +146,13 @@ The `Future` return is awaited end-to-end; throwing from `onSave` surfaces a Sna
 
 ### `PluginKitDialog`
 
-```dart
-class PluginKitDialog extends StatelessWidget {
-  final PluginKitDialogController controller;
-  final SaveCallback onSave;
-  final VoidCallback onCancel;
-
-  const PluginKitDialog({
-    required this.controller,
-    required this.onSave,
-    required this.onCancel,
-    super.key,
-  });
-}
-```
+<Code code={extractRegion(pluginKitDialogSource, 'plugin-kit-dialog-plugin-kit-dialog')} lang="dart" />
 
 The Material dialog shell with rounded corners, a `maxWidth` of 920, and a `maxHeight` of 90% of the screen. Use this when you want to drive the dialog yourself: own the controller, decide when to push and pop, intercept cancel for your own confirm flow. The runtime is read off `controller.runtime`.
 
 ### `PluginKitDialogBody`
 
-```dart
-class PluginKitDialogBody extends StatefulWidget {
-  final PluginKitDialogController controller;
-  final PluginRuntime runtime;
-  final SaveCallback onSave;
-  final VoidCallback onCancel;
-
-  const PluginKitDialogBody({
-    required this.controller,
-    required this.runtime,
-    required this.onSave,
-    required this.onCancel,
-    super.key,
-  });
-}
-```
+<Code code={extractRegion(pluginKitDialogBodySource, 'plugin-kit-dialog-body-plugin-kit-dialog-body')} lang="dart" />
 
 The header-plus-tab-content body without the surrounding `Dialog` chrome. Use this when you want a custom container: a side panel, a route, a dedicated page in a desktop layout. Pass the runtime explicitly here; this widget does not assume the controller's runtime is the one you want rendered.
 
@@ -463,25 +258,7 @@ Same value object across all three axes. Every field is optional; the dialog fal
 
 `icon` is a full `Widget`, wrapped by the dialog in an `IconTheme` keyed to the resolved accent so a plain `Icon(Icons.psychology)` inherits color and size automatically. The accent color follows a service-to-namespace-to-owning-plugin-to-theme cascade resolved per render.
 
-```dart
-runtime
-  ..addPlugins([...myDartOnlyPlugins])
-  ..addPlugin(PluginKitVisualsPlugin(
-    pluginVisuals: const {
-      PluginId('main_agent'): PluginKitVisual(
-        label: 'Main Agent',
-        icon: Icon(Icons.psychology),
-        color: Color(0xFF7C5CFF),
-      ),
-    },
-    serviceVisuals: const {
-      Namespace('agent')('temperature'): PluginKitVisual(
-        icon: Icon(Icons.thermostat),
-        color: Color(0xFFFF9500),
-      ),
-    },
-  ));
-```
+<Code code={extractRegion(dialogSnippets, 'dialog-visuals-plugin')} lang="dart" />
 
 ## Theming (`PluginKitDialogTheme`)
 
@@ -523,18 +300,7 @@ A `ThemeExtension` with six accent slots that Material's `ColorScheme` cannot su
 
 `PluginKitDialogTheme.dark()` and `.light()` are the canonical defaults. `PluginKitDialogTheme.of(context)` returns the registered extension if one exists, otherwise picks dark or light from `Theme.of(context).brightness`. `copyWith` and `lerp` are the standard `ThemeExtension` overrides.
 
-```dart
-showPluginKitDialog(
-  context: context,
-  runtime: myRuntime,
-  initialSettings: settings,
-  onSave: persist,
-  theme: PluginKitDialogTheme.dark().copyWith(
-    stableAccent: Colors.greenAccent,
-    experimentalAccent: Colors.deepOrange,
-  ),
-);
-```
+<Code code={extractRegion(dialogSnippets, 'dialog-show-dialog-themed')} lang="dart" />
 
 ### `buildPluginKitDialogDarkTheme` and `buildPluginKitDialogLightTheme`
 
@@ -549,52 +315,13 @@ Full Material 3 `ThemeData` builders that match the screenshots in the guide. Us
 
 Custom field widgets register against the same registry that the dialog itself uses. The `ConfigFieldRenderer<F>` interface is the contract.
 
-```dart
-abstract interface class ConfigFieldRenderer<T extends ConfigField> {
-  Widget build(
-    BuildContext context,
-    T field,
-    ConfigFieldHandle handle,
-    FieldRenderResolver resolveRenderer,
-  );
-}
-
-typedef FieldRenderResolver = ConfigFieldRenderer Function(ConfigField field);
-```
+<Code code={extractRegion(defaultFieldRenderersPluginSource, 'default-field-renderers-plugin-config-field-renderer')} lang="dart" />
 
 A renderer takes a typed field, the field's current value handle, and a resolver for nested fields (used by group rendering). Build whatever widget you want; write through `handle.value = next` and the dialog tracks the edit on the working draft.
 
 Renderers register under the namespace `'config_field_renderer'` keyed by a string `serviceId` of your choosing. The `ExtensionConfigField.rendererKey` you declare on the field side is the `serviceId` the dialog looks up.
 
-```dart
-class ColorPickerRenderer
-    implements ConfigFieldRenderer<ExtensionConfigField> {
-  const ColorPickerRenderer();
-
-  @override
-  Widget build(context, field, handle, resolveRenderer) {
-    final allowAlpha = field.args['allow_alpha'] as bool? ?? false;
-    return ColorPicker(
-      value: handle.value as int? ?? 0xFF000000,
-      onChanged: (next) => handle.value = next,
-      allowAlpha: allowAlpha,
-    );
-  }
-}
-
-class ColorPickerRendererPlugin extends GlobalPlugin {
-  @override
-  PluginId get pluginId => const PluginId('color_picker_renderer');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerFactory<ConfigFieldRenderer>(
-      FieldRenderersPlugin.namespace('color_picker'),
-      ColorPickerRenderer.new,
-    );
-  }
-}
-```
+<Code code={extractRegion(dialogSnippets, 'dialog-color-picker-renderer')} lang="dart" />
 
 The renderer resolves at render time: registering your plugin after the dialog opens does not affect an in-flight session. If the dialog cannot resolve a `rendererKey`, it surfaces an inline placeholder card naming the missing key rather than throwing during paint.
 

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/logo-256.png" width="160" alt="Plugin Kit logo" />
+  <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/plugin_kit_dialog-256.png" width="160" alt="plugin_kit_dialog logo" />
 </p>
 
 <p align="center">
@@ -29,20 +29,24 @@ The dialog is built from `plugin_kit` plugins itself. Every tab, header action, 
 
 ## Quick start
 
+<!-- code-excerpt "website/snippets/lib/dialog.dart (dialog-show-dialog)" -->
 ```dart
-import 'package:plugin_kit/plugin_kit.dart';
-import 'package:plugin_kit_dialog/plugin_kit_dialog.dart';
-
-final next = await showPluginKitDialog(
-  context: context,
-  runtime: myRuntime, // your PluginRuntime
-  initialSettings: currentSettings,
-  onSave: (settings) async {
-    await persistSettings(settings); // write to disk, push to runtime, etc.
-  },
-);
-if (next != null) {
-  // User saved. `next` is the merged RuntimeSettings.
+Future<void> openConfigDialog(
+  BuildContext context,
+  PluginRuntime myRuntime,
+  RuntimeSettings currentSettings,
+) async {
+  final next = await showPluginKitDialog(
+    context: context,
+    runtime: myRuntime,
+    initialSettings: currentSettings,
+    onSave: (settings) async {
+      await persistSettings(settings); // write to disk, push to runtime, etc.
+    },
+  );
+  if (next != null) {
+    // User saved. `next` is the merged RuntimeSettings.
+  }
 }
 ```
 
@@ -52,30 +56,32 @@ That's it. If your plugins already attach `UiConfigurableCapability`, the Servic
 
 Configurability is opt-in per registration. Attach a `UiConfigurableCapability` next to any service:
 
+<!-- code-excerpt "website/snippets/lib/dialog.dart (dialog-ui-configurable-capability)" -->
 ```dart
-// In your plugin's register(). This code can live in a Dart-only package.
-const agent = Namespace('agent');
+void registerConfigurableService(ScopedServiceRegistry registry) {
+  const agent = Namespace('agent');
 
-registry.registerSingleton<MyService>(
-  agent('temperature'),
-  MyService(),
-  capabilities: const {
-    UiConfigurableCapability(
-      label: 'Temperature',
-      description: 'Controls randomness in responses.',
-      fields: [
-        NumberConfigField(
-          key: 'temperature',
-          label: 'Temperature',
-          min: 0,
-          max: 2,
-          step: 0.1,
-          defaultValue: 1.0,
-        ),
-      ],
-    ),
-  },
-);
+  registry.registerSingleton<MyService>(
+    agent('temperature'),
+    const MyService(),
+    capabilities: const {
+      UiConfigurableCapability(
+        label: 'Temperature',
+        description: 'Controls randomness in responses.',
+        fields: [
+          NumberConfigField(
+            key: 'temperature',
+            label: 'Temperature',
+            min: 0,
+            max: 2,
+            step: 0.1,
+            defaultValue: 1.0,
+          ),
+        ],
+      ),
+    },
+  );
+}
 ```
 
 Saved values flow through `RuntimeSettings.services[Pin('main_agent', ['agent', 'temperature'])].config` (or the typed chain `pluginId.namespace('agent').service('temperature')`).
@@ -101,33 +107,38 @@ Each field carries `key`, `label`, `helperText`, and `defaultValue`. Dotted keys
 
 Visuals are a Flutter-only concern, so the canonical attachment path is one locked `GlobalPlugin` (`PluginKitVisualsPlugin`) that the host app adds to the runtime alongside its other plugins. It carries three independent maps for the three things the dialog renders: plugin tiles, namespace section headers, and individual service cards.
 
+<!-- code-excerpt "website/snippets/lib/dialog.dart (dialog-visuals-plugin)" -->
 ```dart
-runtime
-  ..addPlugins([...myPlugins])
-  ..addPlugin(PluginKitVisualsPlugin(
-    pluginVisuals: {
-      const PluginId('main_agent'): const PluginKitVisual(
-        label: 'Main Agent',
-        description: 'The brain. Drives chat, tools, and routing.',
-        icon: Icon(Icons.psychology),
-        color: Color(0xFF7C5CFF),
+void addVisualsPlugin(PluginRuntime runtime, List<Plugin> myPlugins) {
+  runtime
+    ..addPlugins(myPlugins)
+    ..addPlugin(
+      PluginKitVisualsPlugin(
+        pluginVisuals: {
+          const PluginId('main_agent'): const PluginKitVisual(
+            label: 'Main Agent',
+            description: 'The brain. Drives chat, tools, and routing.',
+            icon: Icon(Icons.psychology),
+            color: Color(0xFF7C5CFF),
+          ),
+        },
+        namespaceVisuals: {
+          const Namespace('agent'): const PluginKitVisual(
+            label: 'Agent',
+            icon: Icon(Icons.smart_toy),
+            color: Color(0xFF7C5CFF),
+          ),
+        },
+        serviceVisuals: {
+          const Namespace('agent')('temperature'): const PluginKitVisual(
+            label: 'Temperature',
+            icon: Icon(Icons.thermostat),
+            color: Color(0xFFFF9500),
+          ),
+        },
       ),
-    },
-    namespaceVisuals: {
-      const Namespace('agent'): const PluginKitVisual(
-        label: 'Agent',
-        icon: Icon(Icons.smart_toy),
-        color: Color(0xFF7C5CFF),
-      ),
-    },
-    serviceVisuals: {
-      const Namespace('agent')('temperature'): const PluginKitVisual(
-        label: 'Temperature',
-        icon: Icon(Icons.thermostat),
-        color: Color(0xFFFF9500),
-      ),
-    },
-  ));
+    );
+}
 ```
 
 Because the visuals plugin lives in your host app (which has Flutter), Dart-only plugins still get rich visuals without importing Flutter. The decoration is keyed by `PluginId`, `Namespace`, or `ServiceId`, so the host owns the map and the plugin source code stays portable. Unknown keys (a plugin or service that doesn't currently exist) are accepted silently; this lets you keep visuals for plugins that may be enabled later. When no visual is found, cards fall back to a generic gear icon and the theme's primary color.
@@ -136,30 +147,39 @@ Because the visuals plugin lives in your host app (which has Flutter), Dart-only
 
 Need a color picker, file selector, or any other widget? Declare an `ExtensionConfigField` from anywhere (no Flutter needed at the field site):
 
+<!-- code-excerpt "website/snippets/lib/config_fields.dart (config-field-extension)" -->
 ```dart
-// In your dart-only plugin.
-const ExtensionConfigField(
+const extensionField = ExtensionConfigField(
   key: 'theme.accent',
   label: 'Accent color',
   rendererKey: 'color_picker',
   args: {'allow_alpha': false},
-)
+);
 ```
 
 Register a Flutter-side renderer for that key from your host app:
 
+<!-- code-excerpt "website/snippets/lib/dialog.dart (dialog-color-picker-renderer)" -->
 ```dart
-class ColorPickerRenderer
-    implements ConfigFieldRenderer<ExtensionConfigField> {
+/// A custom field renderer for color values (Flutter-side).
+class ColorPickerRenderer implements ConfigFieldRenderer<ExtensionConfigField> {
+  /// Creates a [ColorPickerRenderer].
   const ColorPickerRenderer();
 
   @override
-  Widget build(context, field, handle, resolveRenderer) {
+  Widget build(
+    BuildContext context,
+    ExtensionConfigField field,
+    ConfigFieldHandle handle,
+    FieldRenderResolver resolveRenderer,
+  ) {
     final allowAlpha = field.args['allow_alpha'] as bool? ?? false;
-    return ColorPicker(
-      value: handle.value as int? ?? 0xFF000000,
-      onChanged: (next) => handle.value = next,
-      allowAlpha: allowAlpha,
+    return Slider(
+      value: ((handle.value as int?) ?? 0xFF000000).toDouble(),
+      min: 0,
+      max: 0xFFFFFFFF.toDouble(),
+      onChanged: (next) => handle.value = next.toInt(),
+      label: allowAlpha ? 'ARGB' : 'RGB',
     );
   }
 }
@@ -184,17 +204,25 @@ If a renderer key is unknown when the dialog tries to resolve it, an inline plac
 
 Pass a `PluginKitDialogTheme` to override accents, surfaces, and badges:
 
+<!-- code-excerpt "website/snippets/lib/dialog.dart (dialog-show-dialog)" -->
 ```dart
-showPluginKitDialog(
-  context: context,
-  runtime: myRuntime,
-  initialSettings: settings,
-  onSave: persist,
-  theme: PluginKitDialogTheme.dark().copyWith(
-    stableAccent: Colors.greenAccent,
-    experimentalAccent: Colors.deepOrange,
-  ),
-);
+Future<void> openConfigDialog(
+  BuildContext context,
+  PluginRuntime myRuntime,
+  RuntimeSettings currentSettings,
+) async {
+  final next = await showPluginKitDialog(
+    context: context,
+    runtime: myRuntime,
+    initialSettings: currentSettings,
+    onSave: (settings) async {
+      await persistSettings(settings); // write to disk, push to runtime, etc.
+    },
+  );
+  if (next != null) {
+    // User saved. `next` is the merged RuntimeSettings.
+  }
+}
 ```
 
 Or wrap your app with `buildPluginKitDialogDarkTheme()` / `buildPluginKitDialogLightTheme()` to adopt the full Material 3 `ThemeData`.
@@ -257,6 +285,33 @@ BoolConfigField, GroupConfigField,
 ExtensionConfigField (rendererKey, args),
 ConfigField                          // sealed base
 ConfigFieldHandle                    // value/reset handle for renderers
+
+<!-- code-excerpt "website/snippets/lib/config_fields.dart (ui-configurable-capability-number)" -->
+```dart
+void registerWithNumberField(ScopedServiceRegistry registry) {
+  const agent = Namespace('agent');
+
+  registry.registerSingleton<TemperatureService>(
+    agent('temperature'), // ServiceId('agent.temperature')
+    TemperatureService(),
+    capabilities: const {
+      UiConfigurableCapability(
+        label: 'Temperature',
+        description: 'Controls randomness in responses.',
+        fields: [
+          NumberConfigField(
+            key: 'temperature',
+            label: 'Temperature',
+            min: 0,
+            max: 2,
+            step: 0.1,
+            defaultValue: 1.0,
+          ),
+        ],
+      ),
+    },
+  );
+}
 ```
 
 ## Related packages

@@ -4,6 +4,9 @@ description: The lifecycle engine that owns the global scope, spawns sessions, h
 ---
 
 import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import pluginLifecycleDart from '../../../../../website/snippets/lib/plugin_lifecycle.dart?raw';
 
 The `PluginRuntime` is the lifecycle engine. It owns the global scope, spawns sessions, holds the current `RuntimeSettings` snapshot, exposes a change stream, and applies updates across the runtime and its active sessions in one call.
 
@@ -11,17 +14,7 @@ This page covers `PluginRuntime`. For session-specific concerns (isolation, cros
 
 ## Constructing and initializing
 
-```dart
-final runtime = PluginRuntime(plugins: [
-  CorePlugin(),
-  SqlLanguagePlugin(),
-  MarkdownLanguagePlugin(),
-]);
-
-runtime.init(settings: savedSettings);
-
-final session = await runtime.createSession();
-```
+<Code code={extractRegion(pluginLifecycleDart, 'runtime-construct-and-session')} lang="dart" />
 
 `PluginRuntime` is generic over the global and session context types: `PluginRuntime<G extends GlobalPluginContext, S extends SessionPluginContext>`. Bare `PluginRuntime` infers the defaults; supply your own subtypes only when you need a [custom context](/concepts/custom-context/).
 
@@ -45,16 +38,7 @@ When you call `runtime.init(...)`, this happens in order:
 
 After that, the runtime is ready to spawn sessions. You can open one per user action, keep one long-lived session, or mix the two.
 
-```dart
-runtime.init(
-  settings: savedSettings,
-  defaultEnabledPluginIds: const {
-    PluginId('core'),
-    PluginId('search'),
-    PluginId('telemetry'),
-  },
-);
-```
+<Code code={extractRegion(pluginLifecycleDart, 'runtime-init-default-enabled')} lang="dart" />
 
 `defaultEnabledPluginIds` is the "if settings say nothing, turn these on" set. Omit it and unspecified stable plugins default to on, experimental ones default to off.
 
@@ -64,29 +48,13 @@ Users toggle features. Config values change. Priorities shift. You want the runt
 
 ### Full reconciliation
 
-```dart
-// User turns off analytics in a settings screen
-final next = runtime.settings.copyWith(
-  plugins: {
-    ...runtime.settings.plugins,
-    const PluginId('analytics'): const PluginConfig(enabled: false),
-  },
-);
-
-await runtime.updateSettings(next);
-```
+<Code code={extractRegion(pluginLifecycleDart, 'runtime-update-settings')} lang="dart" />
 
 That reconciles the global scope, reconciles every active session, and publishes the new snapshot on `settingsStream`. If the `analytics` plugin was attached, it gets detached. If something was waiting on a capability that `analytics` provided, the ripples show up during this call.
 
 ### Snapshot-only update
 
-```dart
-// Optimistic UI wants settingsStream to emit immediately
-runtime.updateSettingsSnapshot(pendingSettings);
-
-// Later, if the user confirms, run the real reconciliation
-await runtime.updateSettings(pendingSettings);
-```
+<Code code={extractRegion(pluginLifecycleDart, 'runtime-snapshot-then-reconcile')} lang="dart" />
 
 `updateSettingsSnapshot` replaces the stored settings and emits on the stream. It does not run reconciliation, and it does not inject new config into already-resolved services. Think of it as "tell listeners, leave the runtime alone."
 

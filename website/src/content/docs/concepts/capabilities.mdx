@@ -4,6 +4,10 @@ description: Discover service features without instantiating them. Define your o
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import capabilitiesSnippets from '../../../../snippets/lib/capabilities.dart?raw';
+import extensionManifestSource from '../../../../../example/code_editor/bin/09_extension_manifest.dart?raw';
 
 Capabilities are metadata tags attached to service registrations. They exist so you can inspect what a service claims to support without instantiating it.
 
@@ -39,21 +43,7 @@ That makes capabilities safe for discovery code. The host can walk the registry 
 
 That is the point. You are not registering against a fixed schema Plugin Kit defined for you. You are stapling arbitrary tags onto a slot and reading them back later on your own terms.
 
-```dart
-class SupportsFileFormats extends Capability {
-  final Set<String> extensions;
-  const SupportsFileFormats(this.extensions);
-}
-
-class IsSlowCapability extends Capability {
-  final bool isSlow;
-  const IsSlowCapability({this.isSlow = true});
-}
-
-class CeoLovesThisCapability extends Capability {
-  const CeoLovesThisCapability();
-}
-```
+<Code code={extractRegion(capabilitiesSnippets, 'capability-define')} lang="dart" />
 
 Any of those is a real capability. All three can coexist on the same registration. The runtime treats them identically.
 
@@ -61,21 +51,7 @@ Any of those is a real capability. All three can coexist on the same registratio
 
 Pass a set of capabilities when you register the service.
 
-```dart
-class FormatterCapability extends Capability {
-  final List<String> supportedLanguages;
-  const FormatterCapability(this.supportedLanguages);
-}
-
-registry.registerSingleton<FormatterService>(
-  const ServiceId('formatter'),
-  SqlFormatter(),
-  capabilities: {
-    const FormatterCapability(['sql']),
-    const IsSlowCapability(isSlow: false),
-  },
-);
-```
+<Code code={extractRegion(extensionManifestSource, '09-extension-manifest-formatter-capability')} lang="dart" />
 
 Later, the host reads them back:
 
@@ -109,6 +85,8 @@ if (caps.hasType<IsSlowCapability>()) {
 ```
 
 Cleaner than manual casting, and clearer at the call site.
+
+<Code code={extractRegion(capabilitiesSnippets, 'capability-resolve-raw-wrapper')} lang="dart" />
 
 ## Discovery APIs
 

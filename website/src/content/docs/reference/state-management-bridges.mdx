@@ -4,6 +4,15 @@ description: Reference catalog of plugin_kit bridges for Bloc, Riverpod, ChangeN
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import stateBridgesSource from '../../../../snippets/lib/state_bridges.dart?raw';
+import setStateChatScreenSource from '../../../../../example/state_garden/lib/src/integrations/set_state_chat_screen.dart?raw';
+import changeNotifierChatSource from '../../../../../example/state_garden/lib/src/integrations/change_notifier_chat.dart?raw';
+import blocChatSource from '../../../../../example/state_garden/lib/src/integrations/bloc_chat.dart?raw';
+import riverpodChatSource from '../../../../../example/state_garden/lib/src/integrations/riverpod_chat.dart?raw';
+import signalsChatSource from '../../../../../example/state_garden/lib/src/integrations/signals_chat.dart?raw';
+import mobxChatSource from '../../../../../example/state_garden/lib/src/integrations/mobx_chat.dart?raw';
 
 Plugin Kit is library-agnostic about state management, but the bus, registry, and session lifecycle overlap with what most state libraries do. You can wire it through whatever your app already uses, or lean on the bus directly when an extra layer would only forward events. This page shows the wire-up between a `PluginSession` and seven common state holders, with the same chat protocol used in every example so you can read the differences side by side and pick the cost you actually want to pay.
 
@@ -49,20 +58,7 @@ Without the guard, a late fire that calls `notifyListeners` or `emit` on a dead 
 
 Every recipe below uses the same plugin-side protocol so the differences are entirely about state-holder shape.
 
-```dart
-class ChatMessage {
-  final String author;
-  final String text;
-}
-
-class SendMessageRequested {
-  final String text;
-}
-
-class ChatMessagesChanged {
-  final List<ChatMessage> messages;
-}
-```
+<Code code={extractRegion(stateBridgesSource, 'state-bridge-chat-message-types')} lang="dart" />
 
 The plugin's `ChatService` listens for `SendMessageRequested`, appends the user line and an `'echo: ' + text` bot line to its own list, and emits `ChatMessagesChanged` with the full snapshot. See [`chat_service.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/chat/chat_service.dart) for the actual code.
 
@@ -70,43 +66,7 @@ The plugin's `ChatService` listens for `SendMessageRequested`, appends the user 
 
 The reference shape with no library at all. The widget owns the subscription. `mounted` guards every continuation.
 
-```dart
-class SetStateChatScreen extends StatefulWidget {
-  const SetStateChatScreen({super.key, required this.session});
-  final PluginSession session;
-
-  @override
-  State<SetStateChatScreen> createState() => _SetStateChatScreenState();
-}
-
-class _SetStateChatScreenState extends State<SetStateChatScreen> {
-  StreamSubscription<void>? _subscription;
-  List<ChatMessage> _messages = const <ChatMessage>[];
-
-  @override
-  void initState() {
-    super.initState();
-    _subscription = widget.session.on<ChatMessagesChanged>((envelope) {
-      if (!mounted) return;
-      setState(() => _messages = envelope.event.messages);
-    });
-  }
-
-  @override
-  void dispose() {
-    _subscription?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _onSubmit(String text) =>
-      widget.session.emit(SendMessageRequested(text)).then((_) {});
-
-  @override
-  Widget build(BuildContext context) {
-    return ChatView(title: 'setState', messages: _messages, onSend: _onSubmit);
-  }
-}
-```
+<Code code={extractRegion(setStateChatScreenSource, 'set-state-chat-screen-set-state-chat-screen')} lang="dart" />
 
 Source: [`set_state_chat_screen.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/set_state_chat_screen.dart).
 
@@ -114,31 +74,7 @@ Source: [`set_state_chat_screen.dart`](https://github.com/SaadArdati/plugin_kit/
 
 If `flutter_plugin_kit` is in your pubspec, the same screen is the mixin call plus a `setState` inside the handler. The mixin owns the subscription field, the cancel-on-dispose, and the re-attach across session swaps. `listen` is callable from `initState` directly, with no `_wired` flag and no `didChangeDependencies` deferral.
 
-```dart
-class _SetStateChatScreenState extends State<SetStateChatScreen>
-    with PluginSessionStateListener<SetStateChatScreen> {
-  @override
-  PluginSession? get session => widget.session;
-
-  List<ChatMessage> _messages = const <ChatMessage>[];
-
-  @override
-  void initState() {
-    super.initState();
-    listen<ChatMessagesChanged>((event) {
-      if (!mounted) return;
-      setState(() => _messages = event.messages);
-    });
-  }
-
-  Future<void> _onSubmit(String text) =>
-      widget.session.emit(SendMessageRequested(text)).then((_) {});
-
-  @override
-  Widget build(BuildContext context) =>
-      ChatView(title: 'setState', messages: _messages, onSend: _onSubmit);
-}
-```
+<Code code={extractRegion(stateBridgesSource, 'state-bridge-set-state')} lang="dart" />
 
 If the session lives in an ambient `PluginSessionScope` instead of a `widget.session` parameter, drop the `session` override entirely; the mixin reads the scope by default.
 
@@ -146,36 +82,7 @@ If the session lives in an ambient `PluginSessionScope` instead of a `widget.ses
 
 A `ChangeNotifier` subclass holds a `List<ChatMessage>` and calls `notifyListeners` whenever the bus delivers a new snapshot. The `_disposed` flag is the post-dispose guard described above.
 
-```dart
-class ChatChangeNotifier extends ChangeNotifier {
-  ChatChangeNotifier(this._session) {
-    _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
-  }
-
-  final PluginSession _session;
-  late final StreamSubscription<void> _subscription;
-  bool _disposed = false;
-
-  List<ChatMessage> _messages = const <ChatMessage>[];
-  List<ChatMessage> get messages => _messages;
-
-  Future<void> send(String text) =>
-      _session.emit(SendMessageRequested(text)).then((_) {});
-
-  void _onMessagesChanged(EventEnvelope<ChatMessagesChanged> envelope) {
-    if (_disposed) return;
-    _messages = envelope.event.messages;
-    notifyListeners();
-  }
-
-  @override
-  void dispose() {
-    _disposed = true;
-    _subscription.cancel();
-    super.dispose();
-  }
-}
-```
+<Code code={extractRegion(changeNotifierChatSource, 'change-notifier-chat-chat-change-notifier')} lang="dart" />
 
 Wrap with `ChangeNotifierProvider` and read in widgets through `context.watch<ChatChangeNotifier>()` as usual. Source: [`change_notifier_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/change_notifier_chat.dart).
 
@@ -211,49 +118,7 @@ The hand-written `ChangeNotifier` subclass above stays the right shape when you 
 
 A Cubit subscribes in its constructor and guards both the bus handler and the explicit `await` in `send` with `isClosed`.
 
-```dart
-class ChatBlocState {
-  const ChatBlocState({this.messages = const [], this.sending = false});
-  final List<ChatMessage> messages;
-  final bool sending;
-
-  ChatBlocState copyWith({List<ChatMessage>? messages, bool? sending}) =>
-      ChatBlocState(
-        messages: messages ?? this.messages,
-        sending: sending ?? this.sending,
-      );
-
-  // == and hashCode over messages (ListEquality) and sending.
-}
-
-class ChatCubit extends Cubit<ChatBlocState> {
-  ChatCubit(this._session) : super(const ChatBlocState()) {
-    _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
-  }
-
-  final PluginSession _session;
-  late final StreamSubscription<void> _subscription;
-
-  Future<void> send(String text) async {
-    if (isClosed) return;
-    emit(state.copyWith(sending: true));
-    await _session.emit(SendMessageRequested(text));
-    if (isClosed) return;
-    emit(state.copyWith(sending: false));
-  }
-
-  void _onMessagesChanged(EventEnvelope<ChatMessagesChanged> envelope) {
-    if (isClosed) return;
-    emit(state.copyWith(messages: envelope.event.messages));
-  }
-
-  @override
-  Future<void> close() async {
-    await _subscription.cancel();
-    return super.close();
-  }
-}
-```
+<Code code={extractRegion(blocChatSource, 'bloc-chat-chat-bloc-state')} lang="dart" />
 
 `ChatBlocState` implements value equality so `BlocBuilder` does not rebuild when an identical snapshot is re-emitted. Source: [`bloc_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/bloc_chat.dart).
 
@@ -265,42 +130,7 @@ Read the body of `_onMessagesChanged`: it takes a bus event and re-emits it as w
 
 The recommended shape uses a `Provider<PluginSession>` that the host overrides at app boot, plus an `AsyncNotifier` that subscribes inside `build` and registers `ref.onDispose` after wiring the subscription.
 
-```dart
-final sessionProvider = Provider<PluginSession>((ref) {
-  throw UnimplementedError(
-    'Override sessionProvider with the application session at app boot.',
-  );
-});
-
-final chatNotifierProvider =
-    AsyncNotifierProvider<ChatNotifier, List<ChatMessage>>(ChatNotifier.new);
-
-class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
-  StreamSubscription<void>? _subscription;
-
-  @override
-  Future<List<ChatMessage>> build() async {
-    final session = ref.watch(sessionProvider);
-    _subscription = session.on<ChatMessagesChanged>(_onMessagesChanged);
-    ref.onDispose(_cancel);
-    return const <ChatMessage>[];
-  }
-
-  void _onMessagesChanged(EventEnvelope<ChatMessagesChanged> envelope) {
-    state = AsyncData(envelope.event.messages);
-  }
-
-  Future<void> _cancel() async {
-    await _subscription?.cancel();
-    _subscription = null;
-  }
-
-  Future<void> send(String text) async {
-    final session = ref.read(sessionProvider);
-    await session.emit(SendMessageRequested(text));
-  }
-}
-```
+<Code code={extractRegion(riverpodChatSource, 'riverpod-chat-chat-notifier')} lang="dart" />
 
 At app boot:
 
@@ -321,32 +151,7 @@ A `FutureProvider` that calls `runtime.createSession()` inside its build leaks t
 
 A `Signal` holds the snapshot. The bus handler writes to `signal.value`. The `Watch` builder rebuilds when the signal is read inside it.
 
-```dart
-class SignalsChatBridge {
-  SignalsChatBridge(this._session) {
-    _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
-  }
-
-  final PluginSession _session;
-  late final StreamSubscription<void> _subscription;
-  bool _disposed = false;
-
-  final Signal<List<ChatMessage>> messages = signal(const <ChatMessage>[]);
-
-  Future<void> send(String text) =>
-      _session.emit(SendMessageRequested(text)).then((_) {});
-
-  void _onMessagesChanged(EventEnvelope<ChatMessagesChanged> envelope) {
-    if (_disposed) return;
-    messages.value = envelope.event.messages;
-  }
-
-  void dispose() {
-    _disposed = true;
-    _subscription.cancel();
-  }
-}
-```
+<Code code={extractRegion(signalsChatSource, 'signals-chat-signals-chat-bridge')} lang="dart" />
 
 Render with `Watch((context) => ChatView(messages: bridge.messages.value, ...))`. Source: [`signals_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/signals_chat.dart).
 
@@ -354,33 +159,7 @@ Render with `Watch((context) => ChatView(messages: bridge.messages.value, ...))`
 
 Mirror the signals shape with `Observable` plus `runInAction`. No code generation needed.
 
-```dart
-class MobxChatBridge {
-  MobxChatBridge(this._session) {
-    _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
-  }
-
-  final PluginSession _session;
-  late final StreamSubscription<void> _subscription;
-  bool _disposed = false;
-
-  final Observable<List<ChatMessage>> messages =
-      Observable<List<ChatMessage>>(const <ChatMessage>[]);
-
-  Future<void> send(String text) =>
-      _session.emit(SendMessageRequested(text)).then((_) {});
-
-  void _onMessagesChanged(EventEnvelope<ChatMessagesChanged> envelope) {
-    if (_disposed) return;
-    runInAction(() => messages.value = envelope.event.messages);
-  }
-
-  void dispose() {
-    _disposed = true;
-    _subscription.cancel();
-  }
-}
-```
+<Code code={extractRegion(mobxChatSource, 'mobx-chat-mobx-chat-bridge')} lang="dart" />
 
 Render with `Observer(builder: (context) => ChatView(messages: bridge.messages.value, ...))`. Source: [`mobx_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/mobx_chat.dart).
 
@@ -388,35 +167,7 @@ Render with `Observer(builder: (context) => ChatView(messages: bridge.messages.v
 
 GetIt is a service locator, not a state library. The host registers the active `PluginSession` at app boot; the screen looks it up by type. The State class then mirrors the setState recipe.
 
-```dart
-// At app boot:
-final locator = GetIt.asNewInstance();
-locator.registerSingleton<PluginSession>(holder.session);
-
-// In the screen:
-class _GetItChatScreenState extends State<GetItChatScreen> {
-  late final _session = widget.locator.get<PluginSession>();
-  StreamSubscription<void>? _subscription;
-  List<ChatMessage> _messages = const <ChatMessage>[];
-
-  @override
-  void initState() {
-    super.initState();
-    _subscription = _session.on<ChatMessagesChanged>((envelope) {
-      if (!mounted) return;
-      setState(() => _messages = envelope.event.messages);
-    });
-  }
-
-  @override
-  void dispose() {
-    _subscription?.cancel();
-    super.dispose();
-  }
-
-  // ...
-}
-```
+<Code code={extractRegion(stateBridgesSource, 'state-bridge-get-it-screen')} lang="dart" />
 
 Source: [`get_it_chat_screen.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/get_it_chat_screen.dart).
 

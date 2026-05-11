@@ -4,6 +4,9 @@ description: Stateful services with automatic lifecycle management and settings 
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import pluginServicesSnippets from '../../../../../website/snippets/lib/plugin_services.dart?raw';
 
 Plugins are wiring; services are the meat. This page is about which kind of service holds the meat.
 
@@ -27,12 +30,7 @@ This page is the natural next step after [Adding a Plugin](/guides/adding-a-plug
 - The raw settings map as `settings`, for when you need to pass it through.
 - Authoritative identity via `pluginId` and `serviceId`.
 
-```dart
-class ModelRouter extends PluginService {
-  String get defaultModel => config.getString('default_model') ?? 'gpt-4.1';
-  double get temperature => config.getDouble('temperature') ?? 0.7;
-}
-```
+<Code code={extractRegion(pluginServicesSnippets, 'plugin-service-basic')} lang="dart" />
 
 <Aside type="caution" title="Identity is stamped on resolve, not on construct">
 `pluginId` and `serviceId` are set by the registry when the service is resolved.
@@ -47,21 +45,7 @@ accessed via the constructor.
 
 `StatefulPluginService` extends `PluginService` with session lifecycle. It adds `attach(context)`, `detach()`, a bound `context`, and automatic subscription tracking.
 
-```dart
-class DebugAdapter extends StatefulPluginService {
-  @override
-  void attach() {
-    on<DebugEvent>((e) {
-      print('debug action: ${e.event.action}');
-    });
-  }
-
-  @override
-  Future<void> detach() async {
-    print('adapter shutting down');
-  }
-}
-```
+<Code code={extractRegion(pluginServicesSnippets, 'stateful-plugin-service-basic')} lang="dart" />
 
 `attach()` and `detach()` are pure user hooks: no super call, no `context` parameter. The framework binds and unbinds `this.context` around them via library-private `_bindContext` / `_unbindContext`, and cancels every tracked subscription and binding after `detach()` returns. Helpers (`on`, `onRequest`, `bind`, `emit`, `resolve`, etc.) read `this.context` implicitly, so subscriptions inside `attach()` are always bucketed correctly.
 
@@ -75,17 +59,7 @@ stores the raw settings, builds a fresh `ConfigNode`, and updates the cached has
 If your service needs to react when settings change (to throw away a compiled cache, 
 for example), override it and call `super`.
 
-```dart
-class CachedFormatter extends StatefulPluginService {
-  String? _compiledTemplate;
-
-  @override
-  void injectSettings(Map<String, dynamic> settings, {String? hash}) {
-    super.injectSettings(settings, hash: hash);
-    _compiledTemplate = null;
-  }
-}
-```
+<Code code={extractRegion(pluginServicesSnippets, 'stateful-plugin-service-inject-settings')} lang="dart" />
 
 For singletons and lazy singletons, the registry hashes effective settings and
 only re-injects when they actually changed. Each individual `config.getX(...)` read is O(1): a hash-map
@@ -117,18 +91,7 @@ the `ServiceId` via `Namespace.call(...)` and pass it to `resolve(...)` or `mayb
 Stateful services also get short helpers for common runtime actions, so you do not
 have to go through `context` for the normal cases.
 
-```dart
-class ConversationState extends StatefulPluginService {
-  @override
-  void attach() {
-    on<UserMessage>((e) async {
-      final memory = resolve<ConversationMemory>(const ServiceId('memory'));
-      memory.append(e.event.text);
-      await emit(MessageStored(e.event.text));
-    });
-  }
-}
-```
+<Code code={extractRegion(pluginServicesSnippets, 'stateful-plugin-service-resolve-emit')} lang="dart" />
 
 The service-level helpers are thin wrappers over the session context:
 
@@ -153,22 +116,9 @@ Settings are injected by the `ServiceRegistry` at resolution time, so:
 - the service has to extend `PluginService`
 - the settings key has to match the service's slot
 
-```dart
-final settings = RuntimeSettings(
-  services: {
-    const PluginId('model_router').service(const ServiceId('decider')):
-        ServiceSettings(
-          config: {'default_model': 'gpt-4.1-mini'},
-        ),
-  },
-);
-```
+<Code code={extractRegion(pluginServicesSnippets, 'plugin-service-settings-runtime')} lang="dart" />
 
-```dart
-class ModelRouter extends PluginService {
-  String get defaultModel => config.getString('default_model') ?? 'gpt-4.1';
-}
-```
+<Code code={extractRegion(pluginServicesSnippets, 'plugin-service-basic')} lang="dart" />
 
 Singletons and lazy singletons avoid redundant reinjection when the effective settings hash has not changed.
 

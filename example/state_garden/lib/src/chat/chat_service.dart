@@ -10,6 +10,7 @@ import 'chat_message.dart';
 /// [ChatMessagesChanged] with the new snapshot. Each session constructs its
 /// own service instance inline in [ChatPlugin.register], so message lists
 /// never leak between sessions.
+// #docregion chat-service
 class ChatService extends StatefulPluginService {
   ChatService();
 
@@ -36,6 +37,7 @@ class ChatService extends StatefulPluginService {
     await emit(ChatMessagesChanged(List<ChatMessage>.of(_messages)));
   }
 }
+// #enddocregion chat-service
 
 /// Higher-priority alternative used by the hot-swap test.
 ///

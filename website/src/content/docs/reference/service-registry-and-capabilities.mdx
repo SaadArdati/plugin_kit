@@ -4,6 +4,13 @@ description: API reference for Service, ServiceRegistry, ScopedServiceRegistry, 
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import apiReferenceSource from '../../../../snippets/lib/api_reference.dart?raw';
+import serviceRegistrySource from '../../../../../packages/plugin_kit/lib/src/service_registry.dart?raw';
+import serviceRegistrySnippets from '../../../../snippets/lib/service_registry.dart?raw';
+import pluginServicesSource from '../../../../snippets/lib/plugin_services.dart?raw';
+import capabilitiesSource from '../../../../snippets/lib/capabilities.dart?raw';
 
 This page is the curated reference for the registry surface: typed handles, the registry itself, the plugin-facing scoped wrapper, the three registration wrappers, resolution methods, the `PluginService` hierarchy, and capabilities. Reach for it when you want to know exactly which arguments are positional, which are named, and what a method actually returns.
 
@@ -15,33 +22,19 @@ The registry keys most types as plain strings under the hood. The public API wra
 
 ### `PluginId`
 
-```dart
-extension type const PluginId(String value) {}
-```
+<Code code={extractRegion(apiReferenceSource, 'api-reference-typed-handles')} lang="dart" />
 
 Wraps a plugin identifier. Equality and `toString()` delegate to the wrapped string, so `pluginId == 'core'` works directly. Use `pluginId.value` when an API insists on an explicit `String`.
 
 ### `Namespace`
 
-```dart
-extension type const Namespace(String value) {
-  ServiceId service(String id);
-  ServiceId call(String id);            // shorthand for service(id)
-  Namespace child(String name);
-}
-```
+<Code code={extractRegion(apiReferenceSource, 'api-reference-typed-handles')} lang="dart" />
 
 Wraps a namespace name. The `service(...)` helper builds a namespaced `ServiceId`, and `call(...)` makes the namespace itself callable so `agent('model')` reads as a tiny constructor. `child(...)` produces a sub-namespace by appending a segment, so `Namespace('a').child('b')` is `Namespace('a.b')`.
 
 ### `ServiceId`
 
-```dart
-extension type const ServiceId(String value) {
-  Namespace? get namespace;             // full prefix via lastIndexOf('.')
-  String get id;                        // leaf segment after the last dot
-  Namespace? get topNamespace;          // first segment via indexOf('.')
-}
-```
+<Code code={extractRegion(apiReferenceSource, 'api-reference-typed-handles')} lang="dart" />
 
 Wraps the registry key (`namespace.id` or just `id`). `value` is the full underlying string; `==` against another `ServiceId` (or a raw `String`) compares the wrapped values directly.
 
@@ -51,28 +44,11 @@ The three derived getters cover the two ways code typically wants to slice a dot
 - `.id` returns everything after the last dot. For `ServiceId('a.b.c')` it returns `'c'`.
 - `.topNamespace` returns just the first segment. For `ServiceId('a.b.c')` it returns `Namespace('a')`. Use this when UI grouping should flatten nested ids under their root.
 
-```dart
-const greeter = ServiceId('greeter');
-const agentTools = ServiceId('agent.tools');
-
-agentTools.namespace;     // Namespace('agent')
-agentTools.id;            // 'tools'
-agentTools.topNamespace;  // Namespace('agent')
-
-const nested = ServiceId('a.b.c');
-nested.namespace;         // Namespace('a.b')
-nested.topNamespace;      // Namespace('a')
-nested.id;                // 'c'
-```
+<Code code={extractRegion(apiReferenceSource, 'service-id-getters')} lang="dart" />
 
 To produce a namespaced id, build it from a `Namespace`:
 
-```dart
-const agent = Namespace('agent');
-
-final tools = agent.service('tools');   // ServiceId('agent.tools')
-final model = agent('model');           // call() shorthand → ServiceId('agent.model')
-```
+<Code code={extractRegion(apiReferenceSource, 'namespace-build-service-id')} lang="dart" />
 
 `ScopedServiceRegistry` reads `serviceId.value` when forwarding to the raw registry, so the dot separator stays an implementation detail at the call site.
 
@@ -103,31 +79,7 @@ Three pairs, each with a flat and a namespaced variant. All registration methods
 | `registerLazySingleton` | `LazySingletonWrapper` | On first resolve |
 | `registerFactory` | `FactoryWrapper` | On every resolve |
 
-```dart
-void registerSingleton<T extends Object>({
-  required PluginId pluginId,
-  required ServiceId serviceId,
-  required T instance,
-  int priority = ServiceRegistry.defaultPriority,
-  CapabilitySet capabilities = const {},
-});
-
-void registerLazySingleton<T extends Object>({
-  required PluginId pluginId,
-  required ServiceId serviceId,
-  required Factory<T> factory,
-  int priority = ServiceRegistry.defaultPriority,
-  CapabilitySet capabilities = const {},
-});
-
-void registerFactory<T extends Object>({
-  required PluginId pluginId,
-  required ServiceId serviceId,
-  required Factory<T> create,
-  int priority = ServiceRegistry.defaultPriority,
-  CapabilitySet capabilities = const {},
-});
-```
+<Code code={extractRegion(serviceRegistrySource, 'service-registry-register-singleton')} lang="dart" />
 
 There are no `*Namespace` variants on the registry. Build a namespaced `ServiceId` via `Namespace.call(...)` (the call-shorthand `agent('model')`) or `Namespace.service(...)`, then pass the resulting `ServiceId` to the regular `register*` method. That keeps the registry surface narrow: the registry stores `ServiceId` keys; the `Namespace` helper only composes them.
 
@@ -153,12 +105,7 @@ There are no `*Namespace` resolution helpers. Build a namespaced `ServiceId` fro
 
 `resolveAfter` is the chain-of-responsibility hook. The signature is named-only:
 
-```dart
-T resolveAfter<T>({
-  required PluginId pluginId,
-  required ServiceId serviceId,
-});
-```
+<Code code={extractRegion(serviceRegistrySource, 'service-registry-resolve-after')} lang="dart" />
 
 It locates the registration owned by `pluginId`, walks past it, and returns the next enabled wrapper's instance. The caller's own enabled state is not consulted, which is what makes it useful for a winning plugin to defer to whatever it overrode. If no later registration exists, or every later one is disabled, the error message distinguishes the two cases.
 
@@ -183,16 +130,7 @@ For "is this plugin enabled," reach for [`PluginRuntime.isPluginEnabled`](/refer
 
 ### Mutation
 
-```dart
-RegistrationWrapper? unregister({
-  required PluginId pluginId,
-  required ServiceId serviceId,
-});
-
-void updateSettings({required List<LocalPluginOverride> overrides});
-
-ServiceRegistry copy();
-```
+<Code code={extractRegion(serviceRegistrySource, 'service-registry-unregister')} lang="dart" />
 
 `unregister` removes a single plugin's registration. If the slot becomes empty, the key disappears from the registry. The runtime calls this during settings reconciliation when a plugin is disabled. To target a namespaced slot, build the `ServiceId` via `Namespace.call(...)` first.
 
@@ -202,9 +140,7 @@ ServiceRegistry copy();
 
 ### Per-plugin scope
 
-```dart
-ScopedServiceRegistry scopedFor(PluginId pluginId);
-```
+<Code code={extractRegion(serviceRegistrySnippets, 'service-registry-scoped-for')} lang="dart" />
 
 Returns a [`ScopedServiceRegistry`](#scopedserviceregistry) that fills in `pluginId` on every registration call. Plugins always receive one of these in `register`, so they never type their own `pluginId`.
 
@@ -234,50 +170,11 @@ The two big differences from the raw registry are positional arguments for the p
 
 ### Positional registration
 
-```dart
-void registerSingleton<T extends Object>(
-  ServiceId serviceId,
-  T instance, {
-  int? priority,
-  CapabilitySet capabilities = const {},
-});
-
-void registerLazySingleton<T extends Object>(
-  ServiceId serviceId,
-  Factory<T> factory, {
-  int? priority,
-  CapabilitySet capabilities = const {},
-});
-
-void registerFactory<T extends Object>(
-  ServiceId serviceId,
-  Factory<T> create, {
-  int? priority,
-  CapabilitySet capabilities = const {},
-});
-```
+<Code code={extractRegion(serviceRegistrySource, 'service-registry-register-singleton-2')} lang="dart" />
 
 The intent is dense plugin `register` overrides:
 
-```dart
-@override
-void register(ScopedServiceRegistry registry) {
-  registry.registerSingleton<AppConfig>(
-    const ServiceId('config'),
-    AppConfig.load(),
-  );
-
-  registry.registerLazySingleton<Database>(
-    const ServiceId('main_db'),
-    () => Database.connect(),
-  );
-
-  registry.registerFactory<QueryBuilder>(
-    const ServiceId('query_builder'),
-    QueryBuilder.new,
-  );
-}
-```
+<Code code={extractRegion(serviceRegistrySnippets, 'service-registry-register-all-three')} lang="dart" />
 
 `priority` is nullable. When omitted it falls back to `defaultPriority` (set by `withPriority`), and ultimately to `ServiceRegistry.defaultPriority`. The per-call value, when supplied, always wins.
 
@@ -285,14 +182,7 @@ void register(ScopedServiceRegistry registry) {
 
 There are no `*Namespace` register methods. The `ServiceId` you pass already carries any namespace prefix, so the registry only needs the one method per registration mode.
 
-```dart
-const agent = Namespace('agent');
-
-registry.registerSingleton<ModelClient>(
-  agent('model'),                       // ServiceId('agent.model')
-  AnthropicClient(),
-);
-```
+<Code code={extractRegion(serviceRegistrySnippets, 'service-registry-naming-namespace')} lang="dart" />
 
 ### `withPriority`
 
@@ -302,20 +192,11 @@ ScopedServiceRegistry withPriority(int priority);
 
 Returns a new scope whose positional `register*` methods default to `priority` instead of `50`. Per-call `priority` still overrides. Convenient for cascades:
 
-```dart
-@override
-void register(ScopedServiceRegistry registry) {
-  registry.withPriority(150)
-    ..registerSingleton<Formatter>(const ServiceId('formatter'), MyFormatter())
-    ..registerSingleton<Linter>(const ServiceId('linter'), MyLinter());
-}
-```
+<Code code={extractRegion(serviceRegistrySnippets, 'service-registry-settings-injection')} lang="dart" />
 
 ### `raw`
 
-```dart
-final ServiceRegistry raw;
-```
+<Code code={extractRegion(serviceRegistrySource, 'service-registry-final')} lang="dart" />
 
 The escape hatch. Use it when you need to register on behalf of another plugin, inspect existing registrations, or call any of the listing methods that the scoped view does not re-export.
 
@@ -377,12 +258,7 @@ The stamp happens in `_provideAndInject` inside `ServiceRegistry`, which is the 
 
 `settings` is the raw injected map. Most code reads through `config` instead, which is a [`ConfigNode`](/concepts/configuration/) wrapping the same data with typed accessors:
 
-```dart
-class AnthropicService extends PluginService {
-  String get apiKey => config.getString('api_key') ?? '';
-  double get temperature => config.getDouble('temperature') ?? 0.7;
-}
-```
+<Code code={extractRegion(pluginServicesSource, 'plugin-service-settings-inject')} lang="dart" />
 
 `settingsHash` is a stable hash of the current settings. The registry uses it to skip redundant `injectSettings` calls on singleton and lazy-singleton wrappers when nothing changed.
 
@@ -399,19 +275,7 @@ The registry calls this on resolve when an override applies, specifically when a
 
 `PluginService` plus session lifecycle and automatic subscription cleanup.
 
-```dart
-abstract class StatefulPluginService<PKC extends PluginContext>
-    extends PluginService {
-  final List<StreamSubscription> activeSubscriptions = [];
-
-  bool get hasContext;
-  PKC get context;
-
-  void attach();
-
-  Future<void> detach();
-}
-```
+<Code code={extractRegion(pluginServicesSource, 'stateful-plugin-service-basic')} lang="dart" />
 
 The type parameter is the [`PluginContext`](/concepts/sessions/) subclass the service expects, so domain-specific context fields stay typed.
 
@@ -451,14 +315,7 @@ All five helpers return what callers might need to cancel early: a `StreamSubscr
 
 The same helper also exposes `resolve`, `maybeResolve`, and `resolveAfter` so a stateful service can reach into the registry without typing `context.registry` first. To resolve a namespaced slot, build the `ServiceId` via `Namespace.call(...)` and pass it to `resolve(...)` or `maybeResolve(...)`. See [Event Bus & Events](/reference/event-bus-and-events/) for the underlying bus contract.
 
-```dart
-class ChatService extends StatefulPluginService {
-  @override
-  void attach() {
-    on<UserMessage>((envelope) {});
-  }
-}
-```
+<Code code={extractRegion(pluginServicesSource, 'stateful-plugin-service-resolve-emit')} lang="dart" />
 
 ## `Capability` and `CapabilityLookup`
 
@@ -474,24 +331,11 @@ abstract class Capability {
 
 An empty extensible base. The dialog ships `UiConfigurableCapability` (in `plugin_kit`) for opting services into the dialog's Services tab; host apps and plugins define their own beyond that. The convention is `const` constructors so capability sets stay literal:
 
-```dart
-class SupportsLanguages extends Capability {
-  final List<String> languages;
-  const SupportsLanguages(this.languages);
-}
-
-class CanBeSlow extends Capability {
-  final bool slow;
-  final String reason;
-  const CanBeSlow(this.slow, {required this.reason});
-}
-```
+<Code code={extractRegion(capabilitiesSource, 'capability-register-multiple')} lang="dart" />
 
 ### `CapabilitySet`
 
-```dart
-typedef CapabilitySet = Set<Capability>;
-```
+<Code code={extractRegion(serviceRegistrySource, 'service-registry-capability-set')} lang="dart" />
 
 A plain `Set<Capability>` aliased for readability. Always immutable in practice; `register*` methods accept `const {}` as the default.
 
@@ -508,14 +352,7 @@ extension CapabilityLookup on Set<Capability> {
 
 `hasType<T>()` returns whether the set contains at least one capability of type `T`. `getOfType<T>()` returns the first matching capability, or `null`. Together they cover the two questions you ask of a capability set:
 
-```dart
-final wrapper = registry.resolveRaw<CodeLinter>(const ServiceId('linter'));
-
-if (wrapper.capabilities.hasType<CanBeSlow>()) {
-  final slow = wrapper.capabilities.getOfType<CanBeSlow>()!;
-  print('Linter is slow because: ${slow.reason}');
-}
-```
+<Code code={extractRegion(capabilitiesSource, 'capability-resolve-raw-wrapper')} lang="dart" />
 
 The dialog uses exactly this pattern to decide whether a service deserves a config card and which icon to draw next to it. See [Plugin Kit Dialog](/guides/plugin-kit-dialog/) for the end-to-end story.
 

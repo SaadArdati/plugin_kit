@@ -1,0 +1,102 @@
+doc_file	start_line	end_line	old_classification	decision	target_file	region_name	notes
+website/src/content/docs/concepts/capabilities.mdx	28	32	pure-fragment	keep-fenced		 	2 lines of prose + truncated code block; no standalone Dart
+website/src/content/docs/concepts/capabilities.mdx	82	85	pure-fragment	keep-fenced		 	prose + image; no Dart code
+website/src/content/docs/concepts/configuration.mdx	113	117	pure-fragment	keep-fenced		 	1-line accessor fragment; too small
+website/src/content/docs/concepts/configuration.mdx	129	131	no-region	keep-fenced		 	1-line fragment
+website/src/content/docs/concepts/events.mdx	135	140	pure-fragment	keep-fenced		 	3-line fragment; no compilable unit
+website/src/content/docs/concepts/events.mdx	238	242	pure-fragment	keep-fenced		 	3-line fragment
+website/src/content/docs/concepts/plugins.mdx	108	111	pure-fragment	keep-fenced		 	2-line fragment
+website/src/content/docs/concepts/runtime.mdx	14	24	pure-fragment	keep-fenced		 	uses SqlLanguagePlugin/MarkdownLanguagePlugin (fictional types)
+website/src/content/docs/concepts/runtime.mdx	83	89	pure-fragment	keep-fenced		 	pure prose section; no Dart code
+website/src/content/docs/concepts/service-registry.mdx	65	68	pure-fragment	keep-fenced		 	2-line fragment
+website/src/content/docs/concepts/service-registry.mdx	81	95	pure-fragment	keep-fenced		 	prose + image block; no compilable Dart
+website/src/content/docs/concepts/service-registry.mdx	144	155	pure-fragment	keep-fenced		 	prose + Aside component; no Dart
+website/src/content/docs/concepts/service-registry.mdx	187	194	pure-fragment	keep-fenced		 	6-line fragment; partial statement
+website/src/content/docs/concepts/sessions.mdx	137	141	pure-fragment	keep-fenced		 	3-line fragment
+website/src/content/docs/concepts/sessions.mdx	147	149	no-region	keep-fenced		 	1-line fragment
+website/src/content/docs/concepts/sessions.mdx	155	157	no-region	keep-fenced		 	1-line fragment
+website/src/content/docs/examples/model-embassy.mdx	28	36	pure-fragment	keep-fenced		 	uses ModelPassport/AgentBoardingCall/ModelVisa (fictional)
+website/src/content/docs/guides/adding-a-plugin.mdx	67	73	no-region	keep-fenced		 	prose section; no Dart code
+website/src/content/docs/guides/adding-a-plugin.mdx	134	148	pure-fragment	keep-fenced		 	range contains existing <Code> tag; already migrated reference
+website/src/content/docs/guides/adding-a-plugin.mdx	311	325	no-region	keep-fenced		 	prose + Steps/CardGrid MDX; no Dart
+website/src/content/docs/guides/flutter-integration.mdx	68	132	no-region	keep-fenced		 	uses PanelDescriptor/CollectPanels/MinimapPlugin (fictional); widget-returning helper method
+website/src/content/docs/guides/flutter-integration.mdx	280	292	no-region	keep-fenced		 	empty range (beyond file EOF at 237)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	104	110	pure-fragment	keep-fenced		 	end of fenced block + prose; no new Dart to extract
+website/src/content/docs/guides/flutter-plugin-kit.mdx	117	128	pure-fragment	keep-fenced		 	end of fenced block + prose; partial PluginSessionScope snippet
+website/src/content/docs/guides/flutter-plugin-kit.mdx	142	150	pure-fragment	keep-fenced		 	prose paragraph; no Dart
+website/src/content/docs/guides/flutter-plugin-kit.mdx	157	162	pure-fragment	keep-fenced		 	uses /* ... */ placeholder; pseudocode
+website/src/content/docs/guides/flutter-plugin-kit.mdx	169	174	pure-fragment	keep-fenced		 	uses // ... placeholder; pseudocode stub
+website/src/content/docs/guides/flutter-plugin-kit.mdx	192	211	pseudocode	keep-fenced		 	prose + existing <Code> invocation; nothing new to extract
+website/src/content/docs/guides/flutter-plugin-kit.mdx	215	221	pseudocode	keep-fenced		 	uses Cubit<E?> from bloc (not a dep)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	229	232	pure-fragment	keep-fenced		 	start of PluginEventCubit block (uses Cubit, not a dep)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	247	256	pure-fragment	migrate	website/snippets/lib/flutter_integration.dart	flutter-chat-controller	ChatController class; both rows 247:256 and 268:278 cover same block
+website/src/content/docs/guides/flutter-plugin-kit.mdx	268	278	pure-fragment	migrate	website/snippets/lib/flutter_integration.dart	flutter-chat-controller	same block as 247:256; fenced code replaced by single <Code> tag
+website/src/content/docs/guides/flutter-plugin-kit.mdx	309	329	pseudocode	keep-fenced		 	empty range (beyond file EOF)
+website/src/content/docs/guides/logging.mdx	27	33	no-region	migrate	website/snippets/lib/logging.dart	logging-logger-listen	Logger listener; package:logging added to snippets pubspec
+website/src/content/docs/guides/logging.mdx	88	91	pure-fragment	keep-fenced		 	2-line fragment
+website/src/content/docs/guides/migrating-flutter-app.mdx	29	36	pure-fragment	keep-fenced		 	prose section "Start with one seam"; no Dart
+website/src/content/docs/guides/migrating-flutter-app.mdx	133	186	no-region	keep-fenced		 	uses EditorBody (fictional Flutter widget)
+website/src/content/docs/guides/migrating-flutter-app.mdx	344	369	no-region	migrate	website/snippets/lib/plugin_services.dart	migration-assistant-ready	AssistantRuntimeService with emit; AssistantClient scaffolded
+website/src/content/docs/guides/migrating-flutter-app.mdx	373	397	no-region	migrate	website/snippets/lib/plugin_services.dart	migration-wait-for-assistant	AssistantRequestService with onRequest; WaitForAssistant scaffolded
+website/src/content/docs/guides/migrating-flutter-app.mdx	457	477	no-region	keep-fenced		 	prose + Steps MDX; no Dart code
+website/src/content/docs/guides/migrating-flutter-app.mdx	489	513	no-region	keep-fenced		 	prose bullet lists; no Dart
+website/src/content/docs/guides/migrating-flutter-app.mdx	556	598	no-region	keep-fenced		 	CardGrid/LinkCard MDX; no Dart
+website/src/content/docs/guides/plugin-kit-dialog.mdx	211	222	pure-fragment	keep-fenced		 	empty range content; prose only
+website/src/content/docs/guides/plugin-kit-dialog.mdx	274	285	no-region	keep-fenced		 	empty range content; beyond section
+website/src/content/docs/guides/settings.mdx	93	96	pure-fragment	keep-fenced		 	2-line fragment
+website/src/content/docs/guides/settings.mdx	156	160	pure-fragment	keep-fenced		 	3-line fragment
+website/src/content/docs/guides/settings.mdx	164	166	no-region	keep-fenced		 	1-line fragment
+website/src/content/docs/guides/settings.mdx	182	184	no-region	keep-fenced		 	1-line fragment
+website/src/content/docs/guides/testing.mdx	219	224	pure-fragment	keep-fenced		 	4-line fragment
+website/src/content/docs/reference/dialog-api.mdx	366	396	no-region	keep-fenced		 	beyond file EOF (file has 362 lines); stale TSV entry
+website/src/content/docs/reference/dialog-api.mdx	418	436	no-region	keep-fenced		 	beyond file EOF; stale TSV entry
+website/src/content/docs/reference/dialog-api.mdx	446	460	no-region	keep-fenced		 	beyond file EOF; stale TSV entry
+website/src/content/docs/reference/dialog-api.mdx	492	520	no-region	keep-fenced		 	beyond file EOF; stale TSV entry
+website/src/content/docs/reference/dialog-api.mdx	526	537	pure-fragment	keep-fenced		 	beyond file EOF; stale TSV entry
+website/src/content/docs/reference/dialog-api.mdx	541	544	pure-fragment	keep-fenced		 	beyond file EOF; stale TSV entry
+website/src/content/docs/reference/event-bus-and-events.mdx	53	65	no-region	keep-fenced		 	prose + 1-line method signature fragment
+website/src/content/docs/reference/event-bus-and-events.mdx	75	77	pure-fragment	keep-fenced		 	1-line fragment
+website/src/content/docs/reference/event-bus-and-events.mdx	95	97	pure-fragment	keep-fenced		 	1-line fragment
+website/src/content/docs/reference/event-bus-and-events.mdx	138	154	no-region	keep-fenced		 	bare method signatures; not a compilable standalone class
+website/src/content/docs/reference/event-bus-and-events.mdx	162	178	no-region	keep-fenced		 	incomplete extension body (missing closing brace)
+website/src/content/docs/reference/event-bus-and-events.mdx	208	235	no-region	keep-fenced		 	bare method signatures + incomplete extension; not compilable
+website/src/content/docs/reference/event-bus-and-events.mdx	245	259	no-region	keep-fenced		 	partial extension body; not compilable
+website/src/content/docs/reference/event-bus-and-events.mdx	267	293	no-region	keep-fenced		 	extension with abstract method; not compilable standalone
+website/src/content/docs/reference/event-bus-and-events.mdx	312	316	no-region	keep-fenced		 	CardGrid MDX; no Dart
+website/src/content/docs/reference/naming-conventions.mdx	18	25	no-region	keep-fenced		 	prose + partial class body (missing closing brace)
+website/src/content/docs/reference/naming-conventions.mdx	85	90	pure-fragment	keep-fenced		 	4-line fragment
+website/src/content/docs/reference/naming-conventions.mdx	100	107	pure-fragment	keep-fenced		 	uses agent.service('tools') but block is truncated
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	14	19	pure-fragment	keep-fenced		 	import statement + prose; no Dart code block
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	27	44	no-region	keep-fenced		 	abstract class Plugin declaration; not standalone (abstract methods)
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	112	118	pure-fragment	keep-fenced		 	prose + existing <Code> tag; no new extraction needed
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	167	169	pure-fragment	keep-fenced		 	1-line fragment
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	222	276	no-region	migrate	website/snippets/lib/plugin_lifecycle.dart	runtime-update-snapshot	dart block extracted; uses real PluginRuntime/RuntimeSettings types
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	307	314	pure-fragment	keep-fenced		 	CardGrid MDX; no Dart
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	54	66	pure-fragment	keep-fenced		 	two separate truncated code blocks; each ends mid-statement
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	70	75	pure-fragment	keep-fenced		 	prose section header; no Dart
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	83	92	no-region	keep-fenced		 	uses // ... placeholder; pseudocode
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	205	207	pure-fragment	keep-fenced		 	1-line fragment
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	288	295	pure-fragment	keep-fenced		 	6-line method signature fragment
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	299	301	pure-fragment	keep-fenced		 	1-line fragment
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	326	335	no-region	keep-fenced		 	bare method signatures; not compilable standalone
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	356	368	no-region	keep-fenced		 	prose + existing <Code> tags; no new extraction
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	391	394	pure-fragment	keep-fenced		 	2-line fragment
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	430	448	no-region	keep-fenced		 	empty range content
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	469	473	no-region	keep-fenced		 	empty range content
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	502	507	no-region	keep-fenced		 	4-line fragment
+website/src/content/docs/reference/settings-and-configuration.mdx	76	81	pure-fragment	keep-fenced		 	4-line fragment
+website/src/content/docs/reference/settings-and-configuration.mdx	159	164	pure-fragment	keep-fenced		 	4-line fragment
+website/src/content/docs/reference/settings-and-configuration.mdx	209	221	no-region	keep-fenced		 	JSON block + truncated Dart; not complete compilable unit
+website/src/content/docs/reference/settings-and-configuration.mdx	250	253	pure-fragment	keep-fenced		 	2-line fragment
+website/src/content/docs/reference/settings-and-configuration.mdx	316	319	pure-fragment	keep-fenced		 	2-line fragment
+website/src/content/docs/reference/settings-and-configuration.mdx	326	330	pure-fragment	keep-fenced		 	3-line fragment
+website/src/content/docs/reference/settings-and-configuration.mdx	353	357	pure-fragment	keep-fenced		 	3-line fragment
+website/src/content/docs/reference/settings-and-configuration.mdx	378	380	pure-fragment	keep-fenced		 	1-line fragment
+website/src/content/docs/reference/state-management-bridges.mdx	190	204	pure-fragment	keep-fenced		 	partial class body (end of dispose + prose); not standalone
+website/src/content/docs/reference/state-management-bridges.mdx	307	312	pure-fragment	keep-fenced		 	4-line fragment
+website/src/content/docs/reference/state-management-bridges.mdx	391	419	pseudocode	keep-fenced		 	empty range content
+website/src/content/docs/troubleshooting.mdx	40	52	pure-fragment	keep-fenced		 	uses MyGlobalContext/MySessionContext with ... (pseudocode constructors)
+website/src/content/docs/troubleshooting.mdx	157	163	pure-fragment	keep-fenced		 	uses MyQuery/MyResult (fictional); fragment only
+website/src/content/docs/troubleshooting.mdx	173	180	no-region	keep-fenced		 	prose + existing <Code> tag; no new extraction
+website/src/content/docs/troubleshooting.mdx	208	214	pure-fragment	keep-fenced		 	end of code block + prose; not extractable fragment
+website/src/content/docs/troubleshooting.mdx	226	236	no-region	keep-fenced		 	CardGrid MDX; no Dart

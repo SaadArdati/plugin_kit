@@ -63,7 +63,9 @@ class TestSessionPlugin extends SessionPlugin {
 }
 
 void main() {
+  // #docregion runtime-test-runtime
   late PluginRuntime runtime;
+  // #enddocregion runtime-test-runtime
 
   setUp(() {
     runtime = PluginRuntime();
@@ -200,6 +202,7 @@ void main() {
       runtime.addPlugin(TestSessionPlugin('s1'));
       runtime.init();
 
+      // #docregion runtime-test-session
       final session = await runtime.createSession(
         contextFactory: (registry, sessionBus, globalBus) {
           return SessionPluginContext(
@@ -210,6 +213,7 @@ void main() {
           );
         },
       );
+      // #enddocregion runtime-test-session
 
       expect(session.context.extras['test'], 'value');
     });

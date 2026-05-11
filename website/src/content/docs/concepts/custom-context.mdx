@@ -4,6 +4,10 @@ description: Extending PluginContext, GlobalPluginContext, and SessionPluginCont
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import customContextSource from '../../../../../website/snippets/lib/custom_context.dart?raw';
+import runtimeTestSource from '../../../../../packages/plugin_kit/test/runtime_test.dart?raw';
 
 The default `PluginContext`, `GlobalPluginContext`, and `SessionPluginContext` give you a registry, a bus, and some framework-level plumbing. That is enough for small apps. Once your domain has opinions, you usually want the context to carry them directly instead of resolving the same services over and over.
 
@@ -23,36 +27,11 @@ Rough rule: if three plugins want the same thing, put it on the context.
 
 Subclass `SessionPluginContext` (or `GlobalPluginContext`, or both) to add fields.
 
-```dart
-class EditorSessionContext extends SessionPluginContext {
-  final Document document;
-  final UserSession user;
-
-  EditorSessionContext({
-    required super.registry,
-    required super.bus,
-    required super.globalBus,
-    required this.document,
-    required this.user,
-  });
-}
-```
+<Code code={extractRegion(customContextSource, 'session-plugin-context-subclass')} lang="dart" />
 
 Session plugins can now type their context directly:
 
-```dart
-class AutosavePlugin extends SessionPlugin<EditorSessionContext> {
-  @override
-  PluginId get pluginId => const PluginId('autosave');
-
-  @override
-  void attach(EditorSessionContext context) {
-    on<DocumentEdited>(context, (_) {
-      scheduleSave(context.document, context.user.id);
-    });
-  }
-}
-```
+<Code code={extractRegion(customContextSource, 'session-plugin-typed-context')} lang="dart" />
 
 No casting, no re-resolving. `context.document` and `context.user` are always there.
 
@@ -65,26 +44,7 @@ The runtime does not know your custom context type unless you hand it a factory.
 | Global | `runtime.init(globalContextFactory: ...)` |
 | Session | `runtime.createSession(contextFactory: ...)` |
 
-```dart
-runtime.init(
-  globalContextFactory: (registry, bus, sessions) => EditorGlobalContext(
-    registry: registry,
-    bus: bus,
-    sessions: sessions,
-    application: myEditorApp,
-  ),
-);
-
-final session = await runtime.createSession(
-  contextFactory: (registry, sessionBus, globalBus) => EditorSessionContext(
-    registry: registry,
-    bus: sessionBus,
-    globalBus: globalBus,
-    document: currentDocument,
-    user: currentUser,
-  ),
-);
-```
+<Code code={extractRegion(runtimeTestSource, 'runtime-test-session')} lang="dart" />
 
 <Aside type="caution" title="Forget the factory and the runtime throws">
 If a plugin expects a custom context type but you forgot to pass the factory, the runtime throws `StateError` at init or `createSession`. The default factories only build the base types, and silently downcasting would hide the misconfiguration until a plugin tried to read a field that did not exist. The loud failure is the better tradeoff.
@@ -94,36 +54,11 @@ If a plugin expects a custom context type but you forgot to pass the factory, th
 
 A global context usually carries application-level singletons that do not belong in the registry: the top-level app object, a telemetry client, a feature flag service.
 
-```dart
-class EditorGlobalContext extends GlobalPluginContext {
-  final EditorApplication application;
-  final FeatureFlagClient flags;
-
-  EditorGlobalContext({
-    required super.registry,
-    required super.bus,
-    required super.sessions,
-    required this.application,
-    required this.flags,
-  });
-}
-```
+<Code code={extractRegion(customContextSource, 'global-plugin-context-subclass')} lang="dart" />
 
 Global plugins consume it exactly like session plugins consume the session context.
 
-```dart
-class AnalyticsPlugin extends GlobalPlugin<EditorGlobalContext> {
-  @override
-  PluginId get pluginId => const PluginId('analytics');
-
-  @override
-  void attach(EditorGlobalContext context) {
-    if (context.flags.isOn('analytics_v2')) {
-      context.application.telemetry.start();
-    }
-  }
-}
-```
+<Code code={extractRegion(customContextSource, 'global-plugin-typed-context')} lang="dart" />
 
 ## Mixing scopes
 
@@ -133,29 +68,7 @@ A session plugin can declare a custom session context while the global context s
 
 `PluginRuntime` exposes both factories directly.
 
-```dart
-final runtime = PluginRuntime<EditorGlobalContext, EditorSessionContext>();
-
-runtime.init(
-  settings: savedSettings,
-  globalContextFactory: (registry, bus, sessions) => EditorGlobalContext(
-    registry: registry,
-    bus: bus,
-    sessions: sessions,
-    application: myEditorApp,
-  ),
-);
-
-final session = await runtime.createSession(
-  contextFactory: (registry, sessionBus, globalBus) => EditorSessionContext(
-    registry: registry,
-    bus: sessionBus,
-    globalBus: globalBus,
-    document: currentDocument,
-    user: currentUser,
-  ),
-);
-```
+<Code code={extractRegion(runtimeTestSource, 'runtime-test-runtime')} lang="dart" />
 
 No subclassing needed.
 

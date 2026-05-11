@@ -16,6 +16,7 @@ import '../widgets/chat_view.dart';
 /// re-runs `build` when the observable is read inside it. Cancels the bus
 /// subscription in [dispose]; the `_disposed` guard blocks any in-flight
 /// cascade fire after dispose.
+// #docregion mobx-chat-mobx-chat-bridge
 class MobxChatBridge {
   MobxChatBridge(this._session) {
     _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
@@ -42,6 +43,7 @@ class MobxChatBridge {
     unawaited(_subscription.cancel());
   }
 }
+// #enddocregion mobx-chat-mobx-chat-bridge
 
 class MobxChatScreen extends StatefulWidget {
   const MobxChatScreen({super.key, required this.session});

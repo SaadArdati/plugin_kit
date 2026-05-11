@@ -4,6 +4,10 @@ description: Reference for RuntimeSettings, PluginConfig, ServiceSettings, and C
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import runtimeSettingsSource from '../../../../snippets/lib/runtime_settings.dart?raw';
+import settingsSource from '../../../../../packages/plugin_kit/lib/src/settings.dart?raw';
 
 This page is the API reference for the configuration model: the types the host
 hands to the runtime, and the typed reader services use to consume those values.
@@ -40,19 +44,7 @@ over the injected map. Defaults live in the service, not in the settings model.
 Top-level container for plugin enablement and service overrides. Immutable,
 JSON-round-trippable, value-equal.
 
-```dart
-class RuntimeSettings {
-  final Map<PluginId, PluginConfig> plugins;
-  final Map<Pin, ServiceSettings> services;
-
-  const RuntimeSettings({
-    this.plugins = const {},
-    this.services = const {},
-  });
-
-  const RuntimeSettings.empty();
-}
-```
+<Code code={extractRegion(runtimeSettingsSource, 'runtime-settings-construct')} lang="dart" />
 
 ### Fields and constructors
 
@@ -67,9 +59,7 @@ Both constructors are `const`. The default constructor's parameters default
 to `const {}`. `RuntimeSettings.empty()` is the canonical "no overrides"
 starting point; prefer it over passing two empty maps explicitly.
 
-```dart
-const settings = RuntimeSettings.empty();
-```
+<Code code={extractRegion(runtimeSettingsSource, 'runtime-settings-empty')} lang="dart" />
 
 ### Query helpers
 
@@ -95,12 +85,7 @@ fully-resolved enablement decision (locked plugins, experimental fallback,
 
 ### `copyWith`
 
-```dart
-RuntimeSettings copyWith({
-  Map<PluginId, PluginConfig>? plugins,
-  Map<Pin, ServiceSettings>? services,
-});
-```
+<Code code={extractRegion(settingsSource, 'settings-copy-with-2')} lang="dart" />
 
 Returns a copy with the given replacements. When a parameter is omitted, the
 result holds a shallow clone of the existing map (a fresh `Map` instance with
@@ -125,26 +110,7 @@ with dots into the wire `serviceId`.
 In Dart code, prefer the typed-chain helpers when you have the underlying
 `PluginId` / `Namespace` / `ServiceId` handles in scope:
 
-```dart
-const mainAgent = PluginId('main_agent');
-const agent = Namespace('agent');
-
-final settings = RuntimeSettings(
-  services: {
-    // Plugin-scoped: main_agent's agent.temperature service.
-    mainAgent.namespace('agent').service('temperature'):
-        const ServiceSettings(config: {'value': 0.7}),
-
-    // Equivalently, hand-built Pin:
-    Pin('main_agent', ['agent', 'temperature']):
-        const ServiceSettings(config: {'value': 0.7}),
-
-    // Wildcard: applies to whichever plugin wins agent.system_message.
-    Pin.wildcard(['agent', 'system_message']):
-        const ServiceSettings(config: {'value': 'Be concise.'}),
-  },
-);
-```
+<Code code={extractRegion(runtimeSettingsSource, 'runtime-settings-priority')} lang="dart" />
 
 The wildcard form is winner-scoped, not layered. The runtime resolves the
 current winner first, then materializes the wildcard override onto that
@@ -156,12 +122,7 @@ see [Settings & Overrides](/guides/settings/#wildcard-overrides).
 When you receive an override key as a wire string (e.g., from JSON your
 own code is parsing), build a `Pin` via `Pin.fromWire`:
 
-```dart
-final pin = Pin.fromWire('main_agent:agent.temperature');
-// pin.pluginId  == PluginId('main_agent')
-// pin.serviceId == ServiceId('agent.temperature')
-// pin.wire      == 'main_agent:agent.temperature'
-```
+<Code code={extractRegion(runtimeSettingsSource, 'pin-from-wire')} lang="dart" />
 
 `Pin.fromWire` is a `const` constructor that accepts any string and stores
 it verbatim. Validation happens lazily on access: reading `pin.pluginId`
@@ -173,17 +134,7 @@ offending key, which makes JSON-fed typos easy to spot.
 
 Plugin-level enablement plus an arbitrary plugin-wide map.
 
-```dart
-class PluginConfig {
-  final bool enabled;
-  final Map<String, dynamic> config;
-
-  const PluginConfig({
-    this.enabled = true,
-    this.config = const {},
-  });
-}
-```
+<Code code={extractRegion(runtimeSettingsSource, 'plugin-config-construct')} lang="dart" />
 
 ### Fields
 
@@ -247,10 +198,7 @@ All three settings types ship `toJson()` returning `Map<String, dynamic>` and
 a matching `fromJson(Map<String, dynamic>)` factory. Round-tripping returns
 an equal value:
 
-```dart
-final restored = RuntimeSettings.fromJson(settings.toJson());
-assert(settings == restored);
-```
+<Code code={extractRegion(runtimeSettingsSource, 'runtime-settings-json-roundtrip')} lang="dart" />
 
 The wire format mirrors the field shape:
 
@@ -313,21 +261,14 @@ There is no `getMap` returning a nullable map, and no path-style traversal.
 The accessor is intentionally flat. To walk a nested map, read it with
 `map(key)` and index into the result.
 
-```dart
-final headers = config.map('headers');
-final timeoutMs = headers['timeout_ms'] as int?;
-```
+<Code code={extractRegion(runtimeSettingsSource, 'config-node-map-access')} lang="dart" />
 
 ### Defaults and missing keys
 
 `ConfigNode` does not carry default values. The convention is to apply the
 default at the call site through `??`:
 
-```dart
-final temperature = config.getDouble('temperature') ?? 0.7;
-final tools = config.list<String>('tools') ?? const [];
-final provider = config.getString('provider') ?? 'openai';
-```
+<Code code={extractRegion(runtimeSettingsSource, 'config-node-defaults')} lang="dart" />
 
 `map(key)` is the only accessor that returns a non-null fallback. It returns
 `const {}` rather than null because the typical use is "read a sub-map and

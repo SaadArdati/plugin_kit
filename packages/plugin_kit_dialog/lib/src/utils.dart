@@ -6,7 +6,9 @@ import 'package:plugin_kit/plugin_kit.dart';
 /// Signature for the dialog's save callback. Receives the current working
 /// settings and may return a Future to delay dialog closure until async work
 /// (persistence, validation, etc.) completes.
+// #docregion utils-save-callback
 typedef SaveCallback = FutureOr<void> Function(RuntimeSettings);
+// #enddocregion utils-save-callback
 
 /// Run [dispose] and route any error -- thrown synchronously from invoking
 /// the closure, or surfacing on the returned future -- through

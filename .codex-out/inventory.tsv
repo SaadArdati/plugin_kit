@@ -1,0 +1,328 @@
+doc_file	start_line	end_line	loc	first_line	classification	candidate_source
+README.md	40	94	53	import 'package:plugin_kit/plugin_kit.dart';	real-code	example/villain_lair/bin/12_dependencies.dart
+example/state_garden/README.md	74	101	26	class ChatService extends StatefulPluginService {	real-code	example/state_garden/lib/src/chat/chat_service.dart
+packages/flutter_plugin_kit/README.md	28	68	39	import 'package:flutter/material.dart';	real-code	packages/flutter_plugin_kit/example/lib/main.dart
+packages/flutter_plugin_kit/README.md	72	79	6	Builder(	aspirational	(create)
+packages/flutter_plugin_kit/README.md	89	99	9	ChangeNotifierProvider(	pure-fragment	(skip)
+packages/flutter_plugin_kit/README.md	107	122	14	class PluginEventCubit<E> extends Cubit<E?> {	real-code	example/state_garden/lib/src/integrations/bloc_chat.dart
+packages/plugin_kit/README.md	28	82	53	import 'package:plugin_kit/plugin_kit.dart';	real-code	example/villain_lair/bin/04_service_registry.dart
+packages/plugin_kit/README.md	90	108	17	abstract class Plugin {	real-code	packages/plugin_kit/lib/src/plugin/core.dart
+packages/plugin_kit/README.md	127	145	17	class ChatThread extends SessionStatefulPluginService {	real-code	example/code_editor/lib/app/plugins/ai_assist_plugin.dart
+packages/plugin_kit/README.md	151	179	27	// Factory: new instance each resolve.	pure-fragment	(skip)
+packages/plugin_kit/README.md	185	192	6	const agent = Namespace('agent');	pure-fragment	(skip)
+packages/plugin_kit/README.md	200	225	24	// Subscribe. Higher priority runs later in the ascending cascade.	aspirational	(create)
+packages/plugin_kit/README.md	233	237	3	final session = await runtime.createSession();	pure-fragment	(skip)
+packages/plugin_kit/README.md	245	261	15	final settings = RuntimeSettings(	aspirational	(create)
+packages/plugin_kit/README.md	269	284	14	class SupportsFileFormats extends Capability {	aspirational	(create)
+packages/plugin_kit/README.md	301	340	38	import 'package:plugin_kit/plugin_kit.dart';	aspirational	(create)
+packages/plugin_kit_dialog/README.md	32	47	14	import 'package:plugin_kit/plugin_kit.dart';	aspirational	(create)
+packages/plugin_kit_dialog/README.md	55	79	23	// In your plugin's register(). This code can live in a Dart-only package.	real-code	example/plugin_kit_dialog_demo/lib/plugins/chat_plugin.dart
+packages/plugin_kit_dialog/README.md	104	131	26	runtime	real-code	example/plugin_kit_dialog_demo/lib/plugin_visuals.dart
+packages/plugin_kit_dialog/README.md	139	147	7	// In your dart-only plugin.	aspirational	(create)
+packages/plugin_kit_dialog/README.md	151	179	27	class ColorPickerRenderer	real-code	packages/plugin_kit_dialog/test/runtime/config_field_dispatch_test.dart
+packages/plugin_kit_dialog/README.md	187	198	10	showPluginKitDialog(	pure-fragment	(skip)
+packages/plugin_kit_dialog/README.md	223	245	21	import 'package:plugin_kit_dialog/plugin_kit_dialog.dart';	aspirational	(create)
+packages/plugin_kit_dialog/README.md	249	260	10	import 'package:plugin_kit/plugin_kit.dart';	aspirational	(create)
+skills/plugin-kit/anti-patterns.md	25	34	8	class MyRedactionPlugin extends SessionPlugin {	real-code	packages/plugin_kit/test/multi_session_isolation_test.dart
+skills/plugin-kit/anti-patterns.md	44	51	6	const settings = RuntimeSettings(	aspirational	(create)
+skills/plugin-kit/anti-patterns.md	56	65	8	final settings = RuntimeSettings(	aspirational	(create)
+skills/plugin-kit/anti-patterns.md	71	77	5	@override	aspirational	(create)
+skills/plugin-kit/anti-patterns.md	82	94	11	// (a) Lazy + closure capture; resolve when the lazy factory fires.	aspirational	(create)
+skills/plugin-kit/anti-patterns.md	100	105	4	@override	pseudocode	(skip)
+skills/plugin-kit/anti-patterns.md	110	117	6	@override	pseudocode	(skip)
+skills/plugin-kit/anti-patterns.md	123	133	9	class MyService extends StatefulPluginService {	aspirational	(create)
+skills/plugin-kit/anti-patterns.md	138	143	4	on<MyEvent>((e) {	aspirational	(create)
+skills/plugin-kit/anti-patterns.md	151	163	11	class ChatPlugin extends SessionPlugin {	real-code	example/state_garden/lib/src/chat/chat_plugin.dart
+skills/plugin-kit/anti-patterns.md	168	173	4	registry.registerSingleton<ChatService>(	pure-fragment	(skip)
+skills/plugin-kit/anti-patterns.md	179	184	4	@override	pseudocode	(skip)
+skills/plugin-kit/anti-patterns.md	189	192	2	on<MyEvent>(context, (e) => /* ... */);  // Plugin: pass context	pseudocode	(skip)
+skills/plugin-kit/anti-patterns.md	198	200	1	final svc = registry.resolveByPlugin(PluginId('chat'), ServiceId('agent.model'));	aspirational	(create)
+skills/plugin-kit/anti-patterns.md	208	215	6	class MyPlugin extends SessionPlugin {	aspirational	(create)
+skills/plugin-kit/anti-patterns.md	221	225	3	PluginId('chat')   // fine	pure-fragment	(skip)
+skills/plugin-kit/anti-patterns.md	229	238	8	class UserMessageReceived {	aspirational	(create)
+skills/plugin-kit/api-cheatsheet.md	21	65	43	const PluginId         chatId    = PluginId('chat');	pure-fragment	(skip)
+skills/plugin-kit/api-cheatsheet.md	71	101	29	class MyPlugin extends SessionPlugin {	pseudocode	(skip)
+skills/plugin-kit/api-cheatsheet.md	145	157	11	registry.registerSingleton<MyService>(serviceId, MyService(), priority: 50);	pure-fragment	(skip)
+skills/plugin-kit/api-cheatsheet.md	169	173	3	context.resolve<T>(serviceId);            // throws if missing/disabled	pure-fragment	(skip)
+skills/plugin-kit/api-cheatsheet.md	176	182	5	registry.raw.resolve<T>(serviceId);	pure-fragment	(skip)
+skills/plugin-kit/api-cheatsheet.md	185	191	5	registry.raw.listAllServiceIds([pluginId]);              // Set<ServiceId>	pure-fragment	(skip)
+skills/plugin-kit/api-cheatsheet.md	197	207	9	class ConfigurableCapability extends Capability { const ConfigurableCapability(); }	aspirational	(create)
+skills/plugin-kit/api-cheatsheet.md	213	232	18	class ModelRouter extends PluginService {	pseudocode	(skip)
+skills/plugin-kit/api-cheatsheet.md	247	258	10	on<MyEvent>(	pseudocode	(skip)
+skills/plugin-kit/api-cheatsheet.md	263	273	9	onRequest<RequestType, ResponseType?>((envelope) async {	aspirational	(create)
+skills/plugin-kit/api-cheatsheet.md	282	285	2	bind(context, (envelope) => log(envelope.event));   // Plugin form	pure-fragment	(skip)
+skills/plugin-kit/api-cheatsheet.md	292	296	3	context.sessions.emit(...);              // global plugin: broadcast to every session bus	pure-fragment	(skip)
+skills/plugin-kit/api-cheatsheet.md	300	320	19	final settings = RuntimeSettings(	real-code	example/villain_lair/bin/08_config_and_settings.dart
+skills/plugin-kit/api-cheatsheet.md	330	354	23	final runtime = PluginRuntime(plugins: [/* ... */]);	pseudocode	(skip)
+skills/plugin-kit/api-cheatsheet.md	358	362	3	PluginContext.stub();              // base context	pure-fragment	(skip)
+skills/plugin-kit/api-cheatsheet.md	368	394	25	final runtime = PluginRuntime(plugins: [/* ... */]);	pseudocode	(skip)
+skills/plugin-kit/patterns.md	27	60	32	abstract class Redactor {	real-code	example/state_garden/lib/src/chat/chat_plugin.dart
+skills/plugin-kit/patterns.md	74	107	32	class EnterpriseRouter implements ModelRouter {	real-code	example/plugin_kit_dialog_demo/lib/plugins/web_search_explorer_plugin.dart
+skills/plugin-kit/patterns.md	120	145	24	class ChatPlugin extends SessionPlugin {	real-code	packages/plugin_kit_dialog/test/runtime/visuals_dispatch_test.dart
+skills/plugin-kit/patterns.md	153	177	23	final session = await runtime.createSession(	real-code	packages/plugin_kit/test/runtime_test.dart
+skills/plugin-kit/patterns.md	197	208	10	const Namespace agent = Namespace('agent');	aspirational	(create)
+skills/plugin-kit/patterns.md	216	233	16	class DraftOutgoingMessage {	aspirational	(create)
+skills/plugin-kit/patterns.md	243	253	9	String? routeFor(String prompt) {	aspirational	(create)
+skills/plugin-kit/patterns.md	259	270	10	String? routeFor(String prompt) {	real-code	packages/plugin_kit/lib/src/event_bus.dart
+skills/plugin-kit/testing.md	9	13	3	PluginContext.stub({registry, bus, extras});	aspirational	(create)
+skills/plugin-kit/testing.md	17	25	7	final ctx = SessionPluginContext.stub();	pure-fragment	(skip)
+skills/plugin-kit/testing.md	31	36	4	ctx.bus.on<DraftMessage>((e) => e.event.text = e.event.text.toUpperCase());	pure-fragment	(skip)
+website/src/content/docs/concepts/capabilities.mdx	28	32	3	const tooling = Namespace('tooling');	pure-fragment	(skip)
+website/src/content/docs/concepts/capabilities.mdx	42	56	13	class SupportsFileFormats extends Capability {	aspirational	(create)
+website/src/content/docs/concepts/capabilities.mdx	64	78	13	class FormatterCapability extends Capability {	real-code	example/code_editor/bin/09_extension_manifest.dart
+website/src/content/docs/concepts/capabilities.mdx	82	85	2	final wrapper = context.registry.resolveRaw(const ServiceId('formatter'));	pure-fragment	(skip)
+website/src/content/docs/concepts/capabilities.mdx	100	109	8	final caps = wrapper.capabilities;	aspirational	(create)
+website/src/content/docs/concepts/configuration.mdx	40	45	4	class AnthropicService extends PluginService {	aspirational	(create)
+website/src/content/docs/concepts/configuration.mdx	77	85	7	class ModelConfig extends PluginService {	aspirational	(create)
+website/src/content/docs/concepts/configuration.mdx	89	103	13	final settings = RuntimeSettings(	real-code	example/villain_lair/bin/08_config_and_settings.dart
+website/src/content/docs/concepts/configuration.mdx	113	117	3	final tools = config.list<String>('tools') ?? const [];	pure-fragment	(skip)
+website/src/content/docs/concepts/configuration.mdx	129	131	1	final payload = config.raw('advanced_payload');	aspirational	(create)
+website/src/content/docs/concepts/custom-context.mdx	26	39	12	class EditorSessionContext extends SessionPluginContext {	real-code	packages/plugin_kit/test/runtime_routing_test.dart
+website/src/content/docs/concepts/custom-context.mdx	43	55	11	class AutosavePlugin extends SessionPlugin<EditorSessionContext> {	real-code	example/code_editor/lib/app/plugins/minimap_plugin.dart
+website/src/content/docs/concepts/custom-context.mdx	68	87	18	runtime.init(	real-code	packages/plugin_kit/test/runtime_test.dart
+website/src/content/docs/concepts/custom-context.mdx	97	110	12	class EditorGlobalContext extends GlobalPluginContext {	real-code	packages/plugin_kit/test/runtime_test.dart
+website/src/content/docs/concepts/custom-context.mdx	114	126	11	class AnalyticsPlugin extends GlobalPlugin<EditorGlobalContext> {	real-code	packages/plugin_kit/lib/src/event_bus.dart
+website/src/content/docs/concepts/custom-context.mdx	136	158	21	final runtime = PluginRuntime<EditorGlobalContext, EditorSessionContext>();	real-code	packages/plugin_kit/test/runtime_test.dart
+website/src/content/docs/concepts/event-bus.mdx	19	32	12	class UserLoggedInEvent {	aspirational	(create)
+website/src/content/docs/concepts/event-bus.mdx	51	61	9	context.bus.on<UserMessage>((e) {	aspirational	(create)
+website/src/content/docs/concepts/event-bus.mdx	75	79	3	final unbind = context.bus.bind((envelope) {	aspirational	(create)
+website/src/content/docs/concepts/event-bus.mdx	89	99	9	context.bus.onRequest<SearchQuery, SearchResults?>((req) async {	aspirational	(create)
+website/src/content/docs/concepts/event-bus.mdx	123	139	15	context.bus.on<ToolExecutionEvent>((e) {	aspirational	(create)
+website/src/content/docs/concepts/event-bus.mdx	169	181	11	final result = await context.bus.emit<BeforeSaveEvent>(	aspirational	(create)
+website/src/content/docs/concepts/events.mdx	40	46	5	class UserMessageReceived {	aspirational	(create)
+website/src/content/docs/concepts/events.mdx	62	77	14	class ChatLogger extends StatefulPluginService {	real-code	example/code_editor/lib/app/plugins/terminal_plugin.dart
+website/src/content/docs/concepts/events.mdx	107	113	5	@override	aspirational	(create)
+website/src/content/docs/concepts/events.mdx	135	140	4	await emit(UserMessageReceived(	pure-fragment	(skip)
+website/src/content/docs/concepts/events.mdx	156	194	37	class DraftOutgoingMessage {	real-code	example/code_editor/lib/app/plugins/ai_assist_plugin.dart
+website/src/content/docs/concepts/events.mdx	216	234	17	class FindOpenPort {	real-code	packages/plugin_kit/test/multi_session_isolation_test.dart
+website/src/content/docs/concepts/events.mdx	238	242	3	final port = await context.bus.request<FindOpenPort, int?>(	pure-fragment	(skip)
+website/src/content/docs/concepts/plugin-services.mdx	30	35	4	class ModelRouter extends PluginService {	aspirational	(create)
+website/src/content/docs/concepts/plugin-services.mdx	50	64	13	class DebugAdapter extends StatefulPluginService {	real-code	example/code_editor/lib/plugins/debugger.dart
+website/src/content/docs/concepts/plugin-services.mdx	78	88	9	class CachedFormatter extends StatefulPluginService {	real-code	packages/plugin_kit/test/wildcard_pipeline_test.dart
+website/src/content/docs/concepts/plugin-services.mdx	120	131	10	class ConversationState extends StatefulPluginService {	real-code	example/villain_lair/bin/15_the_grand_heist.dart
+website/src/content/docs/concepts/plugin-services.mdx	156	165	8	final settings = RuntimeSettings(	real-code	example/villain_lair/bin/08_config_and_settings.dart
+website/src/content/docs/concepts/plugin-services.mdx	167	171	3	class ModelRouter extends PluginService {	aspirational	(create)
+website/src/content/docs/concepts/plugins.mdx	49	70	20	class GreeterPlugin extends SessionPlugin {	real-code	example/villain_lair/bin/07_sessions.dart
+website/src/content/docs/concepts/plugins.mdx	108	111	2	@override	pure-fragment	(skip)
+website/src/content/docs/concepts/runtime.mdx	14	24	9	final runtime = PluginRuntime(plugins: [	pure-fragment	(skip)
+website/src/content/docs/concepts/runtime.mdx	48	57	8	runtime.init(	aspirational	(create)
+website/src/content/docs/concepts/runtime.mdx	67	77	9	// User turns off analytics in a settings screen	aspirational	(create)
+website/src/content/docs/concepts/runtime.mdx	83	89	5	// Optimistic UI wants settingsStream to emit immediately	pure-fragment	(skip)
+website/src/content/docs/concepts/service-registry.mdx	34	52	17	@override	aspirational	(create)
+website/src/content/docs/concepts/service-registry.mdx	65	68	2	final db = context.resolve<Database>(const ServiceId('main_db'));	pure-fragment	(skip)
+website/src/content/docs/concepts/service-registry.mdx	81	95	13	// plugin: core	pure-fragment	(skip)
+website/src/content/docs/concepts/service-registry.mdx	113	126	12	Future<void> formatFile(File file) async {	aspirational	(create)
+website/src/content/docs/concepts/service-registry.mdx	144	155	10	static const panel = Namespace('panel');	pure-fragment	(skip)
+website/src/content/docs/concepts/service-registry.mdx	164	169	4	class AnthropicService extends PluginService {	aspirational	(create)
+website/src/content/docs/concepts/service-registry.mdx	187	194	6	const tooling = Namespace('tooling');	pure-fragment	(skip)
+website/src/content/docs/concepts/service-registry.mdx	204	214	9	registry.registerSingleton<CodeLinter>(	aspirational	(create)
+website/src/content/docs/concepts/sessions.mdx	17	31	13	// Editor opens a new document	real-code	packages/plugin_kit/test/runtime_test.dart
+website/src/content/docs/concepts/sessions.mdx	92	129	36	class ThemeService extends StatefulPluginService<GlobalPluginContext> {	real-code	example/villain_lair/bin/09_global_vs_session.dart
+website/src/content/docs/concepts/sessions.mdx	137	141	3	context.globalBus.emit<DocumentSaved>(	pure-fragment	(skip)
+website/src/content/docs/concepts/sessions.mdx	147	149	1	context.bus.emit<SystemReady>(event: SystemReady());	pure-fragment	(skip)
+website/src/content/docs/concepts/sessions.mdx	155	157	1	context.bus.emit<UserMessage>(event: UserMessage(text));	pure-fragment	(skip)
+website/src/content/docs/examples/model-embassy.mdx	28	36	7	final passport = ModelPassport(family: 'anthropic', id: 'claude-sonnet');	pure-fragment	(skip)
+website/src/content/docs/examples/model-embassy.mdx	72	82	9	// Session A: production credentials (scoped key).	aspirational	(create)
+website/src/content/docs/getting-started.mdx	64	118	53	import 'package:plugin_kit/plugin_kit.dart';	real-code	example/villain_lair/bin/12_dependencies.dart
+website/src/content/docs/guides/adding-a-plugin.mdx	15	48	32	import 'package:plugin_kit/plugin_kit.dart';	real-code	example/code_editor/bin/10_full_editor_cli.dart
+website/src/content/docs/guides/adding-a-plugin.mdx	67	73	5	class NotificationService {	aspirational	(create)
+website/src/content/docs/guides/adding-a-plugin.mdx	83	98	14	import 'package:plugin_kit/plugin_kit.dart';	real-code	packages/flutter_plugin_kit/example/lib/plugins.dart
+website/src/content/docs/guides/adding-a-plugin.mdx	134	148	13	final runtime = PluginRuntime(	pure-fragment	(skip)
+website/src/content/docs/guides/adding-a-plugin.mdx	177	213	35	class NotificationRequest {	real-code	example/villain_lair/bin/05_stateful_services.dart
+website/src/content/docs/guides/adding-a-plugin.mdx	262	271	8	class NotificationService extends PluginService {	aspirational	(create)
+website/src/content/docs/guides/adding-a-plugin.mdx	275	285	9	final settings = RuntimeSettings(	real-code	example/villain_lair/bin/08_config_and_settings.dart
+website/src/content/docs/guides/adding-a-plugin.mdx	311	325	13	class ChatBackendService extends PluginService {	aspirational	(create)
+website/src/content/docs/guides/adding-a-plugin.mdx	339	358	18	const myNotifier = PluginId('my_notifier');	real-code	example/villain_lair/bin/13_settings_reconciliation.dart
+website/src/content/docs/guides/adding-a-plugin.mdx	378	396	17	class SupportsFileFormats extends Capability {	aspirational	(create)
+website/src/content/docs/guides/adding-a-plugin.mdx	400	407	6	final slow = context.registry.resolveCapability<IsSlowCapability>(	aspirational	(create)
+website/src/content/docs/guides/flutter-integration.mdx	68	132	63	class _EditorScreenState extends State<_EditorScreen> {	real-code	example/code_editor/lib/app/editor_app.dart
+website/src/content/docs/guides/flutter-integration.mdx	142	146	3	abstract class PanelWidgetFactory {	real-code	example/code_editor/lib/app/factories.dart
+website/src/content/docs/guides/flutter-integration.mdx	150	179	28	class TerminalPanelFactory extends StatefulPluginService	real-code	example/code_editor/lib/app/plugins/terminal_plugin.dart
+website/src/content/docs/guides/flutter-integration.mdx	189	209	19	// In shell: define the event.	real-code	example/code_editor/lib/app/contributions.dart
+website/src/content/docs/guides/flutter-integration.mdx	217	232	14	Future<void> _setEnabled(PluginId pluginId, bool enabled) async {	aspirational	(create)
+website/src/content/docs/guides/flutter-integration.mdx	239	249	9	Future<void> _togglePending = Future.value();	real-code	example/code_editor/lib/app/editor_app.dart
+website/src/content/docs/guides/flutter-integration.mdx	280	292	11	testWidgets('editor shell renders registered panels', (tester) async {	aspirational	(create)
+website/src/content/docs/guides/flutter-integration.mdx	296	310	13	class FakeSearchPlugin extends SessionPlugin {	real-code	packages/plugin_kit_dialog/lib/src/runtime/plugins/plugin_kit_visuals_plugin.dart
+website/src/content/docs/guides/flutter-plugin-kit.mdx	38	78	39	import 'package:flutter/material.dart';	real-code	packages/flutter_plugin_kit/example/lib/main.dart
+website/src/content/docs/guides/flutter-plugin-kit.mdx	84	91	6	Builder(	aspirational	(create)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	104	110	5	PluginRuntimeScope(	pure-fragment	(skip)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	117	128	10	final runtime = PluginRuntime(plugins: [...])..init();	pure-fragment	(skip)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	142	150	7	PluginRuntimeScope(	pure-fragment	(skip)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	157	162	4	PluginSessionScope(	pure-fragment	(skip)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	169	174	4	PluginSessionScope(	pure-fragment	(skip)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	192	211	18	class _ChatScreenState extends State<ChatScreen>	pseudocode	(skip)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	215	221	5	class _PaneState extends State<Pane> with PluginSessionStateListener<Pane> {	pseudocode	(skip)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	229	232	2	final last = context.watchEvent<ChatMessageReceived>();	pure-fragment	(skip)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	247	256	8	final notifier = PluginEventNotifier<ChatMessageReceived>(	pure-fragment	(skip)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	268	278	9	ChangeNotifierProvider(	pure-fragment	(skip)
+website/src/content/docs/guides/flutter-plugin-kit.mdx	284	299	14	class PluginEventCubit<E> extends Cubit<E?> {	real-code	example/state_garden/lib/src/integrations/bloc_chat.dart
+website/src/content/docs/guides/flutter-plugin-kit.mdx	309	329	19	class ChatController with PluginSessionListener {	pseudocode	(skip)
+website/src/content/docs/guides/logging.mdx	27	33	5	import 'package:logging/logging.dart';	aspirational	(create)
+website/src/content/docs/guides/logging.mdx	58	67	8	try {	aspirational	(create)
+website/src/content/docs/guides/logging.mdx	88	91	2	Logger('plugin_kit.PluginRuntime').level = Level.FINE;	pure-fragment	(skip)
+website/src/content/docs/guides/migrating-flutter-app.mdx	29	36	6	GetIt.I.registerLazySingleton<SearchService>(	pure-fragment	(skip)
+website/src/content/docs/guides/migrating-flutter-app.mdx	40	56	15	class AlgoliaSearchPlugin extends SessionPlugin {	real-code	example/code_editor/lib/plugins/linter_suite.dart
+website/src/content/docs/guides/migrating-flutter-app.mdx	66	93	26	class SearchRequested {	real-code	packages/plugin_kit/test/multi_session_isolation_test.dart
+website/src/content/docs/guides/migrating-flutter-app.mdx	133	186	52	import 'dart:async';	real-code	packages/flutter_plugin_kit/lib/src/session_scope.dart
+website/src/content/docs/guides/migrating-flutter-app.mdx	255	266	10	class FileSaveRequested {	aspirational	(create)
+website/src/content/docs/guides/migrating-flutter-app.mdx	286	324	37	class ChatMessagesChanged {	real-code	example/state_garden/lib/src/integrations/change_notifier_chat.dart
+website/src/content/docs/guides/migrating-flutter-app.mdx	330	337	6	final bridge = context.watch<ChatBridge>();	real-code	example/state_garden/lib/src/integrations/plugin_kit_session_listener_chat.dart
+website/src/content/docs/guides/migrating-flutter-app.mdx	344	369	24	final pluginRuntimeProvider = Provider<PluginRuntime>((ref) {	aspirational	(create)
+website/src/content/docs/guides/migrating-flutter-app.mdx	373	397	23	class ChatController extends AsyncNotifier<List<ChatMessage>> {	aspirational	(create)
+website/src/content/docs/guides/migrating-flutter-app.mdx	409	437	27	class ChatCubit extends Cubit<ChatState> {	real-code	example/state_garden/lib/src/integrations/bloc_chat.dart
+website/src/content/docs/guides/migrating-flutter-app.mdx	457	477	19	class AssistantReady {	real-code	example/code_editor/lib/app/plugins/ai_assist_plugin.dart
+website/src/content/docs/guides/migrating-flutter-app.mdx	489	513	23	class WaitForAssistant {	real-code	example/code_editor/lib/app/plugins/ai_assist_plugin.dart
+website/src/content/docs/guides/migrating-flutter-app.mdx	526	547	20	class MessageChunkReceived {	aspirational	(create)
+website/src/content/docs/guides/migrating-flutter-app.mdx	556	598	41	class ServerEventStreamReady {	real-code	example/code_editor/lib/app/plugins/ai_assist_plugin.dart
+website/src/content/docs/guides/migrating-flutter-app.mdx	626	640	13	class LegacySearchAdapterPlugin extends SessionPlugin {	real-code	packages/plugin_kit/test/multi_session_isolation_test.dart
+website/src/content/docs/guides/plugin-kit-dialog.mdx	24	40	15	import 'package:plugin_kit/plugin_kit.dart';	aspirational	(create)
+website/src/content/docs/guides/plugin-kit-dialog.mdx	76	100	23	// In your plugin's register(). This code can live in a Dart-only package.	real-code	example/plugin_kit_dialog_demo/lib/plugins/chat_plugin.dart
+website/src/content/docs/guides/plugin-kit-dialog.mdx	125	153	27	runtime	real-code	example/plugin_kit_dialog_demo/lib/plugin_visuals.dart
+website/src/content/docs/guides/plugin-kit-dialog.mdx	163	171	7	// In your dart-only plugin.	aspirational	(create)
+website/src/content/docs/guides/plugin-kit-dialog.mdx	175	203	27	class ColorPickerRenderer	real-code	packages/plugin_kit_dialog/test/runtime/config_field_dispatch_test.dart
+website/src/content/docs/guides/plugin-kit-dialog.mdx	211	222	10	showPluginKitDialog(	pure-fragment	(skip)
+website/src/content/docs/guides/plugin-kit-dialog.mdx	253	270	16	import 'package:plugin_kit_dialog/plugin_kit_dialog.dart';	aspirational	(create)
+website/src/content/docs/guides/plugin-kit-dialog.mdx	274	285	10	import 'package:plugin_kit/plugin_kit.dart';	aspirational	(create)
+website/src/content/docs/guides/settings.mdx	30	47	16	final settings = RuntimeSettings(	real-code	example/villain_lair/bin/08_config_and_settings.dart
+website/src/content/docs/guides/settings.mdx	93	96	2	'linter_suite:line_length_linter'  // specific plugin	pure-fragment	(skip)
+website/src/content/docs/guides/settings.mdx	123	132	8	final settings = RuntimeSettings(	real-code	example/code_editor/bin/08_editor_settings.dart
+website/src/content/docs/guides/settings.mdx	156	160	3	final runtime = PluginRuntime(	pure-fragment	(skip)
+website/src/content/docs/guides/settings.mdx	164	166	1	await runtime.updateSettings(nextSettings);	pure-fragment	(skip)
+website/src/content/docs/guides/settings.mdx	182	184	1	runtime.updateSettingsSnapshot(nextSettings);	pure-fragment	(skip)
+website/src/content/docs/guides/settings.mdx	205	208	2	final json = settings.toJson();	real-code	example/villain_lair/bin/08_config_and_settings.dart
+website/src/content/docs/guides/testing.mdx	20	27	6	test('NotificationService applies the configured channel', () {	aspirational	(create)
+website/src/content/docs/guides/testing.mdx	39	54	14	import 'package:plugin_kit/plugin_kit.dart';	real-code	packages/plugin_kit/test/service_registry_test.dart
+website/src/content/docs/guides/testing.mdx	58	78	19	test('plugin answers notification requests', () async {	aspirational	(create)
+website/src/content/docs/guides/testing.mdx	86	108	21	void main() {	real-code	packages/plugin_kit/test/runtime_test.dart
+website/src/content/docs/guides/testing.mdx	114	148	33	class TrackingPlugin extends SessionPlugin {	real-code	packages/plugin_kit/test/runtime_test.dart
+website/src/content/docs/guides/testing.mdx	154	170	15	test('plugin disables after updateSettings', () async {	aspirational	(create)
+website/src/content/docs/guides/testing.mdx	178	205	26	test('ChatBuffer records messages while attached', () async {	aspirational	(create)
+website/src/content/docs/guides/testing.mdx	219	224	4	expect(	pure-fragment	(skip)
+website/src/content/docs/guides/testing.mdx	228	240	11	test('bad plugin surfaces in PluginLifecycleException', () async {	aspirational	(create)
+website/src/content/docs/introduction.mdx	45	72	26	class CasualPlugin extends SessionPlugin {	real-code	example/villain_lair/bin/04_service_registry.dart
+website/src/content/docs/reference/dialog-api.mdx	30	42	11	class UiConfigurableCapability extends Capability {	real-code	packages/plugin_kit/lib/src/dialog/ui_configurable_capability.dart
+website/src/content/docs/reference/dialog-api.mdx	48	71	22	const agent = Namespace('agent');	real-code	example/plugin_kit_dialog_demo/lib/plugins/chat_plugin.dart
+website/src/content/docs/reference/dialog-api.mdx	75	89	13	sealed class ConfigField {	real-code	packages/plugin_kit/lib/src/dialog/config_field.dart
+website/src/content/docs/reference/dialog-api.mdx	97	109	11	final class TextConfigField extends ConfigField {	real-code	packages/plugin_kit/lib/src/dialog/config_field.dart
+website/src/content/docs/reference/dialog-api.mdx	115	131	15	final class MultilineConfigField extends ConfigField {	real-code	packages/plugin_kit/lib/src/dialog/config_field.dart
+website/src/content/docs/reference/dialog-api.mdx	137	149	11	final class PasswordConfigField extends ConfigField {	real-code	packages/plugin_kit/lib/src/dialog/config_field.dart
+website/src/content/docs/reference/dialog-api.mdx	155	175	19	final class NumberConfigField extends ConfigField {	real-code	packages/plugin_kit/lib/src/dialog/config_field.dart
+website/src/content/docs/reference/dialog-api.mdx	183	188	4	enum NumberFieldStyle {	real-code	packages/plugin_kit/lib/src/dialog/config_field.dart
+website/src/content/docs/reference/dialog-api.mdx	194	206	11	final class DropdownConfigField<T> extends ConfigField {	real-code	packages/plugin_kit/lib/src/dialog/config_field.dart
+website/src/content/docs/reference/dialog-api.mdx	212	219	6	class DropdownOption<T> {	real-code	packages/plugin_kit/lib/src/dialog/config_field.dart
+website/src/content/docs/reference/dialog-api.mdx	225	234	8	final class BoolConfigField extends ConfigField {	real-code	packages/plugin_kit/lib/src/dialog/config_field.dart
+website/src/content/docs/reference/dialog-api.mdx	240	251	10	final class GroupConfigField extends ConfigField {	real-code	packages/plugin_kit/lib/src/dialog/config_field.dart
+website/src/content/docs/reference/dialog-api.mdx	259	273	13	final class ExtensionConfigField extends ConfigField {	real-code	packages/plugin_kit/lib/src/dialog/config_field.dart
+website/src/content/docs/reference/dialog-api.mdx	279	286	6	abstract class ConfigFieldHandle {	real-code	packages/plugin_kit/lib/src/dialog/config_field.dart
+website/src/content/docs/reference/dialog-api.mdx	298	308	9	Future<RuntimeSettings?> showPluginKitDialog({	real-code	packages/plugin_kit_dialog/lib/src/widgets/plugin_kit_dialog.dart
+website/src/content/docs/reference/dialog-api.mdx	314	316	1	typedef SaveCallback = FutureOr<void> Function(RuntimeSettings);	real-code	packages/plugin_kit_dialog/lib/src/utils.dart
+website/src/content/docs/reference/dialog-api.mdx	326	339	12	class PluginKitDialog extends StatelessWidget {	real-code	packages/plugin_kit_dialog/lib/src/widgets/plugin_kit_dialog.dart
+website/src/content/docs/reference/dialog-api.mdx	345	360	14	class PluginKitDialogBody extends StatefulWidget {	real-code	packages/plugin_kit_dialog/lib/src/widgets/plugin_kit_dialog_body.dart
+website/src/content/docs/reference/dialog-api.mdx	366	396	29	class PluginKitDialogController extends ChangeNotifier {	real-code	packages/plugin_kit_dialog/lib/src/controller/plugin_kit_dialog_controller.dart
+website/src/content/docs/reference/dialog-api.mdx	418	436	17	class PluginKitVisualsPlugin extends GlobalPlugin {	real-code	packages/plugin_kit_dialog/lib/src/runtime/plugins/plugin_kit_visuals_plugin.dart
+website/src/content/docs/reference/dialog-api.mdx	446	460	13	class PluginKitVisual {	aspirational	(create)
+website/src/content/docs/reference/dialog-api.mdx	466	484	17	runtime	real-code	packages/plugin_kit_dialog/test/runtime/visuals_dispatch_test.dart
+website/src/content/docs/reference/dialog-api.mdx	492	520	27	class PluginKitDialogTheme extends ThemeExtension<PluginKitDialogTheme> {	real-code	packages/plugin_kit_dialog/lib/src/theme/plugin_kit_dialog_theme.dart
+website/src/content/docs/reference/dialog-api.mdx	526	537	10	showPluginKitDialog(	pure-fragment	(skip)
+website/src/content/docs/reference/dialog-api.mdx	541	544	2	ThemeData buildPluginKitDialogDarkTheme();	pure-fragment	(skip)
+website/src/content/docs/reference/dialog-api.mdx	552	563	10	abstract interface class ConfigFieldRenderer<T extends ConfigField> {	real-code	packages/plugin_kit_dialog/lib/src/runtime/plugins/default_field_renderers_plugin.dart
+website/src/content/docs/reference/dialog-api.mdx	569	597	27	class ColorPickerRenderer	real-code	packages/plugin_kit_dialog/test/runtime/config_field_dispatch_test.dart
+website/src/content/docs/reference/event-bus-and-events.mdx	14	21	6	class EventBus {	aspirational	(create)
+website/src/content/docs/reference/event-bus-and-events.mdx	31	40	8	class EventEnvelope<T> {	aspirational	(create)
+website/src/content/docs/reference/event-bus-and-events.mdx	53	65	11	StreamSubscription on<T>(	real-code	packages/plugin_kit/lib/src/event_bus.dart
+website/src/content/docs/reference/event-bus-and-events.mdx	75	77	1	void Function() bind(EventBindingCallback callback);	pure-fragment	(skip)
+website/src/content/docs/reference/event-bus-and-events.mdx	83	89	5	final unbind = bus.bind((envelope) {	aspirational	(create)
+website/src/content/docs/reference/event-bus-and-events.mdx	95	97	1	bool hasRequestHandler<Request, Response>({String? identifier});	pure-fragment	(skip)
+website/src/content/docs/reference/event-bus-and-events.mdx	103	120	16	Future<EventEnvelope<T>> emit<T>({	real-code	packages/plugin_kit/lib/src/event_bus.dart
+website/src/content/docs/reference/event-bus-and-events.mdx	138	154	15	StreamSubscription onRequest<Request, Response>(	real-code	packages/plugin_kit/lib/src/event_bus.dart
+website/src/content/docs/reference/event-bus-and-events.mdx	162	178	15	StreamSubscription onRequestSync<Request, Response>(	real-code	packages/plugin_kit/lib/src/event_bus.dart
+website/src/content/docs/reference/event-bus-and-events.mdx	208	235	26	extension PluginHelper on Plugin {	real-code	packages/plugin_kit/lib/src/plugin/extensions.dart
+website/src/content/docs/reference/event-bus-and-events.mdx	245	259	13	StreamSubscription on<E>(EventHandler<E> handler, {int priority = 0, String? identifier});	real-code	packages/plugin_kit/lib/src/event_bus.dart
+website/src/content/docs/reference/event-bus-and-events.mdx	267	293	25	extension SessionHelper on PluginSession {	real-code	packages/plugin_kit/lib/src/plugin/extensions.dart
+website/src/content/docs/reference/event-bus-and-events.mdx	312	316	3	extension SessionBroadcast on List<PluginSession> {	aspirational	(create)
+website/src/content/docs/reference/naming-conventions.mdx	18	25	6	class CorePlugin extends GlobalPlugin {	real-code	example/plugin_kit_dialog_demo/lib/plugins/core_plugin.dart
+website/src/content/docs/reference/naming-conventions.mdx	85	90	4	registry.registerSingleton<Greeter>(	pure-fragment	(skip)
+website/src/content/docs/reference/naming-conventions.mdx	100	107	6	const agent = Namespace('agent');	pure-fragment	(skip)
+website/src/content/docs/reference/naming-conventions.mdx	155	165	9	class UserLoggedIn {	aspirational	(create)
+website/src/content/docs/reference/naming-conventions.mdx	173	182	8	class SendNotification {	aspirational	(create)
+website/src/content/docs/reference/naming-conventions.mdx	190	197	6	class DraftOutgoingMessage {	aspirational	(create)
+website/src/content/docs/reference/naming-conventions.mdx	224	234	9	class SupportsLanguages extends Capability {	aspirational	(create)
+website/src/content/docs/reference/naming-conventions.mdx	265	272	6	const settings = RuntimeSettings(	aspirational	(create)
+website/src/content/docs/reference/naming-conventions.mdx	285	303	17	const linter = PluginId('linter_suite');	aspirational	(create)
+website/src/content/docs/reference/naming-conventions.mdx	311	319	7	ServiceSettings(	aspirational	(create)
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	14	19	4	const id = PluginId('greeter');	pure-fragment	(skip)
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	27	44	16	abstract class Plugin {	real-code	packages/plugin_kit/lib/src/plugin/core.dart
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	62	67	4	abstract class StatefulPluginService<PKC extends PluginContext> extends PluginService {	aspirational	(create)
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	81	91	9	abstract class GlobalPlugin<G extends GlobalPluginContext> extends Plugin {	aspirational	(create)
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	99	104	4	extension type const FeatureFlag(String value) {	real-code	packages/plugin_kit/lib/src/plugin/core.dart
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	112	118	5	@override	pure-fragment	(skip)
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	126	145	18	class PluginContext {	aspirational	(create)
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	157	163	5	class GlobalPluginContext extends PluginContext {	aspirational	(create)
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	167	169	1	await context.sessions.emit(InvalidateCacheEvent());	pure-fragment	(skip)
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	177	181	3	class SessionPluginContext extends PluginContext {	aspirational	(create)
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	189	206	16	class PluginSession<K extends PluginContext> {	aspirational	(create)
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	222	276	53	class PluginRuntime<G extends GlobalPluginContext, S extends SessionPluginContext> {	real-code	packages/plugin_kit/lib/src/plugin/runtime.dart
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	307	314	6	final runtime = PluginRuntime(plugins: allPlugins);	pure-fragment	(skip)
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	335	340	4	class PluginLifecycleException implements Exception {	real-code	packages/plugin_kit/lib/src/plugin/exceptions.dart
+website/src/content/docs/reference/plugins-and-lifecycle.mdx	347	355	7	try {	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	18	20	1	extension type const PluginId(String value) {}	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	26	32	5	extension type const Namespace(String value) {	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	38	44	5	extension type const ServiceId(String value) {	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	54	66	11	const greeter = ServiceId('greeter');	pure-fragment	(skip)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	70	75	4	const agent = Namespace('agent');	pure-fragment	(skip)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	83	92	8	class ServiceRegistry {	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	106	130	23	void registerSingleton<T extends Object>({	real-code	packages/plugin_kit/lib/src/service_registry.dart
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	156	161	4	T resolveAfter<T>({	real-code	packages/plugin_kit/lib/src/service_registry.dart
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	186	195	8	RegistrationWrapper? unregister({	real-code	packages/plugin_kit/lib/src/service_registry.dart
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	205	207	1	ScopedServiceRegistry scopedFor(PluginId pluginId);	pure-fragment	(skip)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	215	231	15	class ScopedServiceRegistry {	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	237	258	20	void registerSingleton<T extends Object>(	real-code	packages/plugin_kit/lib/src/service_registry.dart
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	262	280	17	@override	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	288	295	6	const agent = Namespace('agent');	pure-fragment	(skip)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	299	301	1	ScopedServiceRegistry withPriority(int priority);	pure-fragment	(skip)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	305	312	6	@override	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	316	318	1	final ServiceRegistry raw;	real-code	packages/plugin_kit/lib/src/service_registry.dart
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	326	335	8	sealed class RegistrationWrapper<T extends Object> {	real-code	packages/plugin_kit/lib/src/service_registry.dart
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	356	368	11	abstract class PluginService {	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	380	385	4	class AnthropicService extends PluginService {	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	391	394	2	@mustCallSuper	pure-fragment	(skip)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	402	414	11	abstract class StatefulPluginService<PKC extends PluginContext>	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	430	448	17	StreamSubscription on<E>(EventHandler<E> handler, {int priority = 0, String? identifier});	real-code	packages/plugin_kit/lib/src/event_bus.dart
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	454	461	6	class ChatService extends StatefulPluginService {	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	469	473	3	abstract class Capability {	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	477	488	10	class SupportsLanguages extends Capability {	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	492	494	1	typedef CapabilitySet = Set<Capability>;	real-code	packages/plugin_kit/lib/src/service_registry.dart
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	502	507	4	extension CapabilityLookup on Set<Capability> {	aspirational	(create)
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	511	518	6	final wrapper = registry.resolveRaw<CodeLinter>(const ServiceId('linter'));	aspirational	(create)
+website/src/content/docs/reference/settings-and-configuration.mdx	43	55	11	class RuntimeSettings {	aspirational	(create)
+website/src/content/docs/reference/settings-and-configuration.mdx	70	72	1	const settings = RuntimeSettings.empty();	aspirational	(create)
+website/src/content/docs/reference/settings-and-configuration.mdx	76	81	4	bool isPluginEnabled(PluginId pluginId);	pure-fragment	(skip)
+website/src/content/docs/reference/settings-and-configuration.mdx	98	103	4	RuntimeSettings copyWith({	real-code	packages/plugin_kit/lib/src/settings.dart
+website/src/content/docs/reference/settings-and-configuration.mdx	128	147	18	const mainAgent = PluginId('main_agent');	aspirational	(create)
+website/src/content/docs/reference/settings-and-configuration.mdx	159	164	4	final pin = Pin.fromWire('main_agent:agent.temperature');	pure-fragment	(skip)
+website/src/content/docs/reference/settings-and-configuration.mdx	176	186	9	class PluginConfig {	aspirational	(create)
+website/src/content/docs/reference/settings-and-configuration.mdx	209	221	11	class ServiceSettings {	real-code	packages/plugin_kit/lib/src/settings.dart
+website/src/content/docs/reference/settings-and-configuration.mdx	250	253	2	final restored = RuntimeSettings.fromJson(settings.toJson());	pure-fragment	(skip)
+website/src/content/docs/reference/settings-and-configuration.mdx	316	319	2	final headers = config.map('headers');	pure-fragment	(skip)
+website/src/content/docs/reference/settings-and-configuration.mdx	326	330	3	final temperature = config.getDouble('temperature') ?? 0.7;	pure-fragment	(skip)
+website/src/content/docs/reference/settings-and-configuration.mdx	353	357	3	Iterable<String> get keys;	pure-fragment	(skip)
+website/src/content/docs/reference/settings-and-configuration.mdx	378	380	1	static String hashSettings(Map<String, dynamic> settings);	pure-fragment	(skip)
+website/src/content/docs/reference/state-management-bridges.mdx	52	65	12	class ChatMessage {	aspirational	(create)
+website/src/content/docs/reference/state-management-bridges.mdx	73	109	35	class SetStateChatScreen extends StatefulWidget {	real-code	example/state_garden/lib/src/integrations/set_state_chat_screen.dart
+website/src/content/docs/reference/state-management-bridges.mdx	117	141	23	class _SetStateChatScreenState extends State<SetStateChatScreen>	real-code	example/state_garden/lib/src/integrations/flutter_plugin_kit_chat_screen.dart
+website/src/content/docs/reference/state-management-bridges.mdx	149	178	28	class ChatChangeNotifier extends ChangeNotifier {	real-code	example/state_garden/lib/src/integrations/change_notifier_chat.dart
+website/src/content/docs/reference/state-management-bridges.mdx	190	204	13	ChangeNotifierProvider(	pure-fragment	(skip)
+website/src/content/docs/reference/state-management-bridges.mdx	214	256	41	class ChatBlocState {	real-code	example/state_garden/lib/src/integrations/bloc_chat.dart
+website/src/content/docs/reference/state-management-bridges.mdx	268	303	34	final sessionProvider = Provider<PluginSession>((ref) {	real-code	example/state_garden/lib/src/integrations/riverpod_chat.dart
+website/src/content/docs/reference/state-management-bridges.mdx	307	312	4	ProviderScope(	pure-fragment	(skip)
+website/src/content/docs/reference/state-management-bridges.mdx	324	349	24	class SignalsChatBridge {	real-code	example/state_garden/lib/src/integrations/signals_chat.dart
+website/src/content/docs/reference/state-management-bridges.mdx	357	383	25	class MobxChatBridge {	real-code	example/state_garden/lib/src/integrations/mobx_chat.dart
+website/src/content/docs/reference/state-management-bridges.mdx	391	419	27	// At app boot:	pseudocode	(skip)
+website/src/content/docs/troubleshooting.mdx	40	52	11	runtime.init(	pure-fragment	(skip)
+website/src/content/docs/troubleshooting.mdx	62	72	9	Future<void> _togglePending = Future.value();	real-code	example/code_editor/lib/app/editor_app.dart
+website/src/content/docs/troubleshooting.mdx	91	99	7	try {	aspirational	(create)
+website/src/content/docs/troubleshooting.mdx	157	163	5	// Wrong: handler throws but the error is on the unobserved Future.	pure-fragment	(skip)
+website/src/content/docs/troubleshooting.mdx	173	180	6	final result = await bus.maybeRequest<MyQuery, MyResult>(MyQuery(...));	pure-fragment	(skip)
+website/src/content/docs/troubleshooting.mdx	190	202	11	ServiceSettings copyWith({	real-code	packages/plugin_kit/lib/src/settings.dart
+website/src/content/docs/troubleshooting.mdx	208	214	5	final cleared = ServiceSettings(	pure-fragment	(skip)
+website/src/content/docs/troubleshooting.mdx	226	236	9	import 'package:golden_toolkit/golden_toolkit.dart';	real-code	example/code_editor/test/golden_test.dart

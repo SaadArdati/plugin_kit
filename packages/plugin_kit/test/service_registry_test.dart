@@ -102,7 +102,9 @@ void main() {
       // disabled-but-present successor was the failure path: the wrong
       // branch's message ("disabled by overrides") would still match
       // contains('after plugin') and pass a looser assertion.
+      // #docregion service-registry-test-registry
       final registry = ServiceRegistry();
+      // #enddocregion service-registry-test-registry
       registry.registerSingleton<String>(
         pluginId: const PluginId('alpha'),
         serviceId: const ServiceId('svc'),

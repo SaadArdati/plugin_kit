@@ -59,6 +59,7 @@ class ServiceSettings {
   };
 
   /// Returns a copy with any provided fields replaced.
+  // #docregion settings-copy-with
   ServiceSettings copyWith({
     bool? enabled,
     Map<String, dynamic>? config,
@@ -70,6 +71,7 @@ class ServiceSettings {
       priority: priority ?? this.priority,
     );
   }
+  // #enddocregion settings-copy-with
 
   @override
   bool operator ==(Object other) {
@@ -276,10 +278,12 @@ class RuntimeSettings {
   }
 
   /// Returns a copy with optional plugin/service map replacements.
+  // #docregion settings-copy-with-2
   RuntimeSettings copyWith({
     Map<PluginId, PluginConfig>? plugins,
     Map<Pin, ServiceSettings>? services,
   }) {
+  // #enddocregion settings-copy-with-2
     return RuntimeSettings(
       plugins: plugins ?? {...this.plugins},
       services: services ?? {...this.services},

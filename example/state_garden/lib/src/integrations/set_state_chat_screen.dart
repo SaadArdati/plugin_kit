@@ -12,6 +12,7 @@ import '../widgets/chat_view.dart';
 /// The widget owns the [StreamSubscription]. Every async continuation that
 /// touches state checks `mounted`. The subscription is cancelled in
 /// [State.dispose].
+// #docregion set-state-chat-screen-set-state-chat-screen
 class SetStateChatScreen extends StatefulWidget {
   const SetStateChatScreen({super.key, required this.session});
 
@@ -20,6 +21,7 @@ class SetStateChatScreen extends StatefulWidget {
   @override
   State<SetStateChatScreen> createState() => _SetStateChatScreenState();
 }
+// #enddocregion set-state-chat-screen-set-state-chat-screen
 
 class _SetStateChatScreenState extends State<SetStateChatScreen> {
   StreamSubscription<void>? _subscription;

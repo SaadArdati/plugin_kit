@@ -4,6 +4,12 @@ description: Idiomatic patterns for using the event bus from inside plugin code.
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import namingSnippets from '../../../../snippets/lib/naming.dart?raw';
+import pluginServicesSnippets from '../../../../snippets/lib/plugin_services.dart?raw';
+import pluginLifecycleSnippets from '../../../../snippets/lib/plugin_lifecycle.dart?raw';
+import sessionsSnippets from '../../../../snippets/lib/sessions.dart?raw';
 
 This page is the patterns side of the event bus: what to reach for from inside plugin code, and how
 to shape an event type.
@@ -37,13 +43,7 @@ That is the vision for an event-driven plugin architecture, and it is what Plugi
 
 Events are just Dart types.
 
-```dart
-class UserMessageReceived {
-  final String sessionId;
-  final String text;
-  const UserMessageReceived({required this.sessionId, required this.text});
-}
-```
+<Code code={extractRegion(namingSnippets, 'naming-event-past-tense')} lang="dart" />
 
 Two conventions that pay off over time:
 
@@ -59,22 +59,7 @@ The "pre-commit interception" section below covers when that exception is right 
 Inside a `StatefulPluginService.attach()`, use the service helpers instead of reaching into
  `context.bus`. They track subscriptions for you and cancel them on `detach` automatically.
 
-```dart
-class ChatLogger extends StatefulPluginService {
-  @override
-  void attach() {
-    on<UserMessageReceived>((e) {
-      log('chat', '${e.event.sessionId}: ${e.event.text}');
-    });
-
-    on<OutgoingReply>((e) {
-      if (e.event.isDraft) {
-        e.stop(const ReplyDiscarded());
-      }
-    });
-  }
-}
-```
+<Code code={extractRegion(pluginServicesSnippets, 'stateful-plugin-service-resolve-emit')} lang="dart" />
 
 The three tracked subscription helpers:
 
@@ -104,13 +89,7 @@ into `activeBindings`, all torn down automatically when the plugin detaches. `Pl
 
 Plugin helpers take `context` as the first positional argument, since plugins are shared across sessions.
 
-```dart
-@override
-void attach(SessionPluginContext context) {
-  on<UserMessageReceived>(context, (e) {
-  });
-}
-```
+<Code code={extractRegion(pluginLifecycleSnippets, 'session-plugin-attach')} lang="dart" />
 
 Reach for `context.bus.on(...)` only when you genuinely need to manage a subscription's lifetime
 by hand: the bus call returns a `StreamSubscription` you have to cancel yourself, and is not tracked.
@@ -153,45 +132,7 @@ the chain produced. It is how you give plugins a seat at the table without calli
 This is also the main exception to the immutability rule above: the payload is
 intentionally a draft object that handlers are allowed to edit in place.
 
-```dart
-class DraftOutgoingMessage {
-  String text;
-  final Map<String, String> metadata;
-
-  DraftOutgoingMessage(this.text) : metadata = {};
-}
-
-// A plugin that expands typed macros like /shrug before the message goes out.
-class MacroExpander extends StatefulPluginService {
-  static const _macros = {
-    '/shrug': r'¯\_(ツ)_/¯',
-    '/tableflip': '(╯°□°)╯︵ ┻━┻',
-  };
-
-  @override
-  void attach() {
-    on<DraftOutgoingMessage>((e) {
-      final msg = e.event;
-      _macros.forEach((macro, replacement) {
-        msg.text = msg.text.replaceAll(macro, replacement);
-      });
-      msg.metadata['macros_expanded'] = 'true';
-    });
-  }
-}
-
-// The emitter acts on whatever the chain produced.
-final envelope = await context.bus.emit<DraftOutgoingMessage>(
-  event: DraftOutgoingMessage(userInput),
-);
-
-if (envelope.stopped) {
-  // A handler vetoed or replaced the message entirely.
-  return;
-}
-
-await sendToServer(envelope.event); // the transformed payload
-```
+<Code code={extractRegion(namingSnippets, 'naming-event-draft')} lang="dart" />
 
 A handler can do two things to the payload:
 
@@ -213,25 +154,7 @@ before it lands without the emitter having to call them by name.
 The bus also does typed request/response. The mechanics are covered in
 [Event Bus](/concepts/event-bus/#request-and-response); here is the shape inside plugin code.
 
-```dart
-class FindOpenPort {
-  const FindOpenPort();
-}
-
-class PortAllocator extends StatefulPluginService {
-  final _ports = <int>{};
-
-  @override
-  void attach() {
-    onRequest<FindOpenPort, int?>((e) async {
-      for (var port = 8000; port < 9000; port++) {
-        if (_ports.add(port)) return port;
-      }
-      return null; // concede; let the next handler try
-    });
-  }
-}
-```
+<Code code={extractRegion(sessionsSnippets, 'multi-session-isolation')} lang="dart" />
 
 Callers ask through the bus:
 

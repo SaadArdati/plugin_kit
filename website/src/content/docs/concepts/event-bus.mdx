@@ -4,6 +4,9 @@ description: Typed, priority-ordered events with request/response and explicit c
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import eventBusSnippets from '../../../../snippets/lib/event_bus.dart?raw';
 
 The `EventBus` is how plugins coordinate without holding references to each other. It is typed, priority-ordered,
 and supports both fire-and-forget events and typed request/response. This page is the 
@@ -16,20 +19,7 @@ etc...), see [Event Patterns](/concepts/events/).
 
 Define an event type. Emit it. Subscribe from somewhere that has no idea who the emitter is.
 
-```dart
-class UserLoggedInEvent {
-  final String userId;
-  UserLoggedInEvent(this.userId);
-}
-
-context.bus.on<UserLoggedInEvent>((e) {
-  print('User logged in: ${e.event.userId}');
-});
-
-await context.bus.emit<UserLoggedInEvent>(
-  event: UserLoggedInEvent('u_123'),
-);
-```
+<Code code={extractRegion(eventBusSnippets, 'event-bus-on-emit')} lang="dart" />
 
 That is the whole happy path. Emit fires every matching handler in priority order. Emitters
 and subscribers never have to know about each other.
@@ -48,17 +38,7 @@ A handler can read the payload, mutate it for downstream handlers, or call `e.st
 
 Event handlers run in ascending priority order. Lower number runs first.
 
-```dart
-context.bus.on<UserMessage>((e) {
-  if (e.event.text.contains('spam')) {
-    e.stop(MessageBlocked());
-  }
-}, priority: 0);
-
-context.bus.on<UserMessage>((e) {
-  processMessage(e.event.text);
-}, priority: 10);
-```
+<Code code={extractRegion(eventBusSnippets, 'event-bus-priority')} lang="dart" />
 
 The first handler can mutate the payload so later handlers see the new value, or call `e.stop(...)` to halt 
 the cascade and pin the final result. The second handler only runs if the first one did not stop.
@@ -72,11 +52,7 @@ a competition; the bus is a pipeline. The rest of the system follows from that p
 
 `bind(...)` registers a callback that sees every non-internal event on the bus before typed handlers run.
 
-```dart
-final unbind = context.bus.bind((envelope) {
-  logger.debug('event ${envelope.event.runtimeType}');
-});
-```
+<Code code={extractRegion(eventBusSnippets, 'event-bus-bind')} lang="dart" />
 
 Use it for tracing or analytics. It is not where business logic lives.
 Think of it as a bus-wide tap that sees the pre-dispatch view of every event.
@@ -86,17 +62,7 @@ Think of it as a bus-wide tap that sees the pre-dispatch view of every event.
 
 The same bus also does typed request/response.
 
-```dart
-context.bus.onRequest<SearchQuery, SearchResults?>((req) async {
-  if (!canHandle(req.event)) return null;
-
-  return await performSearch(req.event.query);
-}, priority: 0);
-
-final results = await context.bus.request<SearchQuery, SearchResults?>(
-  SearchQuery(query: 'dart patterns'),
-);
-```
+<Code code={extractRegion(eventBusSnippets, 'event-bus-request-response')} lang="dart" />
 
 The dispatch model:
 
@@ -120,23 +86,7 @@ Handlers and emissions can be scoped to an identifier. This is how you multiplex
 logical targets (tools, agents, panels, departments, per-document channels) without
 needing a separate bus for each.
 
-```dart
-context.bus.on<ToolExecutionEvent>((e) {
-  print('saw tool execution');
-});
-
-context.bus.on<ToolExecutionEvent>(
-  (e) {
-    print('calculator specifically');
-  },
-  identifier: 'calculator',
-);
-
-await context.bus.emit<ToolExecutionEvent>(
-  event: ToolExecutionEvent(),
-  identifier: 'calculator',
-);
-```
+<Code code={extractRegion(eventBusSnippets, 'event-bus-identifier-scoping')} lang="dart" />
 
 When you emit with an identifier, the bus merges general handlers for that type with handlers
 registered for that exact identifier. Handlers scoped to a different identifier do not see the event at all.
@@ -166,19 +116,7 @@ See [Sessions](/concepts/sessions/) for the full story on cross-scope communicat
 
 `emit` returns `EventEnvelope<T>`, not `Future<void>`. If you do not care about interception, ignore the return value and move on. If you do care:
 
-```dart
-final result = await context.bus.emit<BeforeSaveEvent>(
-  event: BeforeSaveEvent(documentId: 'doc_1'),
-);
-
-if (result.stopped) {
-  print('Save was blocked or replaced: ${result.event}');
-}
-
-// Mutated result.
-final BeforeSaveEvent payload = result.event;
-print('Final document ID to save: ${payload.documentId}');
-```
+<Code code={extractRegion(eventBusSnippets, 'event-bus-emit-envelope')} lang="dart" />
 
 The envelope carries whatever the handler chain ended up with: the possibly-mutated payload, 
 whether it was stopped, and (if so) the final value.

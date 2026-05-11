@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve workspace
+        run: flutter pub get
+
+      - name: Analyze
+        run: |
+          flutter analyze packages/plugin_kit
+          flutter analyze packages/plugin_kit_dialog
+          flutter analyze packages/flutter_plugin_kit
+          flutter analyze website/snippets
+          flutter analyze example/state_garden
+          flutter analyze example/code_editor
+          flutter analyze example/plugin_kit_dialog_demo
+
+      - name: Test
+        run: |
+          flutter test packages/plugin_kit
+          flutter test packages/plugin_kit_dialog
+          flutter test packages/flutter_plugin_kit
+          flutter test website/snippets
+          flutter test example/state_garden
+          flutter test example/plugin_kit_dialog_demo
+
+  doc-excerpts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install website deps
+        run: pnpm --filter ./website install
+
+      - name: Check .md doc excerpts are in sync
+        run: |
+          node website/scripts/update-md-excerpts.mjs \
+            README.md \
+            packages/plugin_kit/README.md \
+            packages/plugin_kit_dialog/README.md \
+            packages/flutter_plugin_kit/README.md \
+            example/state_garden/README.md \
+            skills/plugin-kit/anti-patterns.md \
+            skills/plugin-kit/patterns.md \
+            skills/plugin-kit/api-cheatsheet.md \
+            skills/plugin-kit/testing.md \
+            --check
+
+      - name: Build website (verifies MDX excerpts compile)
+        run: cd website && pnpm build

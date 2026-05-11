@@ -3,6 +3,7 @@
 /// `ConfigNode`, `RuntimeSettings`, and wildcard service overrides.
 ///
 /// `LineLengthLinter` reads its `max_line_length` threshold from injected
+// #docregion 08-editor-settings-settings
 /// settings via `PluginService.config`. Three scenarios:
 ///
 /// 1. Default (max 80). An 85-char line is flagged.
@@ -14,6 +15,7 @@
 /// scenario can read the diagnostics published by [LinterSuitePlugin] in
 /// response to [DocumentSavedEvent].
 library;
+// #enddocregion 08-editor-settings-settings
 
 import 'package:code_editor/code_editor.dart';
 import 'package:code_editor/mocks.dart';

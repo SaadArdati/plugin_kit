@@ -4,6 +4,11 @@ description: Runtime plugin configuration, service enablement, and wildcard over
 ---
 
 import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import runtimeSettingsSource from '../../../../snippets/lib/runtime_settings.dart?raw';
+import editorSettingsSource from '../../../../../example/code_editor/bin/08_editor_settings.dart?raw';
+import pluginLifecycleSource from '../../../../snippets/lib/plugin_lifecycle.dart?raw';
 
 `RuntimeSettings` is how the outside world tells the runtime what to do.
 
@@ -27,24 +32,7 @@ call and a runtime that converges.
 
 ## The shape
 
-```dart
-final settings = RuntimeSettings(
-  plugins: {
-    const PluginId('sql_language'): const PluginConfig(enabled: true),
-    const PluginId('experimental_router'): const PluginConfig(enabled: false),
-  },
-  services: {
-    const PluginId('linter_suite').service(const ServiceId('line_length_linter')):
-        ServiceSettings(
-          config: {'max_line_length': 120},
-        ),
-    PluginId.wildcard.service(const ServiceId('agent_service')): ServiceSettings(
-      priority: 200,
-      config: {'provider': 'openai'},
-    ),
-  },
-);
-```
+<Code code={extractRegion(runtimeSettingsSource, 'runtime-settings-construct')} lang="dart" />
 
 Two maps do the work.
 
@@ -120,16 +108,7 @@ Wildcard overrides are one of the more useful pieces of the system.
 
 If multiple plugins register the same slot, `*:serviceId` applies to whichever registration currently wins that slot.
 
-```dart
-final settings = RuntimeSettings(
-  services: {
-    PluginId.wildcard.service(const ServiceId('line_length_linter')):
-        ServiceSettings(
-          config: {'max_line_length': 120},
-        ),
-  },
-);
-```
+<Code code={extractRegion(editorSettingsSource, '08-editor-settings-settings')} lang="dart" />
 
 You can target a slot by role instead of by plugin id. That matters when:
 
@@ -153,17 +132,11 @@ There are three common paths.
 
 ### 1. Initialize with settings
 
-```dart
-final runtime = PluginRuntime(
-  plugins: [SqlPlugin(), RouterPlugin()],
-)..init(settings: settings);
-```
+<Code code={extractRegion(pluginLifecycleSource, 'settings-init-with-settings')} lang="dart" />
 
 ### 2. Reconcile live settings
 
-```dart
-await runtime.updateSettings(nextSettings);
-```
+<Code code={extractRegion(pluginLifecycleSource, 'settings-update-settings')} lang="dart" />
 
 This is the full lifecycle-aware path. It reconciles the global scope and every active session.
 
@@ -179,9 +152,7 @@ right path.
 
 ### 3. Update the snapshot without lifecycle work
 
-```dart
-runtime.updateSettingsSnapshot(nextSettings);
-```
+<Code code={extractRegion(pluginLifecycleSource, 'settings-snapshot-only')} lang="dart" />
 
 This updates the runtime's stored settings and emits on `settingsStream`. It does not run reconciliation, and it does not inject new config into already-resolved services. Useful for optimistic UI, bookkeeping updates, and anything where you are confident the runtime does not need to converge. When unsure, reach for `updateSettings(...)` instead.
 
@@ -202,10 +173,7 @@ Toggling a session plugin via `updateSettings` runs the full lifecycle, same as 
 
 `RuntimeSettings`, `PluginConfig`, and `ServiceSettings` all round-trip through JSON.
 
-```dart
-final json = settings.toJson();
-final restored = RuntimeSettings.fromJson(json);
-```
+<Code code={extractRegion(runtimeSettingsSource, 'runtime-settings-to-json')} lang="dart" />
 
 That makes the settings model usable for persisted user preferences, workspace settings, admin-defined defaults, or UI-driven editors.
 

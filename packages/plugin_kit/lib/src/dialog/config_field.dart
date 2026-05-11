@@ -6,6 +6,7 @@
 library;
 
 /// Base schema for a configurable input rendered by the dialog.
+// #docregion config-field-config-field
 sealed class ConfigField {
   /// Dotted-key path under `ServiceSettings.config`.
   /// Examples: `"model"`, `"provider.name"`, `"limits.max_tokens"`.
@@ -28,8 +29,10 @@ sealed class ConfigField {
     this.defaultValue,
   });
 }
+// #enddocregion config-field-config-field
 
 /// Single-line text input.
+// #docregion config-field-text-config-field
 final class TextConfigField extends ConfigField {
   /// Placeholder text shown when no value is set.
   final String? placeholder;
@@ -43,8 +46,10 @@ final class TextConfigField extends ConfigField {
     this.placeholder,
   });
 }
+// #enddocregion config-field-text-config-field
 
 /// Multi-line text editor with optional moustache-tag chip hints.
+// #docregion config-field-multiline-config-field
 final class MultilineConfigField extends ConfigField {
   /// Suggested moustache tags displayed as hint chips under the editor.
   final List<String> moustacheTags;
@@ -66,8 +71,10 @@ final class MultilineConfigField extends ConfigField {
     this.maxLines = 14,
   });
 }
+// #enddocregion config-field-multiline-config-field
 
 /// Obscured input with a show/hide toggle.
+// #docregion config-field-password-config-field
 final class PasswordConfigField extends ConfigField {
   /// Placeholder text shown when no value is set.
   final String? placeholder;
@@ -81,8 +88,10 @@ final class PasswordConfigField extends ConfigField {
     this.placeholder,
   });
 }
+// #enddocregion config-field-password-config-field
 
 /// Visual style for [NumberConfigField].
+// #docregion config-field-number-field-style
 enum NumberFieldStyle {
   /// Render as a slider with an inline value badge.
   slider,
@@ -91,6 +100,7 @@ enum NumberFieldStyle {
   /// value rather than constraining the slider.
   textInput,
 }
+// #enddocregion config-field-number-field-style
 
 /// Numeric input.
 ///
@@ -100,6 +110,7 @@ enum NumberFieldStyle {
 ///
 /// When [isInteger] is true, the value is stored as `int`, parsing strips
 /// decimals, and slider steps default to 1.
+// #docregion config-field-number-config-field
 final class NumberConfigField extends ConfigField {
   /// Minimum numeric value allowed by the field.
   final double? min;
@@ -130,8 +141,10 @@ final class NumberConfigField extends ConfigField {
     this.isInteger = false,
   });
 }
+// #enddocregion config-field-number-config-field
 
 /// Typed dropdown.
+// #docregion config-field-dropdown-config-field
 final class DropdownConfigField<T> extends ConfigField {
   /// Allowed options rendered in the dropdown.
   final List<DropdownOption<T>> options;
@@ -145,8 +158,10 @@ final class DropdownConfigField<T> extends ConfigField {
     super.defaultValue,
   });
 }
+// #enddocregion config-field-dropdown-config-field
 
 /// A single selectable option for [DropdownConfigField].
+// #docregion config-field-dropdown-option
 class DropdownOption<T> {
   /// Runtime value assigned when this option is selected.
   final T value;
@@ -157,8 +172,10 @@ class DropdownOption<T> {
   /// Creates a dropdown option.
   const DropdownOption(this.value, this.label);
 }
+// #enddocregion config-field-dropdown-option
 
 /// Single switch.
+// #docregion config-field-bool-config-field
 final class BoolConfigField extends ConfigField {
   /// Creates a boolean switch field schema.
   const BoolConfigField({
@@ -168,8 +185,10 @@ final class BoolConfigField extends ConfigField {
     super.defaultValue,
   });
 }
+// #enddocregion config-field-bool-config-field
 
 /// Visually groups a sub-set of fields under a sub-heading.
+// #docregion config-field-group-config-field
 final class GroupConfigField extends ConfigField {
   /// Child fields rendered inside the grouped section.
   final List<ConfigField> children;
@@ -182,6 +201,7 @@ final class GroupConfigField extends ConfigField {
     super.helperText,
   });
 }
+// #enddocregion config-field-group-config-field
 
 /// Escape hatch for custom field renderers.
 ///
@@ -189,6 +209,7 @@ final class GroupConfigField extends ConfigField {
 /// [args] to it. This keeps the field declaration Flutter-free; the custom
 /// widget itself lives in a Flutter-side package that registers a
 /// `ConfigFieldRenderer` for the same key with the dialog runtime.
+// #docregion config-field-extension-config-field
 final class ExtensionConfigField extends ConfigField {
   /// Identifier used to look up a renderer registered with the dialog runtime.
   final String rendererKey;
@@ -206,9 +227,11 @@ final class ExtensionConfigField extends ConfigField {
     super.defaultValue,
   });
 }
+// #enddocregion config-field-extension-config-field
 
 /// Opaque handle exposed to field renderers for reading and writing the
 /// current working value of a single field.
+// #docregion config-field-config-field-handle
 abstract class ConfigFieldHandle {
   /// Current working value for the bound field.
   Object? get value;
@@ -222,3 +245,4 @@ abstract class ConfigFieldHandle {
   /// Restores the field value to its declared default.
   void reset();
 }
+// #enddocregion config-field-config-field-handle

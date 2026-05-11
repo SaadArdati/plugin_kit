@@ -25,23 +25,8 @@ Pure Dart. No Flutter. Depends only on `collection` and `meta`.
 
 Two plugins claim the same `'greeter'` slot at different priorities. The runtime resolves to the winner. The host code never sees the competition.
 
+<!-- code-excerpt "website/snippets/lib/plugin_lifecycle.dart (session-plugin-basic)" -->
 ```dart
-import 'package:plugin_kit/plugin_kit.dart';
-
-abstract class Greeter {
-  String greet(String name);
-}
-
-class CasualGreeter implements Greeter {
-  @override
-  String greet(String name) => 'Hello, $name.';
-}
-
-class FormalGreeter implements Greeter {
-  @override
-  String greet(String name) => 'Good day, $name.';
-}
-
 class CasualPlugin extends SessionPlugin {
   @override
   PluginId get pluginId => const PluginId('casual');
@@ -69,7 +54,7 @@ class FormalPlugin extends SessionPlugin {
   }
 }
 
-Future<void> main() async {
+Future<void> runGreeterExample() async {
   final runtime = PluginRuntime(plugins: [CasualPlugin(), FormalPlugin()])
     ..init();
   final session = await runtime.createSession();
@@ -124,13 +109,15 @@ Behavior another plugin should override, settings-tune, or disable belongs in a 
 | Settings injection from `RuntimeSettings.services`. | `PluginService`. | All three. Override `injectSettings` only to react to changes; **must** call `super.injectSettings(settings, hash: hash)`. |
 | Lifecycle, events, or session-bound state. | `StatefulPluginService` (or aliases `SessionStatefulPluginService` / `GlobalStatefulPluginService`). | `registerSingleton` / `registerLazySingleton` only; factories rejected. `attach()` and `detach()` are pure user hooks (no `super`). Auto-tracked event helpers (`on`, `onRequest`, `bind`, `emit`) read `this.context` implicitly. |
 
+<!-- code-excerpt "website/snippets/lib/plugin_services.dart (session-stateful-plugin-service)" -->
 ```dart
-class ChatThread extends SessionStatefulPluginService {
+class ChatThread extends StatefulPluginService<SessionPluginContext> {
+  /// The accumulated messages for this session.
   final List<Message> messages = [];
 
   @override
   void attach() {
-    on<NewMessage>((e) => messages.add(e.event));
+    on<NewMessage>((e) => messages.add(Message(e.event.text)));
   }
 
   @override
@@ -139,9 +126,6 @@ class ChatThread extends SessionStatefulPluginService {
   }
 }
 
-// Registered by ChatPlugin under ServiceId('thread'). Pin: chat:thread.
-// Service ids name the role inside the plugin's domain. The plugin id
-// already says "chat", so the service id stays specific and short.
 ```
 
 ## Service registry
@@ -197,31 +181,32 @@ The registry knows nothing about namespaces; they are pure composition into the 
 
 Typed, priority-ordered. Handlers receive an `EventEnvelope<T>`, read or mutate the payload via `e.event`, and call `e.stop(value)` to halt the cascade with a final value. There is one subscription primitive (`on<T>`); a "read-only observer" is just a handler that doesn't mutate.
 
+<!-- code-excerpt "website/snippets/lib/event_bus.dart (event-bus-mutate-stop)" -->
 ```dart
-// Subscribe. Higher priority runs later in the ascending cascade.
-bus.on<MyEvent>((e) async {
-  e.event = e.event.copyWith(modified: true);
-}, priority: 10);
+Future<void> demonstrateMutateAndStop(EventBus bus) async {
+  bus.on<MyEvent>((env) async {
+    env.event = env.event.copyWith(modified: true);
+  }, priority: 10);
 
-// Stop the cascade with a final value.
-bus.on<MyEvent>((e) async {
-  if (shouldCancel) e.stop(MyEvent.cancelled());
-});
+  bus.on<MyEvent>((env) async {
+    if (env.event.shouldCancel) env.stop(MyEvent.cancelled);
+  });
 
-// Emit. Returns the (possibly mutated, possibly stopped) envelope.
-final envelope = await bus.emit<MyEvent>(event: MyEvent());
+  final result = await bus.emit<MyEvent>(event: const MyEvent());
 
-// Tap-everything observer.
-bus.bind((envelope) => print('saw ${envelope.event}'));
+  bus.bind((obs) => print('saw ${obs.event}'));
 
-// Typed request/response.
-bus.onRequest<PermissionRequest, bool>(
-  (req) async => await showDialog(req.action),
-);
+  bus.onRequest<SearchQuery, SearchResults>(
+    (req) async => const SearchResults(results: ['r']),
+  );
 
-final allowed = await bus.request<PermissionRequest, bool>(
-  PermissionRequest(action: 'delete_file'),
-);
+  final results = await bus.request<SearchQuery, SearchResults>(
+    const SearchQuery(query: 'dart patterns'),
+  );
+
+  print(results.results);
+  print(result.event.shouldCancel);
+}
 ```
 
 `request` and `requestSync` throw `RequestUnavailableException` when no handler is registered or every handler conceded with `null` on a non-nullable response. `maybeRequest` / `maybeRequestSync` convert *only* that exception to `null`; handler-thrown exceptions still propagate. `null` means "request unavailable," not "handler crashed."
@@ -242,22 +227,28 @@ await session.dispose();
 
 `RuntimeSettings` is JSON-serializable top-level configuration. Plugin entries are keyed by `PluginId`; service entries use `Pin` (an extension type wrapping the canonical `'pluginId:serviceId'` wire string). Wildcard overrides apply to whichever plugin currently wins resolution for a given `ServiceId`.
 
+<!-- code-excerpt "website/snippets/lib/runtime_settings.dart (runtime-settings-pin-json)" -->
 ```dart
-final settings = RuntimeSettings(
-  plugins: {
-    const PluginId('formal'): const PluginConfig(enabled: false),
-  },
-  services: {
-    Pin('chat', ['agent', 'model']):
-        const ServiceSettings(config: {'temperature': 0.7}),
-    Pin.wildcard(['agent', 'tools']):
-        const ServiceSettings(priority: 200),
-  },
-);
+/// Demonstrates constructing [RuntimeSettings] with [Pin] keys and
+/// performing a JSON round-trip.
+RuntimeSettings demonstrateSettingsWithPin() {
+  final settings = RuntimeSettings(
+    plugins: {
+      const PluginId('formal'): const PluginConfig(enabled: false),
+    },
+    services: {
+      Pin('chat', ['agent', 'model']):
+          const ServiceSettings(config: {'temperature': 0.7}),
+      Pin.wildcard(['agent', 'tools']):
+          const ServiceSettings(priority: 200),
+    },
+  );
 
-// JSON round-trip preserves the wire format ("chat:agent.model", "*:agent.tools").
-final json = settings.toJson();
-final back = RuntimeSettings.fromJson(json);
+  // JSON round-trip preserves the wire format ("chat:agent.model", "*:agent.tools").
+  final json = settings.toJson();
+  final back = RuntimeSettings.fromJson(json);
+  return back;
+}
 ```
 
 Hand the runtime a new `RuntimeSettings` and reconciliation runs serialized: newly-enabled plugins `register` then `attach`; staying-enabled plugins receive `onPluginSettingsChanged(oldContext, newContext)`; newly-disabled plugins `detach` and unregister. Plugin instances persist across reconciliation; service instances are recreated. Settings persist only after every reconcile succeeds.
@@ -266,21 +257,20 @@ Hand the runtime a new `RuntimeSettings` and reconciliation runs serialized: new
 
 Discover what a service can do without instantiating it. `Capability` is an empty base class; subclass for whatever your app cares about, attach at registration time.
 
+<!-- code-excerpt "website/snippets/lib/capabilities.dart (capability-register-and-resolve)" -->
 ```dart
-class SupportsFileFormats extends Capability {
-  final Set<String> extensions;
-  const SupportsFileFormats(this.extensions);
+void registerWithCapabilities(ScopedServiceRegistry registry) {
+  registry.registerFactory<MyService>(
+    const ServiceId('importer'),
+    () => const MyService(),
+    capabilities: const {SupportsFileFormats({'jsx', 'dart'})},
+  );
 }
 
-registry.registerFactory<MyService>(
-  const ServiceId('importer'),
-  () => MyServiceImpl(),
-  capabilities: {const SupportsFileFormats({'jsx', 'dart'})},
-);
-
-// Inspect without constructing the service.
-final wrapper = registry.resolveRaw(const ServiceId('importer'));
-final formats = wrapper.capabilities.getOfType<SupportsFileFormats>();
+SupportsFileFormats? resolveCapability(ServiceRegistry registry) {
+  final wrapper = registry.resolveRaw<MyService>(const ServiceId('importer'));
+  return wrapper.capabilities.getOfType<SupportsFileFormats>();
+}
 ```
 
 `UiConfigurableCapability` is a built-in capability that ships with this package (Dart-only declaration of editable fields); the Flutter UI for it lives in `plugin_kit_dialog` so non-Flutter consumers never pull in Flutter.

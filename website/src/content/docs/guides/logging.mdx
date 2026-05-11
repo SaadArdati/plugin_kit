@@ -4,6 +4,9 @@ description: How Plugin Kit uses package:logging, which events are logged, and h
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import loggingDart from '../../../../snippets/lib/logging.dart?raw';
 
 Plugin Kit logs through Dart's standard [`package:logging`](https://pub.dev/packages/logging). By default, nothing is printed. You decide where the output goes.
 
@@ -24,13 +27,7 @@ Both sit under `plugin_kit`, so you can subscribe to one specifically or to the 
 
 ## Listen to everything
 
-```dart
-import 'package:logging/logging.dart';
-
-Logger('plugin_kit').onRecord.listen((record) {
-  print('${record.level.name}: ${record.loggerName}: ${record.message}');
-});
-```
+<Code code={extractRegion(loggingDart, 'logging-logger-listen')} lang="dart" />
 
 If your app already uses [`hyper_logger`](https://github.com/SaadArdati/hyper_logger), Plugin Kit records flow through its root subscription automatically. No extra setup.
 
@@ -55,16 +52,7 @@ When a plugin throws during a lifecycle phase, the runtime:
 2. Continues processing the remaining plugins in that phase.
 3. After the phase finishes, throws `PluginLifecycleException` with every collected failure.
 
-```dart
-try {
-  runtime.init();
-} on PluginLifecycleException catch (e) {
-  print('${e.failures.length} plugin(s) failed during ${e.phase}:');
-  for (final (pluginId, error, stackTrace) in e.failures) {
-    print('  $pluginId: $error');
-  }
-}
-```
+<Code code={extractRegion(loggingDart, 'logging-try-catch-plugin-init')} lang="dart" />
 
 The exception carries:
 
@@ -85,10 +73,7 @@ A few things to set up once, then forget about.
 
 **Fine-grained control during debugging.**
 
-```dart
-Logger('plugin_kit.PluginRuntime').level = Level.FINE;
-Logger('plugin_kit.PluginSession').level = Level.FINE;
-```
+<Code code={extractRegion(loggingDart, 'logging-fine-level')} lang="dart" />
 
 Raise a specific logger without turning on every library in your app.
 

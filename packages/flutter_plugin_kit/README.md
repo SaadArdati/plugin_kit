@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/logo-256.png" width="160" alt="Plugin Kit logo" />
+  <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/flutter_plugin_kit-256.png" width="160" alt="flutter_plugin_kit logo" />
 </p>
 
 <p align="center">
@@ -25,12 +25,9 @@ Pulls in only `flutter` and `plugin_kit`.
 
 `ChatPlugin`, `AssistantPlugin`, and `ChatMessageReceived` below are stand-ins for plugins and events you write in your own app. A complete runnable version of this pattern (plus six other state-library variants) lives in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden).
 
+<!-- code-excerpt "website/snippets/lib/flutter_integration.dart (flutter-runtime-scope-in-app)" -->
 ```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_plugin_kit/flutter_plugin_kit.dart';
-import 'package:plugin_kit/plugin_kit.dart';
-
-void main() {
+void exampleAppRoot() {
   runApp(
     MaterialApp(
       home: PluginRuntimeScope(
@@ -44,6 +41,7 @@ void main() {
 }
 
 class ChatScreen extends StatefulWidget {
+  /// Creates a [ChatScreen].
   const ChatScreen({super.key});
 
   @override
@@ -69,13 +67,16 @@ class _ChatScreenState extends State<ChatScreen>
 
 The `Builder`-only variant is even shorter:
 
+<!-- code-excerpt "website/snippets/lib/flutter_integration.dart (flutter-builder-watch-event)" -->
 ```dart
-Builder(
-  builder: (context) {
-    final last = context.watchEvent<ChatMessageReceived>();
-    return Text(last?.text ?? 'idle');
-  },
-);
+Widget buildWatchEventExample() {
+  return Builder(
+    builder: (context) {
+      final last = context.watchEvent<ChatMessageReceived>();
+      return Text(last?.text ?? 'idle');
+    },
+  );
+}
 ```
 
 ## Integrating with state-management libraries
@@ -104,19 +105,25 @@ It also implements `ValueListenable<E?>`, so `ValueListenableProvider`, `ValueLi
 
 No Cubit adapter is bundled; create one by subscribing to `session.on<E>`:
 
+<!-- code-excerpt "website/snippets/lib/flutter_integration.dart (flutter-plugin-event-notifier)" -->
 ```dart
-class PluginEventCubit<E> extends Cubit<E?> {
-  PluginEventCubit(PluginSession session) : super(null) {
-    _sub = session.on<E>((envelope) {
-      if (!isClosed) emit(envelope.event);
-    });
-  }
+/// Example Bloc-style cubit that bridges session events.
+class PluginEventCubit<E> {
+  /// The current event value.
+  E? value;
+
   late final StreamSubscription<void> _sub;
 
-  @override
-  Future<void> close() async {
+  /// Creates a cubit listening to [session] for events of type [E].
+  PluginEventCubit(PluginSession session) {
+    _sub = session.on<E>((envelope) {
+      value = envelope.event;
+    });
+  }
+
+  /// Cancels the subscription.
+  void close() {
     _sub.cancel();
-    return super.close();
   }
 }
 ```

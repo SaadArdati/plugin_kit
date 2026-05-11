@@ -44,6 +44,7 @@ Never _throwAggregated(
 ///   List<FeatureFlag> get featureFlags => const [.experimental];
 /// }
 /// ```
+// #docregion core-feature-flag
 extension type const FeatureFlag(String value) {
   /// Plugin is locked and cannot be enabled or disabled by the user.
   ///
@@ -59,6 +60,7 @@ extension type const FeatureFlag(String value) {
   /// still in development or not yet ready for general use.
   static const experimental = FeatureFlag('experimental');
 }
+// #enddocregion core-feature-flag
 
 /// Abstract base class for all plugins in the plugin_kit system.
 ///

@@ -7,6 +7,7 @@ import 'chat_service.dart';
 /// One plugin instance is shared across sessions. Each session re-runs
 /// [register] and constructs a fresh [ChatService] inline, so no state is
 /// shared.
+// #docregion chat-plugin-chat-plugin
 class ChatPlugin extends SessionPlugin {
   static const PluginId id = PluginId('chat');
   static const ServiceId serviceId = ServiceId('service');
@@ -19,6 +20,7 @@ class ChatPlugin extends SessionPlugin {
     registry.registerSingleton<ChatService>(serviceId, ChatService());
   }
 }
+// #enddocregion chat-plugin-chat-plugin
 
 /// Higher-priority registrant for the same [ChatPlugin.serviceId] slot.
 ///

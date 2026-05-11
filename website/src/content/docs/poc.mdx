@@ -1,0 +1,14 @@
+---
+title: POC code-excerpt
+description: Throwaway page to verify Astro Vite raw import + region slicer.
+---
+
+import { Code } from '@astrojs/starlight/components';
+import chatServiceSource from '../../../../example/state_garden/lib/src/chat/chat_service.dart?raw';
+import { extractRegion } from '../../utils/excerpt.mjs';
+
+Prose before.
+
+<Code code={extractRegion(chatServiceSource, 'chat-service')} lang="dart" />
+
+Prose after.

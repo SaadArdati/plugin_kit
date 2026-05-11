@@ -15,6 +15,7 @@ const ListEquality<ChatMessage> _messagesEquality = ListEquality<ChatMessage>();
 /// flag. CRITICAL-10 of the architecture rules: exposed state types must
 /// support value equality so observers do not rebuild on identical
 /// snapshots.
+// #docregion bloc-chat-chat-bloc-state
 class ChatBlocState {
   const ChatBlocState({
     this.messages = const <ChatMessage>[],
@@ -42,12 +43,14 @@ class ChatBlocState {
   @override
   int get hashCode => Object.hash(sending, _messagesEquality.hash(messages));
 }
+// #enddocregion bloc-chat-chat-bloc-state
 
 /// Recipe: flutter_bloc Cubit.
 ///
 /// Subscribes in the constructor; guards every emit (including the one in
 /// the bus handler) with [isClosed]; cancels the subscription in [close].
 /// The `if (isClosed) return` after every `await` corresponds to CRITICAL-2.
+// #docregion bloc-chat-chat-cubit
 class ChatCubit extends Cubit<ChatBlocState> {
   ChatCubit(this._session) : super(const ChatBlocState()) {
     _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
@@ -75,6 +78,7 @@ class ChatCubit extends Cubit<ChatBlocState> {
     return super.close();
   }
 }
+// #enddocregion bloc-chat-chat-cubit
 
 class BlocChatScreen extends StatelessWidget {
   const BlocChatScreen({super.key, required this.session});

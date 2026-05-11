@@ -543,11 +543,13 @@ class EventBus {
   /// ascending priority order. Dispatch stops when a handler calls
   /// [EventEnvelope.stop] or when every handler has run. Returns the
   /// envelope with its final state.
+  // #docregion event-bus-emit
   Future<EventEnvelope<T>> emit<T>({
     required T event,
     String? identifier,
     bool internal = false,
   }) async {
+    // #enddocregion event-bus-emit
     _checkNotDisposed();
     final wrapped = internal
         ? InternalPluginEventResponse(event: event, identifier: identifier)

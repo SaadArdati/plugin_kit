@@ -1,0 +1,7 @@
+doc_file	start_line	end_line	old_classification	decision	target_file	region_name	notes
+packages/flutter_plugin_kit/README.md	89	99	pure-fragment	keep-fenced		 	provider package not in snippets deps; two-context fragment (parent + child widget body); not compilable without adding dependency
+packages/plugin_kit/README.md	90	108	no-region	keep-fenced			mixed content: end of abstract class code fence + prose + markdown table; not a standalone code block
+packages/plugin_kit/README.md	151	179	pure-fragment	keep-fenced			contains fictional types: MyService, MyServiceImpl (register/resolve block) and Model, GptModel, Tools, McpTools (Namespace block); pseudocode throughout
+packages/plugin_kit/README.md	185	192	pure-fragment	keep-fenced			already inside existing code-excerpt block anchored at line 184 (event-bus-mutate-stop); no action needed
+packages/plugin_kit/README.md	233	237	pure-fragment	migrate	website/snippets/lib/runtime_settings.dart	runtime-settings-pin-json	full enclosing block (230-246) uses all real plugin_kit types; wrapped in demonstrateSettingsWithPin(); README updated with code-excerpt anchor; --check passes
+packages/plugin_kit_dialog/README.md	187	198	pure-fragment	keep-fenced			already inside existing code-excerpt block anchored at line 162 (dialog-color-picker-renderer); no action needed

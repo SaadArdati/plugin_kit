@@ -4,6 +4,10 @@ description: Type-safe settings access with ConfigNode and JSON support.
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import pluginServicesSource from '../../../../../website/snippets/lib/plugin_services.dart?raw';
+import runtimeSettingsSource from '../../../../../website/snippets/lib/runtime_settings.dart?raw';
 
 Configuration gets annoying fast.
 
@@ -37,12 +41,7 @@ The flow is always the same:
 3. The registry injects the service's effective settings.
 4. The service reads those settings through `config`.
 
-```dart
-class AnthropicService extends PluginService {
-  String get apiKey => config.getString('api_key') ?? '';
-  double get temperature => config.getDouble('temperature') ?? 0.7;
-}
-```
+<Code code={extractRegion(pluginServicesSource, 'plugin-service-settings-inject')} lang="dart" />
 
 ## Core getters
 
@@ -74,33 +73,11 @@ The point is not magic. The point is to be forgiving enough for real-world setti
 
 ## A realistic example
 
-```dart
-class ModelConfig extends PluginService {
-  String get provider => config.getString('provider') ?? 'openai';
-  String get model => config.getString('model') ?? 'gpt-4.1-mini';
-  double get temperature => config.getDouble('temperature') ?? 0.7;
-  bool get streaming => config.getBool('streaming') ?? true;
-  List<String> get tools => config.list<String>('tools') ?? const [];
-}
-```
+<Code code={extractRegion(pluginServicesSource, 'plugin-service-basic')} lang="dart" />
 
 With settings arriving as:
 
-```dart
-final settings = RuntimeSettings(
-  services: {
-    Pin('router', ['model_config']): const ServiceSettings(
-      config: {
-        'provider': 'anthropic',
-        'model': 'claude-sonnet-4-5-20250929',
-        'temperature': 0.4,
-        'streaming': true,
-        'tools': ['search', 'browser'],
-      },
-    ),
-  },
-);
-```
+<Code code={extractRegion(runtimeSettingsSource, 'runtime-settings-construct')} lang="dart" />
 
 The service reads every field through the typed getters with no manual parsing.
 
@@ -110,11 +87,7 @@ When you have a real `double` or `bool` in code, pass it as `double` or `bool`. 
 
 For structured settings, use `list<T>(...)` and `map(...)`.
 
-```dart
-final tools = config.list<String>('tools') ?? const [];
-final headers = config.map('headers');
-final timeoutMs = headers['timeout_ms'];
-```
+<Code code={extractRegion(runtimeSettingsSource, 'config-node-list-map')} lang="dart" />
 
 `map(...)` returns an empty map when the value is missing or cannot be cast. You never end up with a null reference exception from this API.
 
@@ -126,9 +99,7 @@ There is no dot-notation traversal (`config.get('http.headers.x-api-key')`). If 
 
 If you need the source value exactly as stored, use `raw(...)`.
 
-```dart
-final payload = config.raw('advanced_payload');
-```
+<Code code={extractRegion(runtimeSettingsSource, 'config-node-raw')} lang="dart" />
 
 Useful when the shape is highly dynamic, when you want custom decoding, or when the typed helpers are too narrow.
 

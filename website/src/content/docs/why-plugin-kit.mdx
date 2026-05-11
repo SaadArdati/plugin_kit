@@ -49,8 +49,6 @@ writing teardown code by hand each time.
 
 ## Design decisions that follow from those values
 
-Five trade-offs the library makes deliberately. Each one is a consequence of one or more of the three values above; together they explain why the API looks the way it does.
-
 **Domain-agnostic core.** The runtime knows nothing about Flutter, servers, editors, agents, or any specific UI framework. Client code extends `PluginContext`, `Plugin`, and `PluginService` to model domain concepts. The same runtime drops into a CLI, a server, or a Flutter app unchanged.
 
 **Competing implementations are a first-class idea.** Most DI containers treat override as a special case. Plugin Kit treats it as the normal case. That is why priority is on the registration, not on the slot: the slot is just a name, and any plugin that registers there is a candidate to win.

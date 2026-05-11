@@ -9,6 +9,7 @@ import '../utils.dart';
 import 'plugin_kit_dialog_body.dart';
 
 /// Material dialog shell that hosts [PluginKitDialogBody].
+// #docregion plugin-kit-dialog-plugin-kit-dialog
 class PluginKitDialog extends StatelessWidget {
   /// Controller backing draft edits, dirty state, and save/reset behavior.
   /// The runtime being edited is read from `controller.runtime`.
@@ -58,8 +59,10 @@ class PluginKitDialog extends StatelessWidget {
     );
   }
 }
+// #enddocregion plugin-kit-dialog-plugin-kit-dialog
 
 /// Opens [PluginKitDialog] and resolves with saved settings or `null` on cancel.
+// #docregion plugin-kit-dialog-show-plugin-kit-dialog
 Future<RuntimeSettings?> showPluginKitDialog({
   required BuildContext context,
   required PluginRuntime runtime,
@@ -69,6 +72,7 @@ Future<RuntimeSettings?> showPluginKitDialog({
   PluginKitDialogTheme? theme,
   bool barrierDismissible = true,
 }) async {
+// #enddocregion plugin-kit-dialog-show-plugin-kit-dialog
   final controller = PluginKitDialogController(
     runtime: runtime,
     initialSettings: initialSettings,

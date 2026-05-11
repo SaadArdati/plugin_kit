@@ -24,38 +24,36 @@ Not for additive shapes. If multiple registrants should each contribute (pipelin
 
 Pattern: register the behavior as a service in the registry; put a single subscription on a dispatcher (the plugin or one dispatcher service); the dispatcher resolves the winner per event and delegates.
 
+<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-direct-subscribe-fix)" -->
 ```dart
-abstract class Redactor {
-  String redact(String input);
-}
-
-class ComplianceRedactor implements Redactor {
-  const ComplianceRedactor();
+// CORRECT: Register the redactor as a service; let the registry pick the winner.
+class MyRedactionPlugin extends SessionPlugin {
   @override
-  String redact(String input) =>
-      input.replaceAll(RegExp(r'\b(?:secret|password)\b', caseSensitive: false), '[REDACTED]');
-}
+  PluginId get pluginId => const PluginId('my_redaction');
 
-class TelemetryPlugin extends SessionPlugin {
-  static const PluginId id = PluginId('telemetry');
-  static const ServiceId redactorId = ServiceId('telemetry.redactor');
-
-  @override
-  PluginId get pluginId => id;
+  static const serviceId = ServiceId('redactor');
 
   @override
   void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<Redactor>(redactorId, ComplianceRedactor());
+    registry.registerSingleton<Redactor>(serviceId, _ComplianceRedactor());
   }
 
   @override
   void attach(SessionPluginContext context) {
-    on<UserMessageReceived>(context, (envelope) {
-      final redactor = context.maybeResolve<Redactor>(redactorId);
-      if (redactor == null) return; // disabled by override
-      envelope.event.text = redactor.redact(envelope.event.text);
+    on<UserMessageReceived>(context, (e) {
+      final redactor = context.maybeResolve<Redactor>(serviceId);
+      if (redactor == null) return;
+      e.event.text = redactor.redact(e.event.text);
     });
   }
+}
+
+class _ComplianceRedactor implements Redactor {
+  @override
+  String redact(String input) => input.replaceAll(
+    RegExp(r'\bsecret\b', caseSensitive: false),
+    '[REDACTED]',
+  );
 }
 ```
 
@@ -71,24 +69,12 @@ Constraint: during `Plugin.register()`, only the scoped registry is in scope; `P
 
 Pattern: capture the registry through a closure thunk; register lazily; defer use until first resolve (after register-all and attach-all complete).
 
+<!-- code-excerpt "website/snippets/lib/service_registry.dart (service-registry-enterprise-router-plugin)" -->
 ```dart
-class EnterpriseRouter implements ModelRouter {
-  final PluginId ownerId;
-  final ServiceRegistry Function() registryThunk;
-  EnterpriseRouter({required this.ownerId, required this.registryThunk});
-
-  @override
-  String? routeFor(String prompt) {
-    if (prompt.toLowerCase().contains('enterprise')) return 'gpt-4-enterprise';
-    return registryThunk().resolveAfter<ModelRouter>(
-      pluginId: ownerId,
-      serviceId: const ServiceId('model_router'),
-    ).routeFor(prompt);
-  }
-}
-
 class EnterpriseRouterPlugin extends GlobalPlugin {
+  /// The plugin id for this router.
   static const PluginId id = PluginId('enterprise_router');
+
   @override
   PluginId get pluginId => id;
 
@@ -117,31 +103,23 @@ Contract: each session has its own service instance. State never leaks across se
 
 Mechanism: `register()` runs once per session for `SessionPlugin` (once per runtime for `GlobalPlugin`). Inline construction means each session evaluates the constructor expression fresh.
 
+<!-- code-excerpt "website/snippets/lib/plugin_services.dart (session-stateful-plugin-service)" -->
 ```dart
-class ChatPlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('chat');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<ChatService>(
-      const ServiceId('chat_service'),
-      ChatService(),
-    );
-  }
-}
-
-class ChatService extends StatefulPluginService {
-  final List<String> messages = [];
+class ChatThread extends StatefulPluginService<SessionPluginContext> {
+  /// The accumulated messages for this session.
+  final List<Message> messages = [];
 
   @override
   void attach() {
-    on<UserMessageReceived>((e) async {
-      messages.add(e.event.text);
-      await emit(BotReply('Heard: ${e.event.text}'));
-    });
+    on<NewMessage>((e) => messages.add(Message(e.event.text)));
+  }
+
+  @override
+  Future<void> detach() async {
+    messages.clear();
   }
 }
+
 ```
 
 Within-session disable then enable resets state. Settings reconciliation that flips this plugin off then back on within the same session re-runs `register()`, the constructor evaluates again, the `messages` list is empty. This is the correct semantic; toggle is a fresh start, not a save/restore.
@@ -150,29 +128,19 @@ State that must outlive reconciliation: persist externally (file, database, in-m
 
 The session id comes from `context.extras`. `PluginRuntime.createSession` and `PluginRuntime.createSession` thread a `Map<String, Object>` through to the context's `extras` field; convention is to write a session id there when state needs to outlive a session lifecycle.
 
+<!-- code-excerpt "website/snippets/lib/sessions.dart (create-session-with-factory)" -->
 ```dart
-final session = await runtime.createSession(
-  contextFactory: (registry, sessionBus, globalBus) => SessionPluginContext(
-    registry: registry,
-    bus: sessionBus,
-    globalBus: globalBus,
-    extras: const {'session_id': 'chat-42'},
-  ),
-);
+Future<void> createSessionWithFactory(PluginRuntime runtime) async {
+  final session = await runtime.createSession(
+    contextFactory: (registry, sessionBus, globalBus) => SessionPluginContext(
+      registry: registry,
+      bus: sessionBus,
+      globalBus: globalBus,
+      extras: const {'session_id': 'chat-42'},
+    ),
+  );
 
-class ChatService extends StatefulPluginService {
-  late List<String> messages;
-
-  @override
-  void attach() {
-    final sessionId = context.extras['session_id'] as String;
-    messages = ChatStore.loadMessages(sessionId);
-    on<UserMessageReceived>((e) async {
-      messages.add(e.event.text);
-      ChatStore.saveMessages(sessionId, messages);
-      await emit(BotReply('Heard: ${e.event.text}'));
-    });
-  }
+  print('session id: ${session.context.extras['session_id']}');
 }
 ```
 
@@ -194,17 +162,23 @@ For runtime composition (most call sites): `final modelId = agent('model');`.
 
 For const contexts (`static const` fields, const `RuntimeSettings` literals): `ServiceId.namespaced(...)` or raw `ServiceId('agent.model')`.
 
+<!-- code-excerpt "website/snippets/lib/naming.dart (naming-namespace-composition)" -->
 ```dart
-const Namespace agent = Namespace('agent');
-final ServiceId modelId = agent('model');
-final ServiceId scopeId = agent.child('system_prompt')('scope');
+/// Composing namespaced service ids.
+void demonstrateNamespaceComposition() {
+  const agent = Namespace('agent');
+  final modelId = agent('model');
+  final scopeId = agent.child('system_prompt')('scope');
 
-final RuntimeSettings settings = RuntimeSettings(
-  services: {
-    const PluginId('chat').namespace('agent').service('model'):
-        ServiceSettings(config: {'temperature': 0.7}),
-  },
-);
+  final settings = RuntimeSettings(
+    services: {
+      const PluginId('chat').namespace('agent').service('model'):
+          const ServiceSettings(config: {'temperature': 0.7}),
+    },
+  );
+
+  print('$modelId $scopeId ${settings.services.length}');
+}
 ```
 
 ## 5. Pre-commit interception
@@ -213,23 +187,20 @@ Use when: plugins should mutate, enrich, redact, or veto an action before it com
 
 Pattern: event payload has mutable fields by design. Emit and read the post-cascade envelope back.
 
+<!-- code-excerpt "website/snippets/lib/naming.dart (naming-event-draft)" -->
 ```dart
+/// A mutable draft event for outgoing messages, allowing handlers to mutate
+/// or veto the payload before it is sent.
 class DraftOutgoingMessage {
+  /// The current text of the draft, mutable by handlers.
   String text;
+
+  /// Metadata attached by handlers.
   final Map<String, String> metadata;
+
+  /// Creates a [DraftOutgoingMessage] with [text].
   DraftOutgoingMessage(this.text) : metadata = {};
 }
-
-on<DraftOutgoingMessage>((envelope) {
-  envelope.event.text = expandMacros(envelope.event.text);
-  envelope.event.metadata['macros_expanded'] = 'true';
-});
-
-final envelope = await context.bus.emit<DraftOutgoingMessage>(
-  event: DraftOutgoingMessage(userInput),
-);
-if (envelope.stopped) return;
-await sendToServer(envelope.event);
 ```
 
 `context.bus.emit(event:)` and the `emit(event)` helper both return `Future<EventEnvelope<T>>`. The helper has positional args; `bus.emit` has named args. Use either.
@@ -240,15 +211,35 @@ Use when: a service wants to delegate to the next-priority registration for the 
 
 `registry.resolveAfter<T>(pluginId: self, serviceId: slot)`: walks priority-sorted list, finds the registration owned by `self`, returns the next enabled wrapper. Never returns self. Throws `StateError` if no fallback.
 
+<!-- code-excerpt "website/snippets/lib/service_registry.dart (service-registry-resolve-after)" -->
 ```dart
-String? routeFor(String prompt) {
-  if (prompt.contains('enterprise')) return 'gpt-4-enterprise';
-  return registryThunk()
-      .resolveAfter<ModelRouter>(
-        pluginId: ownerId,
-        serviceId: const ServiceId('model_router'),
-      )
-      .routeFor(prompt);
+class ChainRouter implements ModelRouter {
+  /// The plugin id that owns this router.
+  final PluginId ownerId;
+
+  /// Returns the live registry on demand.
+  final ServiceRegistry Function() registryThunk;
+
+  /// The service id for resolution delegation.
+  final ServiceId routerId;
+
+  /// Creates a [ChainRouter].
+  ChainRouter({
+    required this.ownerId,
+    required this.registryThunk,
+    required this.routerId,
+  });
+
+  @override
+  String? routeFor(String prompt) {
+    if (prompt.contains('enterprise')) return 'gpt-4-enterprise';
+    return registryThunk()
+        .resolveAfter<ModelRouter>(
+          pluginId: ownerId,
+          serviceId: const ServiceId('model_router'),
+        )
+        .routeFor(prompt);
+  }
 }
 ```
 
@@ -256,15 +247,34 @@ String? routeFor(String prompt) {
 
 There is no `maybeResolveAfter`. For genuinely optional fallback, wrap:
 
+<!-- code-excerpt "website/snippets/lib/service_registry.dart (service-registry-resolve-after)" -->
 ```dart
-String? routeFor(String prompt) {
-  if (canHandle(prompt)) return route(prompt);
-  try {
+class ChainRouter implements ModelRouter {
+  /// The plugin id that owns this router.
+  final PluginId ownerId;
+
+  /// Returns the live registry on demand.
+  final ServiceRegistry Function() registryThunk;
+
+  /// The service id for resolution delegation.
+  final ServiceId routerId;
+
+  /// Creates a [ChainRouter].
+  ChainRouter({
+    required this.ownerId,
+    required this.registryThunk,
+    required this.routerId,
+  });
+
+  @override
+  String? routeFor(String prompt) {
+    if (prompt.contains('enterprise')) return 'gpt-4-enterprise';
     return registryThunk()
-        .resolveAfter<ModelRouter>(pluginId: ownerId, serviceId: routerId)
+        .resolveAfter<ModelRouter>(
+          pluginId: ownerId,
+          serviceId: const ServiceId('model_router'),
+        )
         .routeFor(prompt);
-  } on StateError {
-    return null;
   }
 }
 ```

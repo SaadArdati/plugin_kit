@@ -4,6 +4,10 @@ description: Reference for EventBus, EventEnvelope, request/response, identifier
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import eventBusSnippets from '../../../../../website/snippets/lib/event_bus.dart?raw';
+import eventBusSource from '../../../../../packages/plugin_kit/lib/src/event_bus.dart?raw';
 
 This page is the lookup reference for the public event types in `plugin_kit`. It assumes you already understand the model from the concept pages and want to confirm a signature, a return type, or a default value.
 
@@ -11,14 +15,7 @@ The bus is exported from the package barrel via `src/event_bus.dart`, alongside 
 
 ## `EventBus`
 
-```dart
-class EventBus {
-  EventBus();
-
-  bool get isDisposed;
-  void dispose();
-}
-```
+<Code code={extractRegion(eventBusSnippets, 'event-bus-standalone')} lang="dart" />
 
 Construct with the zero-argument constructor when you need a standalone bus (tests, custom hosts). In application code you almost never instantiate one yourself: each `PluginRuntime` owns one global bus and each `PluginSession` owns its own session bus. See [Runtime](/concepts/runtime/) and [Sessions](/concepts/sessions/) for who creates which.
 
@@ -28,16 +25,7 @@ Construct with the zero-argument constructor when you need a standalone bus (tes
 
 Every handler receives an envelope, not a raw payload. `emit` and `emitInternal` also return one.
 
-```dart
-class EventEnvelope<T> {
-  EventEnvelope({required T event, required String? identifier});
-
-  T event;                  // mutable; downstream handlers see writes
-  final String? identifier; // the emit-time scope, if any
-  bool get stopped;
-  void stop(T value);
-}
-```
+<Code code={extractRegion(eventBusSnippets, 'event-bus-envelope-class')} lang="dart" />
 
 - `event` is mutable. Mutating it in a handler is how you transform the payload for the rest of the cascade.
 - `identifier` is whatever was passed to `emit` (or `request`). It is read-only after construction.
@@ -80,13 +68,7 @@ void Function() bind(EventBindingCallback callback);
 
 The return value is the unbind function. Call it to remove the callback.
 
-```dart
-final unbind = bus.bind((envelope) {
-  log.debug('event ${envelope.event.runtimeType}');
-});
-// ... later
-unbind();
-```
+<Code code={extractRegion(eventBusSnippets, 'event-bus-bind')} lang="dart" />
 
 Internal events emitted via `emitInternal` skip `bind` callbacks entirely.
 
@@ -100,24 +82,7 @@ Reports whether at least one handler is registered for the `(Request, Response)`
 
 ## `emit` and `emitInternal`
 
-```dart
-Future<EventEnvelope<T>> emit<T>({
-  required T event,
-  String? identifier,
-  bool internal = false,
-});
-
-EventEnvelope<T> emitSync<T>({
-  required T event,
-  String? identifier,
-  bool internal = false,
-});
-
-Future<EventEnvelope<T>> emitInternal<T>({
-  required T event,
-  String? identifier,
-});
-```
+<Code code={extractRegion(eventBusSource, 'event-bus-emit')} lang="dart" />
 
 `emit` wraps `event` in an `EventEnvelope<T>`, runs `bind` callbacks (when not internal), then walks the priority-merged handler chain. The cascade stops when a handler calls `envelope.stop(value)`. The returned envelope carries the final state; check `stopped` if you need to know whether someone short-circuited.
 

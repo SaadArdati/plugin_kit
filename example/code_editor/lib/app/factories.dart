@@ -12,6 +12,8 @@ import 'package:flutter/widgets.dart';
 /// The shell provides the panel frame (title bar, collapse/expand).
 /// The factory controls everything inside, so plugins have full creative
 /// freedom over colors and layout.
+// #docregion factories-panel-widget-factory
 abstract class PanelWidgetFactory {
   Widget build(BuildContext context);
 }
+// #enddocregion factories-panel-widget-factory

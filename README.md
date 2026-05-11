@@ -37,23 +37,8 @@ Requires Dart `>=3.10.0`. For Flutter projects that want the scope widgets and `
 
 Two plugins claim the same `'greeter'` slot at different priorities. The runtime resolves to the winner. The host code never sees the competition.
 
+<!-- code-excerpt "website/snippets/lib/plugin_lifecycle.dart (session-plugin-basic)" -->
 ```dart
-import 'package:plugin_kit/plugin_kit.dart';
-
-abstract class Greeter {
-  String greet(String name);
-}
-
-class CasualGreeter implements Greeter {
-  @override
-  String greet(String name) => 'Hello, $name.';
-}
-
-class FormalGreeter implements Greeter {
-  @override
-  String greet(String name) => 'Good day, $name.';
-}
-
 class CasualPlugin extends SessionPlugin {
   @override
   PluginId get pluginId => const PluginId('casual');
@@ -76,12 +61,12 @@ class FormalPlugin extends SessionPlugin {
     registry.registerSingleton<Greeter>(
       const ServiceId('greeter'),
       FormalGreeter(),
-      priority: 100,
+      priority: 100, // wins
     );
   }
 }
 
-Future<void> main() async {
+Future<void> runGreeterExample() async {
   final runtime = PluginRuntime(plugins: [CasualPlugin(), FormalPlugin()])
     ..init();
   final session = await runtime.createSession();

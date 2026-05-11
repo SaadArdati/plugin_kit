@@ -4,6 +4,14 @@ description: Turn one feature into a plugin without turning the plugin class int
 ---
 
 import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import pluginLifecycleSource from '../../../../snippets/lib/plugin_lifecycle.dart?raw';
+import testingSource from '../../../../snippets/lib/testing.dart?raw';
+import pluginServicesSource from '../../../../snippets/lib/plugin_services.dart?raw';
+import runtimeSettingsSource from '../../../../snippets/lib/runtime_settings.dart?raw';
+import namingSource from '../../../../snippets/lib/naming.dart?raw';
+import capabilitiesSource from '../../../../snippets/lib/capabilities.dart?raw';
 
 Adding a plugin is smaller than it sounds.
 
@@ -12,40 +20,7 @@ the runtime a name for the feature.
 
 Here is the whole move up front:
 
-```dart
-import 'package:plugin_kit/plugin_kit.dart';
-
-class NotificationService {
-  Future<void> send(String message) async {
-    print(message);
-  }
-}
-
-class NotificationPlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('my_notifier');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerLazySingleton<NotificationService>(
-      const ServiceId('notification_service'),
-      () => NotificationService(),
-    );
-  }
-}
-
-final runtime = PluginRuntime(
-  plugins: [NotificationPlugin()],
-)..init();
-
-final session = await runtime.createSession();
-final notifications = session.resolve<NotificationService>(
-  const ServiceId('notification_service'),
-);
-
-await notifications.send('Build completed.');
-await runtime.dispose();
-```
+<Code code={extractRegion(pluginLifecycleSource, 'session-plugin-basic')} lang="dart" />
 
 That already buys you three things:
 
@@ -64,13 +39,7 @@ No clever architecture yet. Just one service, one plugin, one session.
 
 Start with the boring Dart class first:
 
-```dart
-class NotificationService {
-  Future<void> send(String message) async {
-    print(message);
-  }
-}
-```
+<Code code={extractRegion(pluginServicesSource, 'adding-plugin-notification-service')} lang="dart" />
 
 That is intentional. Plugin Kit does not require every useful class to inherit
 from something. A service can stay ordinary until it needs settings,
@@ -80,22 +49,7 @@ identity, or lifecycle.
 
 Now give the feature an identity and register the service.
 
-```dart
-import 'package:plugin_kit/plugin_kit.dart';
-
-class NotificationPlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('my_notifier');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerLazySingleton<NotificationService>(
-      const ServiceId('notification_service'),
-      () => NotificationService(),
-    );
-  }
-}
-```
+<Code code={extractRegion(pluginLifecycleSource, 'session-plugin-attach')} lang="dart" />
 
 That is already a real plugin.
 
@@ -131,21 +85,7 @@ once shared behavior is obvious.
 
 Add the plugin to a runtime, create a session, and resolve the service.
 
-```dart
-final runtime = PluginRuntime(
-  plugins: [NotificationPlugin()],
-)..init();
-
-final session = await runtime.createSession();
-
-final notifications = session.resolve<NotificationService>(
-  const ServiceId('notification_service'),
-);
-
-await notifications.send('Build completed.');
-
-await runtime.dispose();
-```
+<Code code={extractRegion(pluginServicesSource, 'adding-plugin-run-notification')} lang="dart" />
 
 You now have:
 
@@ -174,43 +114,7 @@ have to remember the cleanup step.
 
 Here is the notification feature extended with a request/response handler:
 
-```dart
-class NotificationRequest {
-  final String message;
-  NotificationRequest(this.message);
-}
-
-class NotificationPlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('my_notifier');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerLazySingleton<NotificationService>(
-      const ServiceId('notification_service'),
-      () => NotificationService(),
-    );
-
-    registry.registerLazySingleton<NotificationHandler>(
-      const ServiceId('notification_handler'),
-      () => NotificationHandler(),
-    );
-  }
-}
-
-class NotificationHandler extends StatefulPluginService {
-  @override
-  void attach() {
-    onRequest<NotificationRequest, bool>((request) async {
-      final service = context.resolve<NotificationService>(
-        const ServiceId('notification_service'),
-      );
-      await service.send(request.event.message);
-      return true;
-    });
-  }
-}
-```
+<Code code={extractRegion(testingSource, 'testing-level-2-plugin')} lang="dart" />
 
 Notice that the plugin class did not override `attach(...)`. When the
 session starts, the plugin's base `attach(...)` walks every
@@ -259,30 +163,11 @@ slowly turns into a second application hidden inside one class.
 If your service needs runtime configuration, promote it to `PluginService`
 and read from `config`.
 
-```dart
-class NotificationService extends PluginService {
-  String get channel => config.getString('channel') ?? 'default';
-  String get prefix => config.getString('prefix') ?? '';
-
-  Future<void> send(String message) async {
-    print('[$channel] $prefix$message');
-  }
-}
-```
+<Code code={extractRegion(pluginServicesSource, 'plugin-service-settings-inject')} lang="dart" />
 
 Settings target the plugin and service slot:
 
-```dart
-final settings = RuntimeSettings(
-  services: {
-    const PluginId('my_notifier').service(
-      const ServiceId('notification_service'),
-    ): ServiceSettings(
-      config: {'channel': 'builds', 'prefix': '> '},
-    ),
-  },
-);
-```
+<Code code={extractRegion(runtimeSettingsSource, 'runtime-settings-construct')} lang="dart" />
 
 `PluginId.service(...)` returns a `Pin` for the slot owned by that plugin.
 For runtime construction without the chain, use `Pin('my_notifier',
@@ -308,21 +193,7 @@ The canonical user-driven case is a service that needs a secret only the
 user can supply. Suppose your app has a chat plugin that talks to an
 external API, and that API wants a key:
 
-```dart
-class ChatBackendService extends PluginService {
-  String? get apiKey => config.getString('api_key');
-  String get model => config.getString('model') ?? 'claude-opus-4-7';
-
-  Future<ChatReply> reply(String prompt) async {
-    final key = apiKey;
-    if (key == null) {
-      throw StateError('No API key configured.');
-    }
-    // Call the upstream API with key and model.
-    return ChatReply.stub();
-  }
-}
-```
+<Code code={extractRegion(pluginServicesSource, 'adding-plugin-chat-backend-service')} lang="dart" />
 
 A settings UI (more on capabilities in a minute) can read the expected
 shape, render a text field, and push the new value back into
@@ -336,26 +207,7 @@ directly. If you maintain a shelf of plugins shared across several apps,
 this is how you flip the same plugin into different modes without
 forking plugin code.
 
-```dart
-const myNotifier = PluginId('my_notifier');
-const notificationService = ServiceId('notification_service');
-
-final appASettings = RuntimeSettings(
-  services: {
-    myNotifier.service(notificationService): ServiceSettings(
-      config: {'channel': 'slack', 'prefix': '[builds] '},
-    ),
-  },
-);
-
-final appBSettings = RuntimeSettings(
-  services: {
-    myNotifier.service(notificationService): ServiceSettings(
-      config: {'channel': 'console', 'prefix': ''},
-    ),
-  },
-);
-```
+<Code code={extractRegion(namingSource, 'naming-settings-keys')} lang="dart" />
 
 Same plugin code, two runtimes, two behaviors, zero `if (appName == 'A')`
 branches buried inside the plugin. The user-facing and developer-facing
@@ -375,36 +227,11 @@ class. You subclass it with whatever fields you want, attach instances
 during registration, and the host reads them back through the registry
 without instantiating the service.
 
-```dart
-class SupportsFileFormats extends Capability {
-  final Set<String> extensions;
-  const SupportsFileFormats(this.extensions);
-}
-
-class IsSlowCapability extends Capability {
-  const IsSlowCapability();
-}
-
-registry.registerLazySingleton<NotificationService>(
-  const ServiceId('notification_service'),
-  () => NotificationService(),
-  capabilities: {
-    const SupportsFileFormats({'txt', 'md'}),
-    const IsSlowCapability(),
-  },
-);
-```
+<Code code={extractRegion(capabilitiesSource, 'capability-register-multiple')} lang="dart" />
 
 And on the reading side:
 
-```dart
-final slow = context.registry.resolveCapability<IsSlowCapability>(
-  const ServiceId('notification_service'),
-);
-if (slow != null) {
-  // Maybe do not call this on the UI thread.
-}
-```
+<Code code={extractRegion(capabilitiesSource, 'capability-resolve-raw-wrapper')} lang="dart" />
 
 `resolveCapability` returns the capability instance (or `null` when the
 slot's winner does not carry it), so the same call serves as a presence

@@ -79,9 +79,11 @@ class CollectToolbarActions {
 }
 
 /// Emitted by the shell to collect panels from all enabled plugins.
+// #docregion contributions-collect-panels
 class CollectPanels {
   final List<PanelDescriptor> panels = [];
 }
+// #enddocregion contributions-collect-panels
 
 /// Emitted by the shell to collect status bar items from all enabled plugins.
 class CollectStatusBarItems {

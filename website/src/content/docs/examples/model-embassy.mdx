@@ -4,6 +4,9 @@ description: Six scenarios that teach model provider routing through agents, pas
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import runtimeSettings from '../../../../snippets/lib/runtime_settings.dart?raw';
 
 `example/model_embassy/` teaches Plugin Kit through a model-routing metaphor. An agent presents a `ModelPassport` (model family, requirements). The embassy registers one `VisaOffice` per provider. The first office that can honour the passport issues a `ModelVisa` carrying a ready-to-use client. Offices that cannot serve the request return `null` so the next candidate gets a turn.
 
@@ -69,17 +72,7 @@ Concepts: [Event Patterns](/concepts/events/#the-pre-commit-interception-pattern
 
 `ServiceSettings` plus `ConfigNode` inject per-session configuration into a `StatefulPluginService`. Three sessions share one runtime and one registered visa office, but each reads different `api_key`, `base_url`, and `default_model` values from the settings it was created with.
 
-```dart
-// Session A: production credentials (scoped key).
-Pin('visa_office_plugin', ['visa_office']): ServiceSettings(
-  config: {'api_key': prodKey, 'base_url': 'https://api.prod...'},
-),
-
-// Session C: wildcard key targets whichever plugin owns the slot.
-Pin.wildcard(['visa_office']): ServiceSettings(
-  config: {'api_key': stagingKey},
-),
-```
+<Code code={extractRegion(runtimeSettings, 'runtime-settings-priority')} lang="dart" />
 
 Concepts: [Configuration](/concepts/configuration/), [Settings & Overrides](/guides/settings/).
 

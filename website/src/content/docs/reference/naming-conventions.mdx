@@ -4,6 +4,10 @@ description: How to name plugins, services, events, capabilities, and settings k
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import namingSnippets from '../../../../../website/snippets/lib/naming.dart?raw';
+import serviceRegistrySnippets from '../../../../../website/snippets/lib/service_registry.dart?raw';
 
 Plugin Kit does not enforce names beyond uniqueness, but consistent naming is the difference between a runtime you can reason about and one you cannot. This page is the style guide the existing docs and demo follow.
 
@@ -15,14 +19,7 @@ Deviating from these conventions is fine when you have a reason. The cost is mos
 
 A plugin id is a stable, lowercase, snake_case identifier for one feature. Wrap it in `const PluginId('...')` because `PluginId` is an extension type, and the const constructor gives you compile-time guarantees for switch statements and map keys.
 
-```dart
-class CorePlugin extends GlobalPlugin {
-  static const id = PluginId('core');
-
-  @override
-  PluginId get pluginId => id;
-}
-```
+<Code code={extractRegion(namingSnippets, 'naming-core-plugin-static-id')} lang="dart" />
 
 A `static const id` field next to the class is the canonical pattern. Host code refers to `CorePlugin.id` instead of typing the string each time, which keeps the registry's plugin maps free of typos.
 
@@ -82,12 +79,7 @@ When the domain has a clean entity noun, use it. When it does not, use a specifi
 
 A root service id is a single snake_case string passed to a `const ServiceId('...')`.
 
-```dart
-registry.registerSingleton<Greeter>(
-  const ServiceId('greeter'),
-  CasualGreeter(),
-);
-```
+<Code code={extractRegion(serviceRegistrySnippets, 'service-registry-naming-register')} lang="dart" />
 
 Use a root id when there is only one of the thing in the runtime, or when the slot's name already encodes its domain.
 
@@ -97,14 +89,7 @@ Most services in a real app are namespaced. The format is `namespace.service_nam
 
 The idiomatic way to produce one is to build it from a `Namespace`. The registry method itself is the same `registerSingleton` you use for root services; the namespace is just a way of composing the id.
 
-```dart
-const agent = Namespace('agent');
-
-registry.registerSingleton<ModelClient>(
-  agent('model'),                    // ServiceId('agent.model')
-  AnthropicClient(),
-);
-```
+<Code code={extractRegion(serviceRegistrySnippets, 'service-registry-naming-namespace')} lang="dart" />
 
 That registration claims `agent.model`. Resolution and settings overrides both use the dotted form. `agent('model')` is a call-shorthand for `agent.service('model')`; reach for the explicit form when it reads better at the site.
 
@@ -152,17 +137,7 @@ Events are plain Dart classes. The class name carries most of the meaning; field
 
 For events that announce something that already happened, use past tense. The emitter is reporting; subscribers react.
 
-```dart
-class UserLoggedIn {
-  final String userId;
-  const UserLoggedIn(this.userId);
-}
-
-class DocumentSaved {
-  final String documentId;
-  const DocumentSaved(this.documentId);
-}
-```
+<Code code={extractRegion(namingSnippets, 'naming-event-past-tense')} lang="dart" />
 
 Make these immutable: `const` constructors, `final` fields.
 
@@ -170,16 +145,7 @@ Make these immutable: `const` constructors, `final` fields.
 
 For events that carry a request, command, or instruction, use the imperative verb form. Subscribers do something with them, often answering through `request<Req, Res>`.
 
-```dart
-class SendNotification {
-  final String message;
-  const SendNotification(this.message);
-}
-
-class FindOpenPort {
-  const FindOpenPort();
-}
-```
+<Code code={extractRegion(namingSnippets, 'naming-event-imperative')} lang="dart" />
 
 Imperative names pair naturally with `bus.request<SendNotification, bool>(...)`.
 
@@ -187,14 +153,7 @@ Imperative names pair naturally with `bus.request<SendNotification, bool>(...)`.
 
 The pre-commit interception pattern uses an event type whose payload is intentionally mutable so handlers can rewrite it before the cascade ends. Name them `DraftXxx` or `XxxDraft` so the mutability is obvious to anyone reading the type.
 
-```dart
-class DraftOutgoingMessage {
-  String text;
-  final Map<String, String> metadata;
-
-  DraftOutgoingMessage(this.text) : metadata = {};
-}
-```
+<Code code={extractRegion(namingSnippets, 'naming-event-draft')} lang="dart" />
 
 This is the only common shape where event payload fields are mutable. Every other event type stays immutable.
 
@@ -221,17 +180,7 @@ Capabilities are subclasses of `Capability`. The class name describes what fact 
 
 ### Anatomy
 
-```dart
-class SupportsLanguages extends Capability {
-  final List<String> languages;
-  const SupportsLanguages(this.languages);
-}
-
-class IsSlowCapability extends Capability {
-  final bool isSlow;
-  const IsSlowCapability({this.isSlow = true});
-}
-```
+<Code code={extractRegion(namingSnippets, 'naming-capability')} lang="dart" />
 
 Capabilities should:
 
@@ -262,14 +211,7 @@ Capabilities should:
 
 `RuntimeSettings.plugins` is a `Map<PluginId, PluginConfig>`. The key is a `PluginId`, not a string.
 
-```dart
-const settings = RuntimeSettings(
-  plugins: {
-    PluginId('analytics'): PluginConfig(enabled: false),
-    PluginId('experimental_router'): PluginConfig(enabled: true),
-  },
-);
-```
+<Code code={extractRegion(namingSnippets, 'naming-settings-keys')} lang="dart" />
 
 ### Anatomy: service-level keys
 
@@ -282,25 +224,7 @@ const settings = RuntimeSettings(
 
 In Dart code, prefer the typed-chain shorthand when you have the underlying handles in scope: `pluginId.service(serviceId)` or `pluginId.namespace('agent').service('model')`.
 
-```dart
-const linter = PluginId('linter_suite');
-
-final settings = RuntimeSettings(
-  services: {
-    // Plugin-scoped: one specific plugin's registration.
-    linter.service(const ServiceId('line_length_linter')):
-        const ServiceSettings(config: {'max_line_length': 120}),
-
-    // Equivalent hand-built Pin:
-    Pin('linter_suite', ['line_length_linter']):
-        const ServiceSettings(config: {'max_line_length': 120}),
-
-    // Wildcard: applies to whichever plugin wins agent.model.
-    Pin.wildcard(['agent', 'model']):
-        const ServiceSettings(priority: 200),
-  },
-);
-```
+<Code code={extractRegion(namingSnippets, 'naming-namespace-composition')} lang="dart" />
 
 The wire form (used for JSON serialization, accessible via `Pin.wire`) is `pluginId:serviceId` (or `*:serviceId` for wildcards). The `serviceId` half is the full slot key, including any namespace (`agent.model`, not just `model`).
 
@@ -308,15 +232,7 @@ The wire form (used for JSON serialization, accessible via `Pin.wire`) is `plugi
 
 Inside `ServiceSettings.config`, dotted keys write to nested maps automatically. The dialog's `ConfigField.key` uses the same convention.
 
-```dart
-ServiceSettings(
-  config: {
-    'provider.api_key': '...',
-    'provider.region': 'us-east-1',
-    'sampling.temperature': 0.7,
-  },
-);
-```
+<Code code={extractRegion(namingSnippets, 'naming-service-settings')} lang="dart" />
 
 The runtime stores this as a nested `Map<String, dynamic>`. `ConfigNode` reads back through the flat `getString('provider.api_key')` form.
 

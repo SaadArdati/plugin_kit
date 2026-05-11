@@ -4,6 +4,9 @@ description: The foundational building block. Global vs Session scope, lifecycle
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import pluginLifecycle from '../../../../snippets/lib/plugin_lifecycle.dart?raw';
 
 A plugin is the smallest thing the runtime cares about as a unit. It has an identity,
 a lifecycle, and a bit of code that wires behavior into a service registry and an event bus.
@@ -46,28 +49,7 @@ both, and they can depend on each other. The runtime handles the lifecycle and t
 
 Here is a typical session plugin in full.
 
-```dart
-class GreeterPlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('greeter');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerLazySingleton<GreeterService>(
-      const ServiceId('greeter_service'),
-      () => GreeterService(),
-    );
-  }
-
-  @override
-  void attach(SessionPluginContext context) {
-    on<UserJoinedEvent>(context, (event) {
-      final greeter = context.resolve<GreeterService>(const ServiceId('greeter_service'));
-      greeter.sayHello(event.event.userId);
-    });
-  }
-}
-```
+<Code code={extractRegion(pluginLifecycle, 'session-plugin-attach')} lang="dart" />
 
 The example above shows the two hooks every plugin will write: `register` puts services in the registry,
 `attach` subscribes to events. Two more come up when you handle teardown or live config: `detach` cleans up,
@@ -105,10 +87,7 @@ That stricture pays off in three ways.
 
 A plugin can name other plugins it depends on.
 
-```dart
-@override
-Set<PluginId> get dependencies => const {PluginId('formatter_pipeline')};
-```
+<Code code={extractRegion(pluginLifecycle, 'plugins-dependencies-override')} lang="dart" />
 
 The runtime validates dependencies transitively. If `A` depends on `B` and `B` depends on `C`, disabling `C` cascades: `B` gets disabled, then `A`, in order.
 Session plugins can depend on enabled global plugins, not just other session plugins.

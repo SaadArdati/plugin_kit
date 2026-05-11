@@ -6,33 +6,43 @@ Test plugins, services, and event handlers without a full runtime.
 
 Three context factories in `types.dart`. All params optional; defaults are `ServiceRegistry.empty()`, fresh `EventBus()`, `{}`.
 
+<!-- code-excerpt "website/snippets/lib/custom_context.dart (plugin-context-stub)" -->
 ```dart
-PluginContext.stub({registry, bus, extras});
-GlobalPluginContext.stub({registry, bus, extras, sessions});
-SessionPluginContext.stub({registry, bus, globalBus, extras});
+PluginContext makeTestContext() {
+  return PluginContext.stub(
+    registry: ServiceRegistry.empty(),
+    bus: EventBus(),
+  );
+}
 ```
 
 `ctx.registry` on a stub is the raw `ServiceRegistry`. Inject a fake using the named-arg registration form:
 
+<!-- code-excerpt "website/snippets/lib/testing.dart (testing-stub-inject-fake)" -->
 ```dart
-final ctx = SessionPluginContext.stub();
-ctx.registry.registerSingleton<Logger>(
-  pluginId: const PluginId('test'),
-  serviceId: const ServiceId('logger'),
-  instance: FakeLogger(),
-  priority: 1000, // beats anything the SUT registers
-);
-```
+/// Demonstrates injecting a fake into [SessionPluginContext.stub]'s registry
+/// using the named-arg form of [ServiceRegistry.registerSingleton].
+void demonstrateStubInjectFake() {
+  final ctx = SessionPluginContext.stub();
+  ctx.registry.registerSingleton<Logger>(
+    pluginId: const PluginId('test'),
+    serviceId: const ServiceId('logger'),
+    instance: FakeLogger(),
+    priority: 1000, // beats anything the SUT registers
+  );
 
-## Asserting cascade
-
-`emit` returns the post-cascade envelope. Inspect `event` for mutations, `stopped` for halts.
-
+  final logger = ctx.registry.resolve<Logger>(const ServiceId('logger'));
+  assert(logger is FakeLogger, 'expected FakeLogger');
+}
 ```dart
-ctx.bus.on<DraftMessage>((e) => e.event.text = e.event.text.toUpperCase());
-final env = await ctx.bus.emit<DraftMessage>(event: DraftMessage('hi'));
-expect(env.event.text, 'HI');
-expect(env.stopped, false);
+/// Asserts cascade mutation and halt via [EventEnvelope].
+Future<void> testAssertCascade() async {
+  final ctx = PluginContext.stub();
+  ctx.bus.on<DraftMessage>((e) => e.event.text = e.event.text.toUpperCase());
+  final env = await ctx.bus.emit<DraftMessage>(event: DraftMessage('hi'));
+  assert(env.event.text == 'HI', 'handler should uppercase the draft text');
+  assert(!env.stopped, 'no handler called stop; should not be stopped');
+}
 ```
 
 For request/response: `bus.maybeRequest` returns null on no-handler-or-all-conceded; `bus.request` throws `RequestUnavailableException`. Use `maybeRequest` to assert the absence path.

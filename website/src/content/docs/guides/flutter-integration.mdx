@@ -4,6 +4,12 @@ description: How Plugin Kit fits into a Flutter app's widget tree without pickin
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import codeEditorFactoriesSource from '../../../../../example/code_editor/lib/app/factories.dart?raw';
+import flutterIntegrationSnippets from '../../../../snippets/lib/flutter_integration.dart?raw';
+import codeEditorContributionsSource from '../../../../../example/code_editor/lib/app/contributions.dart?raw';
+import sessionsSnippets from '../../../../snippets/lib/sessions.dart?raw';
 
 Plugin Kit's core package is pure Dart, with no `flutter` SDK dependency and no widget imports, so the same runtime drops into a CLI, a server, or a Flutter app unchanged. This page is about wiring that runtime into a widget tree, either directly or through whatever state library you already use.
 
@@ -65,71 +71,7 @@ No extra package. Just Flutter, with the shell owning every dispose call. (For a
 
 ## A minimal editor shell
 
-```dart
-class _EditorScreenState extends State<_EditorScreen> {
-  late final PluginRuntime _runtime;
-  PluginSession? _session;
-
-  List<PanelDescriptor> _panels = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _runtime = PluginRuntime(
-      plugins: [TerminalPlugin(), MinimapPlugin()],
-    );
-    _runtime.init();
-    _createSession();
-  }
-
-  Future<void> _createSession() async {
-    _session = await _runtime.createSession();
-
-    _session!.on<UIRefreshRequest>((_) async {
-      if (!mounted) return;
-      await _collectPanels();
-    });
-
-    await _collectPanels();
-  }
-
-  Future<void> _collectPanels() async {
-    final collect = CollectPanels();
-    await _session!.emit(collect);
-
-    if (!mounted) return;
-    setState(() => _panels = collect.panels);
-  }
-
-  @override
-  void dispose() {
-    // runtime.dispose() iterates and disposes active sessions. Do NOT call
-    // session.dispose() separately. Doing both races on stateful service
-    // detach and can throw ConcurrentModificationError.
-    _runtime.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Row(
-        children: [
-          for (final panel in _panels) _resolvePanel(panel),
-        ],
-      ),
-    );
-  }
-
-  Widget _resolvePanel(PanelDescriptor panel) {
-    const ns = Namespace('panel');
-    final factory = _session?.context.maybeResolve<PanelWidgetFactory>(
-      ns(panel.id),
-    );
-    return factory?.build(context) ?? const SizedBox.shrink();
-  }
-}
-```
+<Code code={extractRegion(flutterIntegrationSnippets, 'flutter-editor-shell-state')} lang="dart" />
 
 That is the whole bridge. Session events trigger `setState`. Plugins contribute via the registry and via events. The widget tree never imports the `ServiceRegistry` or subscribes directly to plugin internals.
 
@@ -139,44 +81,11 @@ Widgets that plugins contribute live in the registry, behind an interface the sh
 
 Define an interface in the shell:
 
-```dart
-abstract class PanelWidgetFactory {
-  Widget build(BuildContext context);
-}
-```
+<Code code={extractRegion(codeEditorFactoriesSource, 'factories-panel-widget-factory')} lang="dart" />
 
 Implement it in the plugin. The factory typically extends `StatefulPluginService` so it inherits session lifecycle and automatic subscription tracking.
 
-```dart
-class TerminalPanelFactory extends StatefulPluginService
-    implements PanelWidgetFactory {
-  final List<String> _history = [];
-
-  @override
-  Widget build(BuildContext context) {
-    return TerminalWidget(history: List.of(_history), onCommand: _run);
-  }
-
-  Future<void> _run(String command) async {
-    _history.add(command);
-    await emit(const UIRefreshRequest());
-  }
-}
-
-class TerminalPlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('terminal');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    const panel = Namespace('panel');
-    registry.registerSingleton<PanelWidgetFactory>(
-      panel('terminal'),                 // ServiceId('panel.terminal')
-      TerminalPanelFactory(),
-    );
-  }
-}
-```
+<Code code={extractRegion(flutterIntegrationSnippets, 'flutter-terminal-plugin')} lang="dart" />
 
 The factory keeps its own state (`_history`). To trigger a rebuild, it emits `UIRefreshRequest` on the session bus. The shell hears it, calls `setState`, and the widget's `build(context)` runs as part of that rebuild.
 
@@ -186,27 +95,7 @@ Because the factory is a `StatefulPluginService`, the runtime manages its lifecy
 
 For things like toolbar items, status bar entries, or panel lists, the shell emits a "collection" event. Plugins listen for it and append to the mutable list inside.
 
-```dart
-// In shell: define the event.
-class CollectPanels {
-  final List<PanelDescriptor> panels = [];
-}
-
-// In shell: emit, read result, setState.
-final collect = CollectPanels();
-await session.emit(collect);
-setState(() => _panels = collect.panels);
-
-// In plugin: subscribe and append.
-@override
-void attach(SessionPluginContext context) {
-  on<CollectPanels>(context, (e) {
-    e.event.panels.add(
-      PanelDescriptor(id: 'terminal', title: 'Terminal'),
-    );
-  });
-}
-```
+<Code code={extractRegion(codeEditorContributionsSource, 'contributions-collect-panels')} lang="dart" />
 
 Because every enabled plugin's handler runs in priority order on the same mutable event object, one emit produces the final list in-place. No separate collect-then-fold step.
 
@@ -214,39 +103,14 @@ Because every enabled plugin's handler runs in priority order on the same mutabl
 
 When a user enables or disables a plugin mid-session, the shell calls `updateSessionSettings(...)` on the runtime.
 
-```dart
-Future<void> _setEnabled(PluginId pluginId, bool enabled) async {
-  final session = _session!;
-  final next = RuntimeSettings(
-    plugins: {
-      ...session.settings.plugins,
-      pluginId: PluginConfig(enabled: enabled),
-    },
-  );
-  await _runtime.updateSessionSettings(
-    session,
-    newSettings: next,
-  );
-  await _collectPanels();
-}
-```
+<Code code={extractRegion(sessionsSnippets, 'session-update-settings')} lang="dart" />
 
 <Aside type="caution" title="Serialize back-to-back toggles">
 `updateSessionSettings` is async. If the user toggles two plugins in quick succession, both handlers can start before the first finishes, and the second one will compute its `next` settings off a snapshot of `session.settings` that has not yet applied the first change. The second toggle silently drops.
 
 The `code_editor` example serializes with a tail-chained `Future`:
 
-```dart
-Future<void> _togglePending = Future.value();
-
-Future<void> _setEnabled(PluginId pluginId, bool enabled) async {
-  _togglePending = _togglePending.then((_) async {
-    // compute next settings from the session's current state,
-    // then updateSessionSettings, then refresh UI
-  });
-  await _togglePending;
-}
-```
+<Code code={extractRegion(flutterIntegrationSnippets, 'flutter-toggle-pending-serialize')} lang="dart" />
 
 If you expose toggles to the user, do this or equivalent.
 </Aside>
@@ -277,37 +141,11 @@ Resist the urge to stuff `PluginRuntime` into an `InheritedWidget` or a Provider
 
 Plugin Kit works with `flutter_test` like any other Dart dependency. The pattern:
 
-```dart
-testWidgets('editor shell renders registered panels', (tester) async {
-  final runtime = PluginRuntime(plugins: [TestPanelPlugin()]);
-  runtime.init();
-
-  await tester.pumpWidget(MaterialApp(home: EditorShell(runtime: runtime)));
-  await tester.pumpAndSettle();
-
-  expect(find.text('Test Panel'), findsOneWidget);
-
-  await runtime.dispose();
-});
-```
+<Code code={extractRegion(flutterIntegrationSnippets, 'flutter-integration-test-widgets')} lang="dart" />
 
 For widgets that resolve services on build, register stubs or fakes in a test-only plugin. The registry does not distinguish "real" from "fake" implementations. Higher priority wins, same as production.
 
-```dart
-class FakeSearchPlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('fake_search');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<SearchService>(
-      const ServiceId('search'),
-      FakeSearch(),
-      priority: 1000, // beat any other registrant
-    );
-  }
-}
-```
+<Code code={extractRegion(flutterIntegrationSnippets, 'flutter-fake-search-plugin')} lang="dart" />
 
 See [Testing](/guides/testing/) for non-widget plugin tests.
 

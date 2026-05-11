@@ -4,6 +4,10 @@ description: A drop-in Flutter customization surface for any PluginRuntime. Thre
 ---
 
 import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import dialogSnippets from '../../../../../website/snippets/lib/dialog.dart?raw';
+import configFieldsSnippets from '../../../../../website/snippets/lib/config_fields.dart?raw';
 
 Plugin Kit Dialog is a Flutter dialog that inspects and edits any [`PluginRuntime`](/concepts/runtime/) at runtime. Drop it in once and your users get a three-tab UI for toggling plugins, editing service config, and inspecting the registry. You write zero settings-screens-per-plugin code.
 
@@ -21,23 +25,7 @@ dependencies:
 
 ## Quick start
 
-```dart
-import 'package:plugin_kit/plugin_kit.dart';
-import 'package:plugin_kit_dialog/plugin_kit_dialog.dart';
-
-final next = await showPluginKitDialog(
-  context: context,
-  runtime: myRuntime,
-  initialSettings: currentSettings,
-  onSave: (settings) async {
-    await persistSettings(settings); // write to disk, push to runtime, etc.
-  },
-);
-
-if (next != null) {
-  // User saved. `next` is the merged RuntimeSettings.
-}
-```
+<Code code={extractRegion(dialogSnippets, 'dialog-show-dialog')} lang="dart" />
 
 That is it. If your plugins already attach `UiConfigurableCapability`, the Services tab populates itself.
 
@@ -73,31 +61,7 @@ A registry inspector with priority chains, winners, shadowed contenders, and a J
 
 Configurability is opt-in per registration. Attach a `UiConfigurableCapability` next to any service:
 
-```dart
-// In your plugin's register(). This code can live in a Dart-only package.
-const agent = Namespace('agent');
-
-registry.registerSingleton<MyService>(
-  agent('temperature'),                  // ServiceId('agent.temperature')
-  MyService(),
-  capabilities: const {
-    UiConfigurableCapability(
-      label: 'Temperature',
-      description: 'Controls randomness in responses.',
-      fields: [
-        NumberConfigField(
-          key: 'temperature',
-          label: 'Temperature',
-          min: 0,
-          max: 2,
-          step: 0.1,
-          defaultValue: 1.0,
-        ),
-      ],
-    ),
-  },
-);
-```
+<Code code={extractRegion(dialogSnippets, 'dialog-ui-configurable-capability')} lang="dart" />
 
 Saved values flow through `RuntimeSettings.services[Pin('main_agent', ['agent', 'temperature'])].config` (or, if you prefer the dotted shorthand, `pluginId.namespace('agent').service('temperature')`). From there, [Configuration](/concepts/configuration/) covers how the service reads them via `config.getDouble('temperature')` and similar typed accessors.
 
@@ -122,35 +86,7 @@ Each field carries `key`, `label`, `helperText`, and `defaultValue`. Dotted keys
 
 Visuals are a Flutter-only concern, so the canonical attachment path is a single locked `GlobalPlugin` that carries host-app overrides. Three independent maps cover the three things the dialog renders: plugin tiles, namespace section headers, and individual service cards.
 
-```dart
-runtime
-  ..addPlugins([...myPlugins])
-  ..addPlugin(PluginKitVisualsPlugin(
-    pluginVisuals: {
-      const PluginId('main_agent'): const PluginKitVisual(
-        label: 'Main Agent',
-        description: 'The brain. Drives chat, tools, and routing.',
-        icon: Icon(Icons.psychology),
-        color: Color(0xFF7C5CFF),
-      ),
-    },
-    namespaceVisuals: {
-      const Namespace('agent'): const PluginKitVisual(
-        label: 'Agent',
-        icon: Icon(Icons.smart_toy),
-        color: Color(0xFF7C5CFF),
-      ),
-    },
-    serviceVisuals: {
-      const Namespace('agent')('temperature'):
-          const PluginKitVisual(
-        label: 'Temperature',
-        icon: Icon(Icons.thermostat),
-        color: Color(0xFFFF9500),
-      ),
-    },
-  ));
-```
+<Code code={extractRegion(dialogSnippets, 'dialog-visuals-plugin')} lang="dart" />
 
 Because the visuals plugin lives in your host app (which has Flutter), Dart-only plugins still get icons, labels, and colors without importing Flutter. The decoration is keyed by `PluginId`, `Namespace`, or `ServiceId`, so the host owns the map and the plugin source code stays portable.
 
@@ -160,47 +96,11 @@ The plugin registers at priority `100`, above the default registry priority of `
 
 Need a color picker, file selector, or any other widget? Declare an `ExtensionConfigField` from anywhere (no Flutter dependency at the field site):
 
-```dart
-// In your dart-only plugin.
-const ExtensionConfigField(
-  key: 'theme.accent',
-  label: 'Accent color',
-  rendererKey: 'color_picker',
-  args: {'allow_alpha': false},
-)
-```
+<Code code={extractRegion(configFieldsSnippets, 'config-field-extension')} lang="dart" />
 
 Register a Flutter-side renderer for that key from your host app:
 
-```dart
-class ColorPickerRenderer
-    implements ConfigFieldRenderer<ExtensionConfigField> {
-  const ColorPickerRenderer();
-
-  @override
-  Widget build(context, field, handle, resolveRenderer) {
-    final allowAlpha = field.args['allow_alpha'] as bool? ?? false;
-    return ColorPicker(
-      value: handle.value as int? ?? 0xFF000000,
-      onChanged: (next) => handle.value = next,
-      allowAlpha: allowAlpha,
-    );
-  }
-}
-
-class ColorPickerRendererPlugin extends GlobalPlugin {
-  @override
-  PluginId get pluginId => const PluginId('color_picker_renderer');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerFactory<ConfigFieldRenderer>(
-      FieldRenderersPlugin.namespace('color_picker'),
-      ColorPickerRenderer.new,
-    );
-  }
-}
-```
+<Code code={extractRegion(dialogSnippets, 'dialog-color-picker-renderer')} lang="dart" />
 
 If a renderer key is unknown when the dialog tries to resolve it, an inline placeholder card surfaces the missing key. The dialog never throws at paint time.
 
@@ -208,18 +108,7 @@ If a renderer key is unknown when the dialog tries to resolve it, an inline plac
 
 Pass a `PluginKitDialogTheme` to override accents, surfaces, and badges:
 
-```dart
-showPluginKitDialog(
-  context: context,
-  runtime: myRuntime,
-  initialSettings: settings,
-  onSave: persist,
-  theme: PluginKitDialogTheme.dark().copyWith(
-    stableAccent: Colors.greenAccent,
-    experimentalAccent: Colors.deepOrange,
-  ),
-);
-```
+<Code code={extractRegion(dialogSnippets, 'dialog-show-dialog-themed')} lang="dart" />
 
 Or wrap your app with `buildPluginKitDialogDarkTheme()` / `buildPluginKitDialogLightTheme()` to adopt the full Material 3 `ThemeData`.
 
@@ -250,24 +139,7 @@ The screenshots above are golden-tested against that demo, so what you see here 
 
 ## Public API
 
-```dart
-import 'package:plugin_kit_dialog/plugin_kit_dialog.dart';
-
-// Entry points
-showPluginKitDialog(...);            // Future<RuntimeSettings?>
-PluginKitDialog(...);                // raw widget (custom hosting)
-PluginKitDialogBody(...);            // tab body (custom chrome)
-PluginKitDialogController(...);      // ChangeNotifier-backed draft
-
-// Visuals
-PluginKitVisualsPlugin({pluginVisuals, namespaceVisuals, serviceVisuals});
-PluginKitVisual(label, description, icon, color);
-
-// Theme
-buildPluginKitDialogDarkTheme();
-buildPluginKitDialogLightTheme();
-PluginKitDialogTheme;                // ThemeExtension
-```
+<Code code={extractRegion(dialogSnippets, 'dialog-show-dialog')} lang="dart" />
 
 Declarative types come from `plugin_kit`:
 

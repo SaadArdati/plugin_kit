@@ -5,6 +5,7 @@
   "scripts": {
     "copy-goldens": "bash scripts/copy-goldens.sh",
     "build-favicons": "node scripts/build-favicons.mjs",
+    "build-package-logos": "node scripts/build-package-logos.mjs",
     "predev": "npm run copy-goldens",
     "prestart": "npm run copy-goldens",
     "prebuild": "npm run copy-goldens",
@@ -15,8 +16,8 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.38.3",
-    "astro": "^6.0.1",
+    "@astrojs/starlight": "^0.39.2",
+    "astro": "^6.3.1",
     "sharp": "^0.34.2",
     "starlight-page-actions": "^0.6.0"
   }

@@ -17,6 +17,7 @@ import '../widgets/chat_view.dart';
 /// cancel removes the entry: the snapshot the cascade is iterating still
 /// contains the handler. Without the guard, [notifyListeners] would throw
 /// after dispose.
+// #docregion change-notifier-chat-chat-change-notifier
 class ChatChangeNotifier extends ChangeNotifier {
   ChatChangeNotifier(this._session) {
     _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
@@ -45,6 +46,7 @@ class ChatChangeNotifier extends ChangeNotifier {
     super.dispose();
   }
 }
+// #enddocregion change-notifier-chat-chat-change-notifier
 
 /// Public screen widget. The host wraps it in a `ChangeNotifierProvider`
 /// that constructs a [ChatChangeNotifier] from the supplied session.

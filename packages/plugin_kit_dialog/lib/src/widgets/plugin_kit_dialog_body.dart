@@ -12,6 +12,7 @@ import '../utils.dart';
 import 'header/plugin_kit_dialog_header.dart';
 
 /// Bare dialog body that wires header chrome and active-tab content (Spec §9.2).
+// #docregion plugin-kit-dialog-body-plugin-kit-dialog-body
 class PluginKitDialogBody extends StatefulWidget {
   /// Controller backing the editable draft state and dirty tracking.
   final PluginKitDialogController controller;
@@ -37,6 +38,7 @@ class PluginKitDialogBody extends StatefulWidget {
   @override
   State<PluginKitDialogBody> createState() => _PluginKitDialogBodyState();
 }
+// #enddocregion plugin-kit-dialog-body-plugin-kit-dialog-body
 
 class _PluginKitDialogBodyState extends State<PluginKitDialogBody> {
   late final PluginRuntime<DialogGlobalContext, SessionPluginContext> _runtime;

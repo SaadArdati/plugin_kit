@@ -1,0 +1,66 @@
+file	line	decision	reason	snippet_region
+website/src/content/docs/introduction.mdx	45	MIGRATED	introduction-plugin-taste region in plugin_lifecycle.dart	introduction-plugin-taste
+website/src/content/docs/troubleshooting.mdx	45	MIGRATED	custom-context-runtime-init region in custom_context.dart	custom-context-runtime-init
+website/src/content/docs/troubleshooting.mdx	144	MIGRATED	event-bus-unawaited-vs-awaited region in event_bus.dart	event-bus-unawaited-vs-awaited
+website/src/content/docs/troubleshooting.mdx	160	MIGRATED	event-bus-maybe-request region in event_bus.dart	event-bus-maybe-request
+website/src/content/docs/troubleshooting.mdx	183	MIGRATED	service-settings-clear-priority region in runtime_settings.dart	service-settings-clear-priority
+website/src/content/docs/troubleshooting.mdx	201	KEEP_RAW	requires golden_toolkit package not in snippets pubspec	n/a
+website/src/content/docs/reference/dialog-api.mdx	303	MIGRATED	dialog-show-dialog-themed region in dialog.dart	dialog-show-dialog-themed
+website/src/content/docs/reference/dialog-api.mdx	161	KEEP_RAW	API signature block (PluginKitDialogController class with abstract/partial bodies)	n/a
+website/src/content/docs/reference/dialog-api.mdx	213	KEEP_RAW	API signature block (PluginKitVisualsPlugin class with abstract members)	n/a
+website/src/content/docs/reference/dialog-api.mdx	241	KEEP_RAW	API signature block (PluginKitVisual value class)	n/a
+website/src/content/docs/reference/dialog-api.mdx	269	KEEP_RAW	API signature block with copyWith({...}) ellipsis	n/a
+website/src/content/docs/reference/dialog-api.mdx	307	MIGRATED	dialog-show-dialog-themed (same as line 303 above, was the replacement target)	dialog-show-dialog-themed
+website/src/content/docs/examples/code-editor.mdx	57	KEEP_RAW	uses PanelWidgetFactory/ServiceSlots/TerminalPanelFactory from code_editor example, not in snippets	n/a
+website/src/content/docs/examples/model-embassy.mdx	31	KEEP_RAW	uses ModelPassport/AgentBoardingCall/ModelVisa from model_embassy example, not in snippets	n/a
+website/src/content/docs/getting-started.mdx	86	KEEP_RAW	illustrative fragment (abstract class body, partial class body)	n/a
+website/src/content/docs/getting-started.mdx	102	KEEP_RAW	partial class body with // ... ellipsis	n/a
+website/src/content/docs/getting-started.mdx	123	KEEP_RAW	single-statement fragment inside numbered walkthrough step	n/a
+website/src/content/docs/getting-started.mdx	136	KEEP_RAW	single-statement fragment inside numbered walkthrough step	n/a
+website/src/content/docs/getting-started.mdx	146	KEEP_RAW	single-statement fragment inside numbered walkthrough step	n/a
+website/src/content/docs/getting-started.mdx	155	KEEP_RAW	single-statement fragment inside numbered walkthrough step	n/a
+website/src/content/docs/getting-started.mdx	165	KEEP_RAW	single-statement fragment inside numbered walkthrough step	n/a
+website/src/content/docs/reference/event-bus-and-events.mdx	41	KEEP_RAW	API signature block (on/onSync method signatures)	n/a
+website/src/content/docs/reference/event-bus-and-events.mdx	63	KEEP_RAW	API signature block (bind method signature)	n/a
+website/src/content/docs/reference/event-bus-and-events.mdx	77	KEEP_RAW	API signature block (hasRequestHandler method signature)	n/a
+website/src/content/docs/reference/event-bus-and-events.mdx	103	KEEP_RAW	API signature block (onRequest/request/maybeRequest signatures)	n/a
+website/src/content/docs/reference/event-bus-and-events.mdx	127	KEEP_RAW	API signature block (onRequestSync/requestSync/maybeRequestSync signatures)	n/a
+website/src/content/docs/reference/event-bus-and-events.mdx	173	KEEP_RAW	API signature block (PluginHelper extension with abstract method signatures)	n/a
+website/src/content/docs/reference/event-bus-and-events.mdx	210	KEEP_RAW	API signature block (StatefulPluginService bus method signatures)	n/a
+website/src/content/docs/reference/event-bus-and-events.mdx	232	KEEP_RAW	API signature block (SessionHelper extension with method signatures)	n/a
+website/src/content/docs/reference/event-bus-and-events.mdx	277	KEEP_RAW	API signature block (SessionBroadcast extension signature)	n/a
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	59	KEEP_RAW	API signature block (ServiceRegistry class with // ... comment)	n/a
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	151	KEEP_RAW	API signature block (ScopedServiceRegistry class declaration)	n/a
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	189	KEEP_RAW	API signature block (withPriority method signature only)	n/a
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	207	KEEP_RAW	API signature block (sealed RegistrationWrapper base class)	n/a
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	237	KEEP_RAW	API signature block (PluginService abstract class)	n/a
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	267	KEEP_RAW	API signature block (@mustCallSuper injectSettings method signature)	n/a
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	294	KEEP_RAW	API signature block (StatefulPluginServiceHelper tracked subscription signatures)	n/a
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	326	KEEP_RAW	API signature block (abstract Capability class)	n/a
+website/src/content/docs/reference/service-registry-and-capabilities.mdx	346	KEEP_RAW	API signature block (CapabilityLookup extension signatures)	n/a
+website/src/content/docs/reference/settings-and-configuration.mdx	66	KEEP_RAW	API signature block (RuntimeSettings query helper method signatures)	n/a
+website/src/content/docs/reference/settings-and-configuration.mdx	160	KEEP_RAW	API signature block (ServiceSettings class with const constructor)	n/a
+website/src/content/docs/reference/state-management-bridges.mdx	97	KEEP_RAW	requires provider package (ChangeNotifierProvider)	n/a
+website/src/content/docs/reference/state-management-bridges.mdx	137	KEEP_RAW	requires riverpod package (ProviderScope/FutureProvider)	n/a
+website/src/content/docs/concepts/capabilities.mdx	32	KEEP_RAW	illustrative 3-line fragment with local variable context not captured in snippet	n/a
+website/src/content/docs/concepts/capabilities.mdx	58	KEEP_RAW	uses IsSlowCapability type not defined in snippets	n/a
+website/src/content/docs/concepts/capabilities.mdx	76	KEEP_RAW	uses IsSlowCapability.isSlow field not defined in snippets	n/a
+website/src/content/docs/concepts/events.mdx	114	KEEP_RAW	illustrative fragment inside stateful service (uses local currentSession variable)	n/a
+website/src/content/docs/concepts/events.mdx	161	KEEP_RAW	illustrative fragment using FindOpenPort type not defined in snippets	n/a
+website/src/content/docs/guides/flutter-plugin-kit.mdx	67	KEEP_RAW	contains [...] ellipsis	n/a
+website/src/content/docs/guides/flutter-plugin-kit.mdx	163	KEEP_RAW	requires provider package (ChangeNotifierProvider)	n/a
+website/src/content/docs/guides/flutter-plugin-kit.mdx	179	KEEP_RAW	requires flutter_bloc package (Cubit/StreamSubscription in Bloc context)	n/a
+website/src/content/docs/guides/settings.mdx	81	KEEP_RAW	illustrative 2-line string-literal example not worth extracting to snippet	n/a
+website/src/content/docs/guides/plugin-kit-dialog.mdx	146	KEEP_RAW	type listing/index block, not compilable Dart code	n/a
+website/src/content/docs/guides/migrating-flutter-app.mdx	39	KEEP_RAW	GetIt "before" example showing migration source, requires get_it package	n/a
+website/src/content/docs/guides/migrating-flutter-app.mdx	202	KEEP_RAW	requires riverpod package (Provider/FutureProvider)	n/a
+website/src/content/docs/guides/migrating-flutter-app.mdx	231	KEEP_RAW	requires flutter_bloc package (AsyncNotifier/StreamSubscription in Bloc context)	n/a
+packages/plugin_kit/README.md	75	KEEP_RAW	API signature block (abstract Plugin class)	n/a
+packages/plugin_kit/README.md	135	KEEP_RAW	illustrative multi-mode example with MyService/MyServiceImpl, no code-excerpt anchor	n/a
+packages/plugin_kit/README.md	169	KEEP_RAW	illustrative namespace example with Model/Tools/GptModel not in snippets	n/a
+packages/plugin_kit/README.md	218	KEEP_RAW	3-line illustrative session lifecycle snippet, no code-excerpt anchor	n/a
+packages/plugin_kit/README.md	291	KEEP_RAW	public API index listing - not compilable dart, uses type names as identifiers	n/a
+skills/plugin-kit/api-cheatsheet.md	*	KEEP_RAW	skills files are plain Markdown read by LLM, not built by website pipeline	n/a
+skills/plugin-kit/testing.md	*	KEEP_RAW	skills files are plain Markdown read by LLM, not built by website pipeline	n/a
+skills/plugin-kit/patterns.md	*	KEEP_RAW	skills files are plain Markdown read by LLM, not built by website pipeline	n/a
+skills/plugin-kit/anti-patterns.md	*	KEEP_RAW	skills files are plain Markdown read by LLM, not built by website pipeline	n/a

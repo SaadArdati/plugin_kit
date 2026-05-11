@@ -4,7 +4,10 @@ description: Add Plugin Kit, write two plugins for the same slot, and watch the 
 ---
 
 import { CardGrid, LinkCard, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
 import PubVersion from '../../components/PubVersion.astro';
+import { extractRegion } from '../../utils/excerpt.mjs';
+import pluginLifecycleDart from '../../../../website/snippets/lib/plugin_lifecycle.dart?raw';
 
 <PubVersion />
 
@@ -61,61 +64,7 @@ The runtime works without it; [Plugin Kit Dialog](/guides/plugin-kit-dialog/) co
 
 Copy this into a fresh Dart file and run it. Walkthrough is below.
 
-```dart
-import 'package:plugin_kit/plugin_kit.dart';
-
-abstract class Greeter {
-  String greet(String name);
-}
-
-class CasualGreeter implements Greeter {
-  @override
-  String greet(String name) => 'Hello, $name.';
-}
-
-class FormalGreeter implements Greeter {
-  @override
-  String greet(String name) => 'Good day, $name.';
-}
-
-class CasualPlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('casual');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<Greeter>(
-      const ServiceId('greeter'),
-      CasualGreeter(),
-    );
-  }
-}
-
-class FormalPlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('formal');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<Greeter>(
-      const ServiceId('greeter'),
-      FormalGreeter(),
-      priority: 100,
-    );
-  }
-}
-
-Future<void> main() async {
-  final runtime = PluginRuntime(plugins: [CasualPlugin(), FormalPlugin()])
-    ..init();
-  final session = await runtime.createSession();
-
-  final greeter = session.resolve<Greeter>(const ServiceId('greeter'));
-  print(greeter.greet('world')); // Good day, world.
-
-  await runtime.dispose();
-}
-```
+<Code code={extractRegion(pluginLifecycleDart, 'session-plugin-basic')} lang="dart" />
 
 Output:
 
@@ -228,18 +177,7 @@ The library only earns its weight when things change. Three quick experiments to
 - **Soft-disable `FormalPlugin` via config.** Pass `RuntimeSettings` to the runtime and mark the formal plugin disabled.
  Both plugins still ship, both classes still exist, but the disabled one never wins:
 
-  ```dart
-  final runtime = PluginRuntime(
-    plugins: [CasualPlugin(), FormalPlugin()],
-  )..init(
-      // Can be user-driven via JSON config, a settings UI, or any other config system you build on top. Hard-coded here for demo purposes.
-      settings: const RuntimeSettings(
-        plugins: {
-          PluginId('formal'): PluginConfig(enabled: false),
-        },
-      ),
-    );
-  ```
+  <Code code={extractRegion(pluginLifecycleDart, 'getting-started-disable-plugin')} lang="dart" />
 
   Output flips to `Hello, world.` This is the move a settings UI makes when a user turns a feature off: same build, same code path,
   different runtime answer. Settings can also be updated live mid-session, and the runtime will reconcile the registry around the change.

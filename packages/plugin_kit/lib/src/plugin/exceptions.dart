@@ -64,6 +64,7 @@ class RequestUnavailableException implements Exception {
 ///   }
 /// }
 /// ```
+// #docregion exceptions-plugin-lifecycle-exception
 class PluginLifecycleException implements Exception {
   /// The lifecycle phase where failures occurred (e.g. `'attachGlobal'`).
   final String phase;
@@ -88,6 +89,7 @@ class PluginLifecycleException implements Exception {
     return buffer.toString();
   }
 }
+// #enddocregion exceptions-plugin-lifecycle-exception
 
 /// Aggregates multiple step failures within a single plugin's `attach` or
 /// `detach` pass. Thrown only when more than one step (e.g. a service's

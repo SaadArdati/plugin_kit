@@ -4,6 +4,14 @@ description: Symptom-to-cause-to-fix entries for the common Plugin Kit mistakes.
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../utils/excerpt.mjs';
+import flutterIntegrationSource from '../../../../website/snippets/lib/flutter_integration.dart?raw';
+import loggingSource from '../../../../website/snippets/lib/logging.dart?raw';
+import settingsSource from '../../../../packages/plugin_kit/lib/src/settings.dart?raw';
+import customContextSource from '../../../../website/snippets/lib/custom_context.dart?raw';
+import eventBusSource from '../../../../website/snippets/lib/event_bus.dart?raw';
+import runtimeSettingsSource from '../../../../website/snippets/lib/runtime_settings.dart?raw';
 
 This page is the index of "I saw X, what went wrong?" entries. Each one is a symptom, the cause behind it, and the fix. Most are referenced individually from concept and guide pages; this page is where you go when you do not know which page to look on.
 
@@ -37,19 +45,7 @@ StateError: contextFactory is required when using a custom session context type 
 
 **Fix.** Pass the factory:
 
-```dart
-runtime.init(
-  settings: settings,
-  globalContextFactory: (registry, bus, sessions) =>
-      MyGlobalContext(registry: registry, bus: bus, sessions: sessions, ...),
-);
-
-final session = await runtime.createSession(
-  settings: settings,
-  contextFactory: (registry, sessionBus, globalBus) =>
-      MySessionContext(registry: registry, bus: sessionBus, globalBus: globalBus, ...),
-);
-```
+<Code code={extractRegion(customContextSource, 'custom-context-runtime-init')} lang="dart" />
 
 See [Custom Context](/concepts/custom-context/) for the full pattern, including how to keep your plugins typed against the custom context.
 
@@ -59,17 +55,7 @@ See [Custom Context](/concepts/custom-context/) for the full pattern, including 
 
 **Fix.** Serialize the toggles. The standard pattern is a tail-chained `Future`:
 
-```dart
-Future<void> _togglePending = Future.value();
-
-Future<void> _setEnabled(PluginId pluginId, bool enabled) async {
-  _togglePending = _togglePending.then((_) async {
-    // compute next settings from the session's current state,
-    // then updateSessionSettings, then refresh UI
-  });
-  await _togglePending;
-}
-```
+<Code code={extractRegion(flutterIntegrationSource, 'flutter-toggle-pending-serialize')} lang="dart" />
 
 The `code_editor` example uses exactly this. If you expose toggles to users through any UI surface, do this or an equivalent serialization.
 
@@ -88,15 +74,7 @@ The `code_editor` example uses exactly this. If you expose toggles to users thro
 
 The failures field is a list of `(PluginId, Object error, StackTrace stackTrace)` records. Iterate and decide whether to log, reroute, or rethrow per plugin:
 
-```dart
-try {
-  runtime.init(settings: settings);
-} on PluginLifecycleException catch (e) {
-  for (final (pluginId, error, stackTrace) in e.failures) {
-    log.severe('plugin $pluginId failed during ${e.phase}', error, stackTrace);
-  }
-}
-```
+<Code code={extractRegion(loggingSource, 'logging-try-catch-plugin-init')} lang="dart" />
 
 The aggregation is intentional. Fail-fast on the first exception would hide downstream problems, so you fix one and immediately rediscover the next one. Plugin Kit surfaces the whole batch. See the [Logging guide](/guides/logging/) for the production pattern.
 
@@ -154,13 +132,7 @@ See [Service Registry](/concepts/service-registry/) for the full priority model,
 
 **Fix.** Make sure you are actually awaiting the bus call:
 
-```dart
-// Wrong: handler throws but the error is on the unobserved Future.
-context.bus.emit<MyEvent>(event: MyEvent(...));
-
-// Right: caller sees the exception.
-await context.bus.emit<MyEvent>(event: MyEvent(...));
-```
+<Code code={extractRegion(eventBusSource, 'event-bus-unawaited-vs-awaited')} lang="dart" />
 
 The bus does not aggregate errors the way `PluginLifecycleException` does; that aggregation is for plugin lifecycle only. Inside `emit`, the first throwing handler interrupts the cascade and the caller gets the exception. This is usually the right tradeoff: silent failure in an event pipeline is far harder to debug a month later than a loud, unambiguous exception at the call site. See the note in the [Logging guide](/guides/logging/) and the explicit semantics in [Event Bus](/concepts/event-bus/).
 
@@ -170,14 +142,7 @@ The bus does not aggregate errors the way `PluginLifecycleException` does; that 
 
 **Fix.** If "no handler" is a valid state in your domain, use `maybeRequest` (returns `Future<Response?>`) or `maybeRequestSync` (synchronous, also returns nullable). Or declare the response type as nullable so the null cascade is permitted:
 
-```dart
-final result = await bus.maybeRequest<MyQuery, MyResult>(MyQuery(...));
-// result is MyResult?
-
-// or:
-final result = await bus.request<MyQuery, MyResult?>(MyQuery(...));
-// result is MyResult?, no throw on null cascade.
-```
+<Code code={extractRegion(eventBusSource, 'event-bus-maybe-request')} lang="dart" />
 
 Pick one based on what reads better. `maybeRequest` is usually clearer at the call site. See [Event Bus & Events reference](/reference/event-bus-and-events/).
 
@@ -187,31 +152,13 @@ Pick one based on what reads better. `maybeRequest` is usually clearer at the ca
 
 **Cause.** The implementation uses the standard Dart `??` fallback:
 
-```dart
-ServiceSettings copyWith({
-  bool? enabled,
-  Map<String, dynamic>? config,
-  int? priority,
-}) {
-  return ServiceSettings(
-    enabled: enabled ?? this.enabled,
-    config: config ?? this.config,
-    priority: priority ?? this.priority,
-  );
-}
-```
+<Code code={extractRegion(settingsSource, 'settings-copy-with')} lang="dart" />
 
 That pattern cannot tell `null` (clear it) from "argument not passed" (keep current). Both look the same to the function body.
 
 **Fix.** When you actually want to clear the priority, construct the `ServiceSettings` directly rather than going through `copyWith`:
 
-```dart
-final cleared = ServiceSettings(
-  enabled: existing.enabled,
-  config: existing.config,
-  // priority intentionally omitted, so it falls back to the default.
-);
-```
+<Code code={extractRegion(runtimeSettingsSource, 'service-settings-clear-priority')} lang="dart" />
 
 This is the same quirk every `copyWith` pattern in Dart has. The library could add a sentinel object, but it does not, because the rebuild approach is unambiguous.
 

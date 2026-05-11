@@ -22,12 +22,20 @@ Symptom in code -> anti-pattern number.
 
 Plugin classes register services and contain no behavior. `Plugin.attach` subscriptions are for wiring only (debug taps, internal bridges between services this plugin owns). Behavior another plugin should override, settings-tune, or disable belongs in a service.
 
+<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-direct-subscribe-wrong)" -->
 ```dart
-class MyRedactionPlugin extends SessionPlugin {
+// WRONG: Multiple plugins subscribing directly to the same event for
+// winner-takes-all semantics. All handlers fire; both mutate; result depends
+// on registration order.
+class MyRedactionPluginWrong extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('my_redaction_wrong');
+
   @override
   void attach(SessionPluginContext context) {
     on<UserMessageReceived>(context, (e) {
-      e.event.text = redact(e.event.text);
+      // This runs alongside every other subscriber -- not winner-only.
+      e.event.text = e.event.text.replaceAll('secret', '[REDACTED]');
     });
   }
 }
@@ -41,25 +49,31 @@ When direct subscription on multiple registrants IS correct: the slot is additiv
 
 ## 2. Hand-typed scoped keys or wildcard sentinels
 
+<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-string-settings-key-wrong)" -->
 ```dart
-const settings = RuntimeSettings(
-  services: {
-    'chat:agent.model': ServiceSettings(config: {'temperature': 0.7}),
-    '*:agent.tools': ServiceSettings(priority: 200),
-  },
-);
+// WRONG: Using raw strings as map keys.
+// RuntimeSettings.services is Map<Pin, ServiceSettings> -- String keys won't compile.
+RuntimeSettings buildWrongSettings() {
+  return const RuntimeSettings(
+    services: {
+      // Use Pin(...) or the typed chain, never raw strings here.
+    },
+  );
+}
 ```
 
 `RuntimeSettings.services` is `Map<Pin, ServiceSettings>`. The String form is JSON wire format only. String keys won't compile against the typed map; if they did via inference, they would leak the `:` and `*` sentinels into every callsite.
 
 Fix:
+<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-string-settings-key-fix)" -->
 ```dart
-final settings = RuntimeSettings(
+// CORRECT: Use the typed chain or Pin constructors.
+final correctSettings = RuntimeSettings(
   services: {
     const PluginId('chat').namespace('agent').service('model'):
-        ServiceSettings(config: {'temperature': 0.7}),
+        const ServiceSettings(config: {'temperature': 0.7}),
     PluginId.wildcard.namespace('agent').service('tools'):
-        ServiceSettings(priority: 200),
+        const ServiceSettings(priority: 200),
   },
 );
 ```
@@ -68,28 +82,48 @@ For Dart-side construction, prefer `pluginId.namespace('ns').service('leaf')` fo
 
 ## 3. Resolving from `register()`
 
+<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-resolve-in-register-wrong)" -->
 ```dart
-@override
-void register(ScopedServiceRegistry registry) {
-  final logger = registry.raw.resolve<Logger>(const ServiceId('logger'));
-  registry.registerSingleton<MyService>(const ServiceId('my'), MyService(logger));
+// WRONG: Resolving services during register(). At that point, other plugins
+// may not have registered yet. The behavior is undefined.
+class BadPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('bad_plugin');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    // DO NOT do this: resolution order is undefined during register-all.
+    final _ = registry.raw.maybeResolve<Logger>(const ServiceId('logger'));
+    registry.registerSingleton<Logger>(const ServiceId('my_logger'), Logger());
+  }
 }
 ```
 
 Lifecycle is register-all then attach-all. During `register()`, other plugins may not have registered. Resolution from `register()` is undefined behavior.
 
 Fix: defer.
+<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-resolve-in-register-fix)" -->
 ```dart
-// (a) Lazy + closure capture; resolve when the lazy factory fires.
-registry.registerLazySingleton<MyService>(
-  const ServiceId('my'),
-  () => MyService(registry.raw.resolve<Logger>(const ServiceId('logger'))),
-);
+// CORRECT: Defer resolution via lazy singleton, or resolve in attach.
+class GoodPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('good_plugin');
 
-// (b) Resolve in attach or in event handlers.
-@override
-void attach(SessionPluginContext context) {
-  final logger = context.resolve<Logger>(const ServiceId('logger'));
+  @override
+  void register(ScopedServiceRegistry registry) {
+    // (a) Lazy + closure capture; resolve when the lazy factory fires.
+    registry.registerLazySingleton<Logger>(
+      const ServiceId('my_logger'),
+      () => registry.raw.resolve<Logger>(const ServiceId('logger')),
+    );
+  }
+
+  @override
+  void attach(SessionPluginContext context) {
+    // (b) Resolve in attach or in event handlers.
+    final logger = context.resolve<Logger>(const ServiceId('logger'));
+    logger.log('good plugin attached');
+  }
 }
 ```
 
@@ -120,14 +154,17 @@ void attach(SessionPluginContext context) {
 
 ## 5. Caching resolved instances at attach time
 
+<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-cache-resolution-wrong)" -->
 ```dart
-class MyService extends StatefulPluginService {
-  late Logger _logger;
+// WRONG: Caching a resolved service in a field. The cache holds the winner
+// at attach time; a higher-priority plugin enabled later is invisible.
+class CachingService extends StatefulPluginService {
+  Logger? _cachedLogger;
 
   @override
   void attach() {
-    _logger = context.resolve<Logger>(const ServiceId('logger'));
-    on<MyEvent>((e) => _logger.log(e.event));
+    _cachedLogger = context.resolve<Logger>(const ServiceId('logger'));
+    on<MyEvent>((e) => _cachedLogger!.log('event'));
   }
 }
 ```
@@ -135,11 +172,18 @@ class MyService extends StatefulPluginService {
 Caches the winner that existed at attach time. Higher-priority plugin enabled later registers a different `Logger`; this code keeps using the old one. Hot-swap silently defeated.
 
 Fix: resolve at point of use.
+<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-cache-resolution-fix)" -->
 ```dart
-on<MyEvent>((e) {
-  final logger = context.resolve<Logger>(const ServiceId('logger'));
-  logger.log(e.event);
-});
+// CORRECT: Resolve at the point of use. O(1) Map lookup.
+class NonCachingService extends StatefulPluginService {
+  @override
+  void attach() {
+    on<MyEvent>((e) {
+      final logger = context.resolve<Logger>(const ServiceId('logger'));
+      logger.log('event');
+    });
+  }
+}
 ```
 
 Resolution is O(1) Map lookup plus at most one priority sort. Cost is negligible against the composition lost by caching.
@@ -148,16 +192,18 @@ Holding fields for components you registered yourself (your own state) is state 
 
 ## 6. Sharing service instances across sessions via captured field
 
+<!-- code-excerpt "example/state_garden/lib/src/chat/chat_plugin.dart (chat-plugin-chat-plugin)" -->
 ```dart
 class ChatPlugin extends SessionPlugin {
-  final ChatService _service = ChatService();
+  static const PluginId id = PluginId('chat');
+  static const ServiceId serviceId = ServiceId('service');
+
+  @override
+  PluginId get pluginId => id;
 
   @override
   void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<ChatService>(
-      const ServiceId('chat'),
-      _service,
-    );
+    registry.registerSingleton<ChatService>(serviceId, ChatService());
   }
 }
 ```
@@ -195,8 +241,36 @@ Reach for `context.bus.on(...)` only when the subscription's lifetime should NOT
 
 ## 8. Coupling to a plugin id for resolution
 
+<!-- code-excerpt "website/snippets/lib/service_registry.dart (service-registry-resolve-after)" -->
 ```dart
-final svc = registry.resolveByPlugin(PluginId('chat'), ServiceId('agent.model'));
+class ChainRouter implements ModelRouter {
+  /// The plugin id that owns this router.
+  final PluginId ownerId;
+
+  /// Returns the live registry on demand.
+  final ServiceRegistry Function() registryThunk;
+
+  /// The service id for resolution delegation.
+  final ServiceId routerId;
+
+  /// Creates a [ChainRouter].
+  ChainRouter({
+    required this.ownerId,
+    required this.registryThunk,
+    required this.routerId,
+  });
+
+  @override
+  String? routeFor(String prompt) {
+    if (prompt.contains('enterprise')) return 'gpt-4-enterprise';
+    return registryThunk()
+        .resolveAfter<ModelRouter>(
+          pluginId: ownerId,
+          serviceId: const ServiceId('model_router'),
+        )
+        .routeFor(prompt);
+  }
+}
 ```
 
 The registry resolves by `ServiceId` and priority decides the winner. There is no `resolveByPlugin` API. Wanting one means coupling to a plugin that may be disabled, replaced, or renamed.
@@ -205,13 +279,16 @@ Fix: resolve by `ServiceId`. Let priority and override do their job. The legitim
 
 ## 9. PluginId starting with `__pk_`
 
+<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-reserved-plugin-id)" -->
 ```dart
-class MyPlugin extends SessionPlugin {
+// WRONG: PluginId values starting with '__pk_' are reserved.
+// runtime.addPlugin(ReservedPlugin()); // throws ArgumentError
+class ReservedPlugin extends SessionPlugin {
   @override
-  PluginId get pluginId => const PluginId('__pk_internal');
-}
+  PluginId get pluginId => const PluginId('my_normal_plugin'); // fine
 
-runtime.addPlugin(MyPlugin());  // throws ArgumentError
+  // Avoid: const PluginId('__pk_internal') -- reserved prefix
+}
 ```
 
 `__pk_` is the reserved prefix for internal sentinels (`PluginId.wildcard.value == '__pk_wildcard__'`, `PluginId.winnerScoped.value == '__pk_winner__'`). `PluginRuntime.addPlugin` rejects any user-supplied id matching that prefix to prevent silent collisions with wildcard service-override resolution.
@@ -226,15 +303,26 @@ PluginId('_my_internal')   // single-underscore is fine; only '__pk_' is reserve
 
 ## 10. Mutable fields on a fact event
 
+<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-mutable-fact-event-wrong)" -->
 ```dart
-class UserMessageReceived {
+// WRONG: Mutating a fact event. Facts are observations of things that already
+// happened; mutating them contradicts their semantics.
+class ImmutableUserMessage {
+  /// The message text.
   final String text;
-  const UserMessageReceived(this.text);
+
+  /// Creates an [ImmutableUserMessage].
+  const ImmutableUserMessage(this.text);
 }
 
-on<UserMessageReceived>((e) {
-  e.event.text = e.event.text.toUpperCase();
-});
+void showMutableMistake(PluginContext context) {
+  context.bus.on<ImmutableUserMessage>((e) {
+    // Trying to mutate a fact event is wrong -- the field is final.
+    // e.event.text = e.event.text.toUpperCase(); // compile error
+    print(e.event.text);
+  });
+}
+
 ```
 
 Two event categories: facts/notifications (describe what already happened) get final fields; pre-commit drafts (designed for handler interception) get mutable fields. Mutating a fact is a category error; there is nothing to intercept.

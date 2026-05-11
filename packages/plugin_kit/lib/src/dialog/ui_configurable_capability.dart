@@ -17,6 +17,7 @@ import 'config_field.dart';
 ///
 /// A service may attach multiple instances of this capability. Each becomes
 /// its own sub-section under the service card.
+// #docregion ui-configurable-capability-ui-configurable-capability
 class UiConfigurableCapability extends Capability {
   /// Section title shown at the top of the rendered card or sub-section.
   final String label;
@@ -34,3 +35,4 @@ class UiConfigurableCapability extends Capability {
     this.description,
   });
 }
+// #enddocregion ui-configurable-capability-ui-configurable-capability

@@ -40,6 +40,7 @@ chatNotifierProvider = AsyncNotifierProvider<ChatNotifier, List<ChatMessage>>(
   ChatNotifier.new,
 );
 
+// #docregion riverpod-chat-chat-notifier
 class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
   bool _disposed = false;
 
@@ -67,6 +68,7 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
     await session.emit(SendMessageRequested(text));
   }
 }
+// #enddocregion riverpod-chat-chat-notifier
 
 class RiverpodChatScreen extends ConsumerWidget {
   const RiverpodChatScreen({super.key});

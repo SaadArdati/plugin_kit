@@ -12,6 +12,7 @@ workspace:
   - packages/flutter_plugin_kit/example
   - example/code_editor
   - example/model_embassy
+  - website/snippets
   - example/villain_lair
   - example/plugin_kit_dialog_demo
   - example/state_garden

@@ -4,6 +4,9 @@ description: "Plugin Kit shown end-to-end: replaceable services compete for slot
 ---
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../utils/excerpt.mjs';
+import pluginLifecycleDart from '../../../../website/snippets/lib/plugin_lifecycle.dart?raw';
 
 Plugin Kit is a runtime for Dart apps that have grown into platforms. Features get real
 lifecycles. Services get replaceable, prioritized implementations. Sessions stay sealed.
@@ -42,34 +45,7 @@ For the design philosophy and three core values, [Why Plugin Kit?](/why-plugin-k
 
 Two plugins claim the same `'greeter'` slot at different priorities; the runtime resolves to the winner. The full runnable program is in [Getting Started](/getting-started/).
 
-```dart
-class CasualPlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('casual');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<Greeter>(const ServiceId('greeter'), CasualGreeter());
-  }
-}
-
-class FormalPlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('formal');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<Greeter>(
-      const ServiceId('greeter'),
-      FormalGreeter(),
-      priority: 100, // wins
-    );
-  }
-}
-
-// session.resolve<Greeter>(const ServiceId('greeter')).greet('world')
-// → "Good day, world."
-```
+<Code code={extractRegion(pluginLifecycleDart, 'introduction-plugin-taste')} lang="dart" />
 
 That move, features owning slots and slots resolving to the current winner, is the vocabulary the rest of the library is built on.
 

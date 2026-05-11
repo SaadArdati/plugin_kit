@@ -4,6 +4,11 @@ description: Patterns for unit-testing plugins, services, and runtime behavior.
 ---
 
 import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+import { extractRegion } from '../../../utils/excerpt.mjs';
+import testingSnippets from '../../../../../website/snippets/lib/testing.dart?raw';
+import serviceRegistryTestSource from '../../../../../packages/plugin_kit/test/service_registry_test.dart?raw';
+import runtimeTestSource from '../../../../../packages/plugin_kit/test/runtime_test.dart?raw';
 
 Plugins are plain Dart classes, so most of what you do to test them is what you would do for any Dart class: construct, poke, assert. The parts that are specific to Plugin Kit are how to set up a registry, a bus, a context, or a whole runtime without spinning up your actual application.
 
@@ -17,14 +22,7 @@ work.
 
 A `PluginService` is a class with a `config` getter. For unit tests, construct it and feed it settings directly.
 
-```dart
-test('NotificationService applies the configured channel', () {
-  final service = NotificationService();
-  service.injectSettings({'channel': 'slack'}, hash: 'test-1');
-
-  expect(service.channel, 'slack');
-});
-```
+<Code code={extractRegion(testingSnippets, 'testing-level-1-service')} lang="dart" />
 
 For `StatefulPluginService`, the same approach works until you need `attach`. At that point, step up to Level 2.
 
@@ -36,46 +34,11 @@ For `StatefulPluginService`, the same approach works until you need `attach`. At
 
 When your target depends on `ServiceRegistry`, `EventBus`, or a `PluginContext`, wire them up directly in the test.
 
-```dart
-import 'package:plugin_kit/plugin_kit.dart';
-import 'package:test/test.dart';
-
-void main() {
-  test('plugin registers notification service', () {
-    final registry = ServiceRegistry();
-    final plugin = NotificationPlugin();
-
-    plugin.register(registry.scopedFor(plugin.pluginId));
-
-    final service = registry.resolve<NotificationService>(const ServiceId('notification_service'));
-    expect(service, isNotNull);
-  });
-}
-```
+<Code code={extractRegion(serviceRegistryTestSource, 'service-registry-test-registry')} lang="dart" />
 
 To exercise `attach` and event behavior, pair the registry with a bus and a context.
 
-```dart
-test('plugin answers notification requests', () async {
-  final registry = ServiceRegistry();
-  final bus = EventBus();
-  final context = SessionPluginContext(
-    registry: registry,
-    bus: bus,
-    globalBus: EventBus(),
-  );
-
-  final plugin = NotificationPlugin();
-  plugin.register(registry.scopedFor(plugin.pluginId));
-  plugin.attach(context);
-
-  final result = await bus.request<NotificationRequest, bool>(
-    NotificationRequest('hello'),
-  );
-
-  expect(result, isTrue);
-});
-```
+<Code code={extractRegion(testingSnippets, 'testing-level-2-plugin')} lang="dart" />
 
 This is the sweet spot for most plugin tests. Fast, no runtime setup, and it exercises real registry and bus behavior.
 
@@ -83,91 +46,19 @@ This is the sweet spot for most plugin tests. Fast, no runtime setup, and it exe
 
 When your test cares about runtime concerns (enablement precedence, settings reconciliation, session lifecycle), reach for `PluginRuntime`.
 
-```dart
-void main() {
-  late PluginRuntime runtime;
-
-  setUp(() {
-    runtime = PluginRuntime();
-  });
-
-  tearDown(() async {
-    await runtime.dispose();
-  });
-
-  test('session plugin attaches on session creation', () async {
-    final plugin = NotificationPlugin();
-    runtime.addPlugin(plugin);
-    runtime.init();
-
-    final session = await runtime.createSession();
-
-    expect(session.isPluginEnabled(const PluginId('notification')), isTrue);
-  });
-}
-```
+<Code code={extractRegion(runtimeTestSource, 'runtime-test-runtime')} lang="dart" />
 
 ### Lifecycle tracking
 
 A tiny subclass with a list of strings is enough to assert lifecycle order.
 
-```dart
-class TrackingPlugin extends SessionPlugin {
-  @override
-  final PluginId pluginId;
-  final List<String> calls = [];
-
-  TrackingPlugin(this.pluginId);
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    calls.add('register');
-  }
-
-  @override
-  void attach(SessionPluginContext context) {
-    calls.add('attach');
-  }
-
-  @override
-  Future<void> detach(SessionPluginContext context) async {
-    calls.add('detach');
-  }
-}
-
-test('session lifecycle runs in the expected order', () async {
-  final plugin = TrackingPlugin(const PluginId('trackee'));
-  runtime.addPlugin(plugin);
-  runtime.init();
-
-  final session = await runtime.createSession();
-  await session.dispose();
-
-  expect(plugin.calls, ['register', 'attach', 'detach']);
-});
-```
+<Code code={extractRegion(testingSnippets, 'testing-tracking-plugin')} lang="dart" />
 
 ### Settings reconciliation
 
 Pass `initialSettings` on init, or call `updateSettings` later.
 
-```dart
-test('plugin disables after updateSettings', () async {
-  final plugin = TrackingPlugin(const PluginId('toggle_me'));
-  runtime.addPlugin(plugin);
-  runtime.init();
-  final session = await runtime.createSession();
-
-  await runtime.updateSettings(
-    const RuntimeSettings(
-      plugins: {PluginId('toggle_me'): PluginConfig(enabled: false)},
-    ),
-  );
-
-  expect(session.isPluginEnabled(const PluginId('toggle_me')), isFalse);
-  expect(plugin.calls, ['register', 'attach', 'detach']);
-});
-```
+<Code code={extractRegion(testingSnippets, 'testing-update-settings-disable')} lang="dart" />
 
 Toggling a plugin off runs its `detach`. Toggling back on runs `register` and `attach` again, same as global. Your assertions can rely on that.
 
@@ -175,34 +66,7 @@ Toggling a plugin off runs its `detach`. Toggling back on runs `register` and `a
 
 For stateful services, attach them against a real context, exercise whatever the service reacts to, then detach to verify cleanup.
 
-```dart
-test('ChatBuffer records messages while attached', () async {
-  final registry = ServiceRegistry();
-  final bus = EventBus();
-  final context = SessionPluginContext(
-    registry: registry,
-    bus: bus,
-    globalBus: EventBus(),
-  );
-
-  final buffer = ChatBuffer();
-  registry.registerSingleton<ChatBuffer>(
-    pluginId: const PluginId('chat'),
-    serviceId: const ServiceId('buffer'),
-    instance: buffer,
-  );
-
-  registry.resolve<ChatBuffer>(const ServiceId('buffer')); // stamps identity
-  buffer.attach(context);
-
-  await bus.emit<NewMessageEvent>(event: NewMessageEvent('hi'));
-  expect(buffer.messages, hasLength(1));
-
-  await buffer.detach();
-  await bus.emit<NewMessageEvent>(event: NewMessageEvent('bye'));
-  expect(buffer.messages, hasLength(1)); // detached; subscription cancelled
-});
-```
+<Code code={extractRegion(testingSnippets, 'testing-stateful-service')} lang="dart" />
 
 The important bit: resolve the service through the registry once before calling `attach`. That is what stamps `pluginId` and `serviceId` onto the instance.
 
@@ -216,28 +80,11 @@ You rarely need to mock the bus itself. It is simple, fast, and well-exercised. 
 
 When a lifecycle phase produces errors, the runtime aggregates them into `PluginLifecycleException` and throws after the phase finishes. Assertions are straightforward.
 
-```dart
-expect(
-  () => runtime.init(),
-  throwsA(isA<PluginLifecycleException>()),
-);
-```
+<Code code={extractRegion(testingSnippets, 'testing-throws-lifecycle-exception')} lang="dart" />
 
 The exception carries a `phase` string (`'attachGlobal'`, `'attachSession'`, `'detachSession'`, `'updateSessionSettings'`, etc.) and a list of `(pluginId, error, stackTrace)` tuples, which is usually what you want to assert against.
 
-```dart
-test('bad plugin surfaces in PluginLifecycleException', () async {
-  runtime.addPlugin(CrashingPlugin());
-
-  try {
-    runtime.init();
-    fail('expected PluginLifecycleException');
-  } on PluginLifecycleException catch (e) {
-    expect(e.phase, 'attachGlobal');
-    expect(e.failures.first.$1, const PluginId('crashing_plugin'));
-  }
-});
-```
+<Code code={extractRegion(testingSnippets, 'testing-lifecycle-exception')} lang="dart" />
 
 ## Patterns that age well
 

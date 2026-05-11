@@ -19,6 +19,7 @@ import '../../widgets/services/fields/text_field_input.dart';
 typedef FieldRenderResolver = ConfigFieldRenderer Function(ConfigField field);
 
 /// Factory interface that builds a widget for a [ConfigField] subtype.
+// #docregion default-field-renderers-plugin-config-field-renderer
 abstract interface class ConfigFieldRenderer<T extends ConfigField> {
   /// Builds a field input widget for [field] using [handle].
   ///
@@ -31,6 +32,7 @@ abstract interface class ConfigFieldRenderer<T extends ConfigField> {
     FieldRenderResolver resolveRenderer,
   );
 }
+// #enddocregion default-field-renderers-plugin-config-field-renderer
 
 /// Registers built-in field renderers used by the dialog runtime.
 class FieldRenderersPlugin extends GlobalPlugin<DialogGlobalContext> {

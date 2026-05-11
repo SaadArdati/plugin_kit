@@ -14,6 +14,7 @@ import '../widgets/chat_view.dart';
 /// `messages.value`; the [Watch] builder rebuilds on read tracking. The
 /// bridge cancels the bus subscription in [dispose]; the `_disposed` guard
 /// blocks any in-flight cascade fire after dispose.
+// #docregion signals-chat-signals-chat-bridge
 class SignalsChatBridge {
   SignalsChatBridge(this._session) {
     _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
@@ -38,6 +39,7 @@ class SignalsChatBridge {
     unawaited(_subscription.cancel());
   }
 }
+// #enddocregion signals-chat-signals-chat-bridge
 
 class SignalsChatScreen extends StatefulWidget {
   const SignalsChatScreen({super.key, required this.session});
