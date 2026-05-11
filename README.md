@@ -28,7 +28,7 @@ Plugins are wiring; services are the meat. The plugin class declares an id, regi
 
 ```yaml
 dependencies:
-  plugin_kit: ^1.0.0
+  plugin_kit: ^1.0.0  <!-- pubver:plugin_kit -->
 ```
 
 Requires Dart `>=3.10.0`. For Flutter projects that want the scope widgets and `State` mixin, also add [`flutter_plugin_kit`](https://pub.dev/packages/flutter_plugin_kit). For the customization UI, add [`plugin_kit_dialog`](https://pub.dev/packages/plugin_kit_dialog).

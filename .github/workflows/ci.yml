@@ -58,5 +58,8 @@ jobs:
       - name: Check .md doc excerpts are in sync
         run: node scripts/update-md-excerpts.mjs --check
 
+      - name: Check .md install versions match pubspec
+        run: node scripts/sync-md-versions.mjs --check
+
       - name: Build website (verifies MDX excerpts compile)
         run: cd website && pnpm build
