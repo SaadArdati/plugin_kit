@@ -1,12 +1,12 @@
 :root {
-	--sl-color-accent-low: #1a1a2e;
-	--sl-color-accent: #4361ee;
-	--sl-color-accent-high: #c4d0ff;
+	--sl-color-accent-low: #3a2e0a;
+	--sl-color-accent: #f6e41b;
+	--sl-color-accent-high: #fdf6c9;
 	--sl-font: 'Inter', system-ui, sans-serif;
 }
 
 :root[data-theme='light'] {
-	--sl-color-accent-low: #dfe6ff;
-	--sl-color-accent: #3a56d4;
-	--sl-color-accent-high: #182464;
+	--sl-color-accent-low: #fdf6c9;
+	--sl-color-accent: #8a6a00;
+	--sl-color-accent-high: #3a2e0a;
 }
