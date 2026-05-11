@@ -31,13 +31,17 @@ jobs:
           flutter analyze example/model_embassy
 
       - name: Test
+        # Skips `goldens`-tagged tests: PNG rendering is environment-sensitive
+        # (fonts, sub-pixel positioning) and the committed goldens exist for
+        # the website's doc images. Regenerate locally after UI changes via
+        # `flutter test --update-goldens test/golden_test.dart`.
         run: |
           flutter test packages/plugin_kit
           flutter test packages/plugin_kit_dialog
           flutter test packages/flutter_plugin_kit
           flutter test website/snippets
           flutter test example/state_garden
-          flutter test example/plugin_kit_dialog_demo
+          flutter test example/plugin_kit_dialog_demo --exclude-tags=goldens
 
   doc-excerpts:
     runs-on: ubuntu-latest

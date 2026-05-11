@@ -1,3 +1,9 @@
+// Golden tests. Tagged `goldens` so CI can skip them with
+// `flutter test --exclude-tags=goldens`. Run locally to regenerate doc
+// images: `flutter test --update-goldens test/golden_test.dart`.
+@Tags(['goldens'])
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golden_toolkit/golden_toolkit.dart';

@@ -1,0 +1,8 @@
+tags:
+  goldens:
+    description: >-
+      Visual golden tests. Skipped in CI because golden rendering is
+      environment-sensitive (font asset bundling differs between local macOS
+      and CI Linux). The committed PNGs are for rendering doc images on the
+      website; run `flutter test --update-goldens test/golden_test.dart`
+      locally after any UI change.
