@@ -103,7 +103,9 @@ Future<void> demonstrateMultiSessionIsolation(PluginRuntime runtime) async {
   // Each session has its own bus; events do not cross.
   sessionA.bus.on<AppThemeChanged>((e) => print('A: ${e.event.theme.name}'));
 
-  await sessionA.bus.emit<AppThemeChanged>(event: const AppThemeChanged(Theme(name: 'dark')));
+  await sessionA.bus.emit<AppThemeChanged>(
+    event: const AppThemeChanged(Theme(name: 'dark')),
+  );
   // Session B's subscriber never fires.
 
   await sessionA.dispose();
@@ -153,12 +155,8 @@ class SessionUserMessage {
 }
 
 /// Session plugin emits on context.bus (the session bus).
-Future<void> emitOnSessionBus(
-  SessionPluginContext context,
-  String text,
-) async {
-  await context.bus.emit<SessionUserMessage>(
-    event: SessionUserMessage(text),
-  );
+Future<void> emitOnSessionBus(SessionPluginContext context, String text) async {
+  await context.bus.emit<SessionUserMessage>(event: SessionUserMessage(text));
 }
+
 // #enddocregion sessions-emit-session-plugin

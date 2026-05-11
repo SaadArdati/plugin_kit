@@ -85,18 +85,23 @@ void demonstrateTypedHandles() {
 /// Full RuntimeSettings construction example.
 final fullSettings = RuntimeSettings(
   plugins: {
-    const PluginId('chat'): const PluginConfig(enabled: true, config: {'api_key': 'xxx'}),
+    const PluginId('chat'): const PluginConfig(
+      enabled: true,
+      config: {'api_key': 'xxx'},
+    ),
     const PluginId('legacy'): const PluginConfig(enabled: false),
   },
   services: {
-    Pin('chat', ['agent', 'model']):
-        const ServiceSettings(config: {'temperature': 0.7}),
+    Pin('chat', ['agent', 'model']): const ServiceSettings(
+      config: {'temperature': 0.7},
+    ),
 
-    Pin.wildcard(['agent', 'tools']):
-        const ServiceSettings(priority: 200, config: {'verbose': true}),
+    Pin.wildcard(['agent', 'tools']): const ServiceSettings(
+      priority: 200,
+      config: {'verbose': true},
+    ),
 
-    Pin('legacy', ['search', 'engine']):
-        const ServiceSettings(enabled: false),
+    Pin('legacy', ['search', 'engine']): const ServiceSettings(enabled: false),
   },
 );
 
@@ -116,14 +121,18 @@ Future<void> demonstrateRequestPatterns(PluginContext context) async {
     return const SearchResults(results: ['result']);
   });
 
-  final response =
-      await context.bus.request<SearchQuery, SearchResults?>(const SearchQuery());
-  final maybe =
-      await context.bus.maybeRequest<SearchQuery, SearchResults?>(const SearchQuery());
-  final sync =
-      context.bus.requestSync<SearchQuery, SearchResults?>(const SearchQuery());
-  final maybeSync =
-      context.bus.maybeRequestSync<SearchQuery, SearchResults?>(const SearchQuery());
+  final response = await context.bus.request<SearchQuery, SearchResults?>(
+    const SearchQuery(),
+  );
+  final maybe = await context.bus.maybeRequest<SearchQuery, SearchResults?>(
+    const SearchQuery(),
+  );
+  final sync = context.bus.requestSync<SearchQuery, SearchResults?>(
+    const SearchQuery(),
+  );
+  final maybeSync = context.bus.maybeRequestSync<SearchQuery, SearchResults?>(
+    const SearchQuery(),
+  );
 
   print('$response $maybe $sync $maybeSync');
 }
@@ -483,4 +492,5 @@ void demonstrateContextStubInject() {
   final svc = ctx.resolve<CheatsheetService>(const ServiceId('cheatsheet'));
   print('resolved: ${svc.runtimeType}');
 }
+
 // #enddocregion testing-context-stub-inject

@@ -11,14 +11,13 @@ final settings = RuntimeSettings(
     const PluginId('experimental_router'): const PluginConfig(enabled: false),
   },
   services: {
-    const PluginId('linter_suite').service(const ServiceId('line_length_linter')):
-        const ServiceSettings(
-          config: {'max_line_length': 120},
-        ),
-    PluginId.wildcard.service(const ServiceId('agent_service')): const ServiceSettings(
-      priority: 200,
-      config: {'provider': 'openai'},
+    const PluginId(
+      'linter_suite',
+    ).service(const ServiceId('line_length_linter')): const ServiceSettings(
+      config: {'max_line_length': 120},
     ),
+    PluginId.wildcard.service(const ServiceId('agent_service')):
+        const ServiceSettings(priority: 200, config: {'provider': 'openai'}),
   },
 );
 // #enddocregion runtime-settings-construct
@@ -26,16 +25,21 @@ final settings = RuntimeSettings(
 // #docregion runtime-settings-json
 final settingsForJson = RuntimeSettings(
   plugins: {
-    const PluginId('chat'): const PluginConfig(enabled: true, config: {'api_key': 'xxx'}),
+    const PluginId('chat'): const PluginConfig(
+      enabled: true,
+      config: {'api_key': 'xxx'},
+    ),
     const PluginId('legacy'): const PluginConfig(enabled: false),
   },
   services: {
-    Pin('chat', ['agent', 'model']):
-        const ServiceSettings(config: {'temperature': 0.7}),
-    Pin.wildcard(['agent', 'tools']):
-        const ServiceSettings(priority: 200, config: {'verbose': true}),
-    Pin('legacy', ['search', 'engine']):
-        const ServiceSettings(enabled: false),
+    Pin('chat', ['agent', 'model']): const ServiceSettings(
+      config: {'temperature': 0.7},
+    ),
+    Pin.wildcard(['agent', 'tools']): const ServiceSettings(
+      priority: 200,
+      config: {'verbose': true},
+    ),
+    Pin('legacy', ['search', 'engine']): const ServiceSettings(enabled: false),
   },
 );
 
@@ -57,14 +61,12 @@ void demonstrateToJson() {
 
 // #docregion runtime-settings-priority
 final settingsWithPriority = RuntimeSettings(
-  plugins: {
-    const PluginId('formal'): const PluginConfig(enabled: false),
-  },
+  plugins: {const PluginId('formal'): const PluginConfig(enabled: false)},
   services: {
-    Pin('chat', ['agent', 'model']):
-        const ServiceSettings(config: {'temperature': 0.7}),
-    Pin.wildcard(['agent', 'tools']):
-        const ServiceSettings(priority: 200),
+    Pin('chat', ['agent', 'model']): const ServiceSettings(
+      config: {'temperature': 0.7},
+    ),
+    Pin.wildcard(['agent', 'tools']): const ServiceSettings(priority: 200),
   },
 );
 // #enddocregion runtime-settings-priority
@@ -102,14 +104,12 @@ const emptySettings = RuntimeSettings.empty();
 /// performing a JSON round-trip.
 RuntimeSettings demonstrateSettingsWithPin() {
   final settings = RuntimeSettings(
-    plugins: {
-      const PluginId('formal'): const PluginConfig(enabled: false),
-    },
+    plugins: {const PluginId('formal'): const PluginConfig(enabled: false)},
     services: {
-      Pin('chat', ['agent', 'model']):
-          const ServiceSettings(config: {'temperature': 0.7}),
-      Pin.wildcard(['agent', 'tools']):
-          const ServiceSettings(priority: 200),
+      Pin('chat', ['agent', 'model']): const ServiceSettings(
+        config: {'temperature': 0.7},
+      ),
+      Pin.wildcard(['agent', 'tools']): const ServiceSettings(priority: 200),
     },
   );
 
@@ -162,7 +162,10 @@ void demonstratePinFromWire() {
 // #docregion config-node-list-map
 /// Demonstrates list and map() on a ConfigNode.
 void demonstrateConfigNodeListMap() {
-  const node = ConfigNode({'tools': ['hammer', 'wrench'], 'headers': {'timeout_ms': 5000}});
+  const node = ConfigNode({
+    'tools': ['hammer', 'wrench'],
+    'headers': {'timeout_ms': 5000},
+  });
   final tools = node.list<String>('tools') ?? const [];
   final headers = node.map('headers');
   final timeoutMs = headers['timeout_ms'] as int?;
@@ -173,7 +176,9 @@ void demonstrateConfigNodeListMap() {
 // #docregion config-node-raw
 /// Demonstrates config.raw for untyped passthrough.
 void demonstrateConfigNodeRaw() {
-  const node = ConfigNode({'advanced_payload': {'nested': true}});
+  const node = ConfigNode({
+    'advanced_payload': {'nested': true},
+  });
   final payload = node.raw('advanced_payload');
   print(payload);
 }
@@ -182,7 +187,10 @@ void demonstrateConfigNodeRaw() {
 // #docregion config-node-defaults
 /// Demonstrates applying defaults via ?? at the call site.
 void demonstrateConfigNodeDefaults() {
-  const node = ConfigNode({'temperature': 0.4, 'tools': ['search']});
+  const node = ConfigNode({
+    'temperature': 0.4,
+    'tools': ['search'],
+  });
   final temperature = node.getDouble('temperature') ?? 0.7;
   final tools = node.list<String>('tools') ?? const [];
   final provider = node.getString('provider') ?? 'openai';
@@ -193,9 +201,12 @@ void demonstrateConfigNodeDefaults() {
 // #docregion config-node-map-access
 /// Demonstrates reading a nested map with map() then indexing.
 void demonstrateNestedMapAccess() {
-  const node = ConfigNode({'headers': {'timeout_ms': 3000}});
+  const node = ConfigNode({
+    'headers': {'timeout_ms': 3000},
+  });
   final headers = node.map('headers');
   final timeoutMs = headers['timeout_ms'] as int?;
   print(timeoutMs);
 }
+
 // #enddocregion config-node-map-access

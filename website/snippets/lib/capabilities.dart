@@ -66,7 +66,9 @@ void registerWithCapabilities(ScopedServiceRegistry registry) {
   registry.registerFactory<MyService>(
     const ServiceId('importer'),
     () => const MyService(),
-    capabilities: const {SupportsFileFormats({'jsx', 'dart'})},
+    capabilities: const {
+      SupportsFileFormats({'jsx', 'dart'}),
+    },
   );
 }
 
@@ -189,4 +191,5 @@ void warnIfSlow(PluginContext context) {
     }
   }
 }
+
 // #enddocregion capability-has-type-is-slow

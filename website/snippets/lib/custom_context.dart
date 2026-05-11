@@ -116,10 +116,7 @@ class AnalyticsPlugin extends GlobalPlugin<EditorGlobalContext> {
 
 // #docregion plugin-context-stub
 PluginContext makeTestContext() {
-  return PluginContext.stub(
-    registry: ServiceRegistry.empty(),
-    bus: EventBus(),
-  );
+  return PluginContext.stub(registry: ServiceRegistry.empty(), bus: EventBus());
 }
 // #enddocregion plugin-context-stub
 
@@ -172,4 +169,5 @@ Future<void> initWithCustomContextFactories() async {
   print('session ready: ${session.context.document.title}');
   await runtime.dispose();
 }
+
 // #enddocregion custom-context-runtime-init

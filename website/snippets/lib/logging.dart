@@ -69,4 +69,5 @@ void setFineLogging() {
   Logger('plugin_kit.PluginRuntime').level = Level.FINE;
   Logger('plugin_kit.PluginSession').level = Level.FINE;
 }
+
 // #enddocregion logging-fine-level

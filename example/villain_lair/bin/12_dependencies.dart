@@ -62,10 +62,11 @@ class HeistCoordinatorPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<String>(
       const ServiceId('plan'),
-      () => 'Step 1: Arrive. '
-      'Step 2: Crack vault. '
-      'Step 3: Leave. '
-      'Step 4: Gary ruins everything.',
+      () =>
+          'Step 1: Arrive. '
+          'Step 2: Crack vault. '
+          'Step 3: Leave. '
+          'Step 4: Gary ruins everything.',
       priority: 50,
     );
   }

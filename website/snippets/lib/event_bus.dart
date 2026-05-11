@@ -110,12 +110,9 @@ Future<void> demonstrateIdentifierScoping(PluginContext context) async {
     print('saw tool execution: ${env.event.toolName}');
   });
 
-  context.bus.on<ToolExecutionEvent>(
-    (env) {
-      print('calculator specifically: ${env.event.toolName}');
-    },
-    identifier: 'calculator',
-  );
+  context.bus.on<ToolExecutionEvent>((env) {
+    print('calculator specifically: ${env.event.toolName}');
+  }, identifier: 'calculator');
 
   await context.bus.emit<ToolExecutionEvent>(
     event: const ToolExecutionEvent(toolName: 'calculator'),
@@ -214,9 +211,7 @@ void demonstrateEventEnvelope(EventEnvelope<UserMessage> envelope) {
 
 /// Right: caller sees the exception.
 Future<void> correctEmitUsage(PluginContext context) async {
-  await context.bus.emit<UserMessage>(
-    event: const UserMessage(text: 'hello'),
-  );
+  await context.bus.emit<UserMessage>(event: const UserMessage(text: 'hello'));
 }
 // #enddocregion event-bus-unawaited-vs-awaited
 
@@ -228,14 +223,12 @@ Future<void> demonstrateMaybeRequest(PluginContext context) async {
     return SearchResults(results: ['result_${env.event.query}']);
   });
 
-  final result =
-      await context.bus.maybeRequest<SearchQuery, SearchResults?>(
+  final result = await context.bus.maybeRequest<SearchQuery, SearchResults?>(
     const SearchQuery(query: 'dart'),
   );
   // result is SearchResults?
 
-  final result2 =
-      await context.bus.request<SearchQuery, SearchResults?>(
+  final result2 = await context.bus.request<SearchQuery, SearchResults?>(
     const SearchQuery(query: 'dart'),
   );
   // result2 is SearchResults?, no throw on null cascade.
@@ -264,10 +257,9 @@ class MessageDispatchService extends StatefulPluginService {
   @override
   void attach() {
     on<UserMessage>((e) async {
-      await emit(UserMessageReceived(
-        sessionId: currentSession,
-        text: e.event.text,
-      ));
+      await emit(
+        UserMessageReceived(sessionId: currentSession, text: e.event.text),
+      );
     });
   }
 }
@@ -287,4 +279,5 @@ Future<int?> requestOpenPort(PluginContext context) async {
   );
   return port;
 }
+
 // #enddocregion events-request-find-port

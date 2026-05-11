@@ -67,9 +67,27 @@ void main() {
     });
   });
 
+  group('service-registry-resolve-after', () {
+    test('BetterDartFormatter handles .dart, delegates other files', () async {
+      final runtime = PluginRuntime(
+        plugins: [DefaultFormatterPlugin(), BetterDartFormatterPlugin()],
+      )..init();
+
+      final formatter = runtime.globalRegistry.resolve<Formatter>(
+        const ServiceId('code_formatter'),
+      );
+      expect(formatter, isA<BetterDartFormatter>());
+      expect(formatter.format('app.dart', '  let x = 1  '), 'let x = 1');
+      expect(formatter.format('notes.txt', '  hello  '), '  hello  ');
+
+      await runtime.dispose();
+    });
+  });
+
   group('service-registry-enterprise-router-plugin', () {
     test('enterprise router plugin registers under model_router', () async {
-      final runtime = PluginRuntime(plugins: [EnterpriseRouterPlugin()])..init();
+      final runtime = PluginRuntime(plugins: [EnterpriseRouterPlugin()])
+        ..init();
       final router = runtime.globalRegistry.resolve<ModelRouter>(
         const ServiceId('model_router'),
       );

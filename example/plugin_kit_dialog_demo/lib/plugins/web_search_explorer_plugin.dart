@@ -22,7 +22,7 @@ class WebSearchExplorerPlugin extends GlobalPlugin {
     registry.registerSingleton<Object>(
       provider,
       () => Object(),
-      priority: 100,
+      priority: Priority.elevated,
       capabilities: const {
         UiConfigurableCapability(
           label: 'Search Provider',

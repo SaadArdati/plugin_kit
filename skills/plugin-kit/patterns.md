@@ -203,32 +203,23 @@ Use when: a service wants to delegate to the next-priority registration for the 
 `registry.resolveAfter<T>(pluginId: self, serviceId: slot)`: walks priority-sorted list, finds the registration owned by `self`, returns the next enabled wrapper. Never returns self. Throws `StateError` if no fallback.
 
 ```dart
-class ChainRouter implements ModelRouter {
-  /// The plugin id that owns this router.
-  final PluginId ownerId;
-
-  /// Returns the live registry on demand.
-  final ServiceRegistry Function() registryThunk;
-
-  /// The service id for resolution delegation.
-  final ServiceId routerId;
-
-  /// Creates a [ChainRouter].
-  ChainRouter({
-    required this.ownerId,
-    required this.registryThunk,
-    required this.routerId,
-  });
-
+/// A formatter that handles `.dart` files itself and defers anything else
+/// to the runner-up `Formatter` in the same slot.
+///
+/// Extending [StatefulPluginService] gets us a bound [context] for registry
+/// access plus framework-stamped [pluginId] and [serviceId], so the chain
+/// delegation reads naturally.
+class BetterDartFormatter extends StatefulPluginService implements Formatter {
   @override
-  String? routeFor(String prompt) {
-    if (prompt.contains('enterprise')) return 'gpt-4-enterprise';
-    return registryThunk()
-        .resolveAfter<ModelRouter>(
-          pluginId: ownerId,
-          serviceId: const ServiceId('model_router'),
-        )
-        .routeFor(prompt);
+  String format(String path, String input) {
+    if (path.endsWith('.dart')) {
+      // Our specialty. Format it ourselves.
+      return input.trim();
+    }
+    // Not a Dart file. Hand off to whichever Formatter was the previous winner.
+    return context.registry
+        .resolveAfter<Formatter>(pluginId: pluginId, serviceId: serviceId)
+        .format(path, input);
   }
 }
 ```
@@ -238,32 +229,23 @@ class ChainRouter implements ModelRouter {
 There is no `maybeResolveAfter`. For genuinely optional fallback, wrap:
 
 ```dart
-class ChainRouter implements ModelRouter {
-  /// The plugin id that owns this router.
-  final PluginId ownerId;
-
-  /// Returns the live registry on demand.
-  final ServiceRegistry Function() registryThunk;
-
-  /// The service id for resolution delegation.
-  final ServiceId routerId;
-
-  /// Creates a [ChainRouter].
-  ChainRouter({
-    required this.ownerId,
-    required this.registryThunk,
-    required this.routerId,
-  });
-
+/// A formatter that handles `.dart` files itself and defers anything else
+/// to the runner-up `Formatter` in the same slot.
+///
+/// Extending [StatefulPluginService] gets us a bound [context] for registry
+/// access plus framework-stamped [pluginId] and [serviceId], so the chain
+/// delegation reads naturally.
+class BetterDartFormatter extends StatefulPluginService implements Formatter {
   @override
-  String? routeFor(String prompt) {
-    if (prompt.contains('enterprise')) return 'gpt-4-enterprise';
-    return registryThunk()
-        .resolveAfter<ModelRouter>(
-          pluginId: ownerId,
-          serviceId: const ServiceId('model_router'),
-        )
-        .routeFor(prompt);
+  String format(String path, String input) {
+    if (path.endsWith('.dart')) {
+      // Our specialty. Format it ourselves.
+      return input.trim();
+    }
+    // Not a Dart file. Hand off to whichever Formatter was the previous winner.
+    return context.registry
+        .resolveAfter<Formatter>(pluginId: pluginId, serviceId: serviceId)
+        .format(path, input);
   }
 }
 ```

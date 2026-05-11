@@ -25,7 +25,9 @@ void main() {
     test('registers linter with multiple capabilities', () {
       final registry = ServiceRegistry();
       registerLinterWithCapabilities(registry);
-      final wrapper = registry.resolveRaw<CodeLinter>(const ServiceId('linter'));
+      final wrapper = registry.resolveRaw<CodeLinter>(
+        const ServiceId('linter'),
+      );
       expect(wrapper.capabilities.hasType<SupportsLanguages>(), isTrue);
       expect(wrapper.capabilities.hasType<PartOfASuiteOfTools>(), isTrue);
       expect(wrapper.capabilities.hasType<CanBeSlow>(), isTrue);
@@ -73,17 +75,20 @@ void main() {
   });
 
   group('capability-resolve-raw-get-of-type', () {
-    test('getFormatterCapability returns null when no CanBeSlow registered', () {
-      final registry = ServiceRegistry();
-      registry.registerSingleton<CodeLinter>(
-        pluginId: const PluginId('linter_suite'),
-        serviceId: const ServiceId('formatter'),
-        create: () => CodeLinter(),
-      );
-      final ctx = PluginContext.stub(registry: registry);
-      final result = getFormatterCapability(ctx);
-      expect(result, isNull);
-    });
+    test(
+      'getFormatterCapability returns null when no CanBeSlow registered',
+      () {
+        final registry = ServiceRegistry();
+        registry.registerSingleton<CodeLinter>(
+          pluginId: const PluginId('linter_suite'),
+          serviceId: const ServiceId('formatter'),
+          create: () => CodeLinter(),
+        );
+        final ctx = PluginContext.stub(registry: registry);
+        final result = getFormatterCapability(ctx);
+        expect(result, isNull);
+      },
+    );
   });
 
   group('capability-has-type-is-slow', () {

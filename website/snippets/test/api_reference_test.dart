@@ -31,10 +31,7 @@ void main() {
   group('api-reference-settings', () {
     test('fullSettings has two plugin entries', () {
       expect(fullSettings.plugins, hasLength(2));
-      expect(
-        fullSettings.plugins.containsKey(const PluginId('chat')),
-        isTrue,
-      );
+      expect(fullSettings.plugins.containsKey(const PluginId('chat')), isTrue);
     });
 
     test('roundTripSettings produces equivalent settings', () {
@@ -46,10 +43,7 @@ void main() {
 
   group('api-reference-bind-pattern', () {
     test('BindingPlugin has correct pluginId', () {
-      expect(
-        BindingPlugin().pluginId,
-        equals(const PluginId('binding_demo')),
-      );
+      expect(BindingPlugin().pluginId, equals(const PluginId('binding_demo')));
     });
   });
 

@@ -34,7 +34,10 @@ class _SelfDecorating extends GlobalPlugin {
     );
     registry.registerSingleton<PluginKitVisual>(
       PluginKitVisualsPlugin.serviceVisualNamespace('tool.editor'),
-      () => const PluginKitVisual(icon: Icon(Icons.edit), color: Color(0xFF00FF00)),
+      () => const PluginKitVisual(
+        icon: Icon(Icons.edit),
+        color: Color(0xFF00FF00),
+      ),
     );
   }
 }

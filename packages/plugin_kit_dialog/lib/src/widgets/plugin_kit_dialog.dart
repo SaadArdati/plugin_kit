@@ -72,7 +72,7 @@ Future<RuntimeSettings?> showPluginKitDialog({
   PluginKitDialogTheme? theme,
   bool barrierDismissible = true,
 }) async {
-// #enddocregion plugin-kit-dialog-show-plugin-kit-dialog
+  // #enddocregion plugin-kit-dialog-show-plugin-kit-dialog
   final controller = PluginKitDialogController(
     runtime: runtime,
     initialSettings: initialSettings,

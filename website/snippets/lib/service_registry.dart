@@ -24,20 +24,20 @@ class AppConfig {
 
 /// A stub code formatter service.
 abstract class Formatter {
-  /// Formats [input] and returns the result.
-  String format(String input);
+  /// Formats [input], the contents of a file at [path], and returns the result.
+  String format(String path, String input);
 }
 
-/// Default formatter implementation.
+/// Default formatter implementation. Returns the input unchanged.
 class DefaultFormatter implements Formatter {
   @override
-  String format(String input) => input;
+  String format(String path, String input) => input;
 }
 
-/// Higher-quality formatter implementation.
+/// Higher-quality formatter implementation. Trims whitespace.
 class PrettierFormatter implements Formatter {
   @override
-  String format(String input) => input.trim();
+  String format(String path, String input) => input.trim();
 }
 
 /// Panel factory abstraction.
@@ -155,35 +155,67 @@ class AnthropicService extends PluginService {
 // #enddocregion service-registry-settings-injection
 
 // #docregion service-registry-resolve-after
-class ChainRouter implements ModelRouter {
-  /// The plugin id that owns this router.
-  final PluginId ownerId;
-
-  /// Returns the live registry on demand.
-  final ServiceRegistry Function() registryThunk;
-
-  /// The service id for resolution delegation.
-  final ServiceId routerId;
-
-  /// Creates a [ChainRouter].
-  ChainRouter({
-    required this.ownerId,
-    required this.registryThunk,
-    required this.routerId,
-  });
-
+/// A formatter that handles `.dart` files itself and defers anything else
+/// to the runner-up `Formatter` in the same slot.
+///
+/// Extending [StatefulPluginService] gets us a bound [context] for registry
+/// access plus framework-stamped [pluginId] and [serviceId], so the chain
+/// delegation reads naturally.
+class BetterDartFormatter extends StatefulPluginService implements Formatter {
   @override
-  String? routeFor(String prompt) {
-    if (prompt.contains('enterprise')) return 'gpt-4-enterprise';
-    return registryThunk()
-        .resolveAfter<ModelRouter>(
-          pluginId: ownerId,
-          serviceId: const ServiceId('model_router'),
-        )
-        .routeFor(prompt);
+  String format(String path, String input) {
+    if (path.endsWith('.dart')) {
+      // Our specialty. Format it ourselves.
+      return input.trim();
+    }
+    // Not a Dart file. Hand off to whichever Formatter was the previous winner.
+    return context.registry
+        .resolveAfter<Formatter>(pluginId: pluginId, serviceId: serviceId)
+        .format(path, input);
   }
 }
 // #enddocregion service-registry-resolve-after
+
+/// Plugin that registers [BetterDartFormatter] as the elevated-priority winner
+/// for the `code_formatter` slot. Used by the matching test to drive the
+/// service through a real runtime so its `context` is bound when `format()`
+/// is called.
+class BetterDartFormatterPlugin extends GlobalPlugin {
+  /// The plugin id for this formatter.
+  static const PluginId id = PluginId('better_dart_formatter');
+
+  @override
+  PluginId get pluginId => id;
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<Formatter>(
+      const ServiceId('code_formatter'),
+      () => BetterDartFormatter(),
+      priority: Priority.elevated,
+    );
+  }
+}
+
+/// Companion plugin that registers [DefaultFormatter] as the lower-priority
+/// runner-up. Together with [BetterDartFormatterPlugin] this builds the
+/// two-registration chain that `resolveAfter` walks past the winner to reach.
+class DefaultFormatterPlugin extends GlobalPlugin {
+  /// The plugin id for the default formatter.
+  static const PluginId id = PluginId('default_formatter');
+
+  @override
+  PluginId get pluginId => id;
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<Formatter>(
+      const ServiceId('code_formatter'),
+      () => DefaultFormatter(),
+      priority: Priority.normal,
+    );
+  }
+}
 
 // #docregion service-registry-scoped-for
 void useScopedRegistry(ServiceRegistry registry) {

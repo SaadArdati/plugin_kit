@@ -144,7 +144,7 @@ void main() {
       expect(
         winner1,
         isA<AltChatService>(),
-        reason: 'priority 100 should beat default 50',
+        reason: 'Priority.elevated should beat Priority.normal default',
       );
       expect(winner1.replyPrefix, equals('alt: '));
 

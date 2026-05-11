@@ -245,4 +245,5 @@ abstract class ConfigFieldHandle {
   /// Restores the field value to its declared default.
   void reset();
 }
+
 // #enddocregion config-field-config-field-handle

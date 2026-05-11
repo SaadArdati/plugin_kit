@@ -106,7 +106,7 @@ void main() {
 
     // Verify expanded state is reachable before snapping the golden.
     expect(find.text('enterprise_chat'), findsOneWidget);
-    expect(find.text('Priority 120'), findsOneWidget);
+    expect(find.text('Priority 1200'), findsOneWidget);
 
     await expectLater(
       find.byType(PluginKitDialog),

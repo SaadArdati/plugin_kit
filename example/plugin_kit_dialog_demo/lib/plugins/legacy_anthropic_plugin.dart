@@ -19,7 +19,7 @@ class LegacyAnthropicPlugin extends GlobalPlugin {
     registry.registerSingleton<Object>(
       CorePlugin.model,
       () => Object(),
-      priority: 30,
+      priority: 300,
       capabilities: const {
         UiConfigurableCapability(
           label: 'Model & Provider (legacy)',

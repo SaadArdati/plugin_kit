@@ -88,7 +88,8 @@ void main() {
         expect(
           identical(svcA, svcB),
           isFalse,
-          reason: 'Each session should resolve its own CounterService '
+          reason:
+              'Each session should resolve its own CounterService '
               'instance when the factory closure constructs inline.',
         );
 
@@ -100,91 +101,81 @@ void main() {
         expect(
           svcB.count,
           0,
-          reason: 'Bumping session A must NOT be visible to session B '
+          reason:
+              'Bumping session A must NOT be visible to session B '
               'under per-session inline construction.',
         );
       },
     );
 
-    test(
-      'factory closing over a field `() => _shared` SHARES one instance '
-      'across sessions (intentional, visible at the call site)',
-      () async {
-        final runtime = PluginRuntime(plugins: [SharedFactoryCounterPlugin()])
-          ..init();
-        final sessionA = await runtime.createSession();
-        final sessionB = await runtime.createSession();
+    test('factory closing over a field `() => _shared` SHARES one instance '
+        'across sessions (intentional, visible at the call site)', () async {
+      final runtime = PluginRuntime(plugins: [SharedFactoryCounterPlugin()])
+        ..init();
+      final sessionA = await runtime.createSession();
+      final sessionB = await runtime.createSession();
 
-        final svcA = sessionA.context.resolve<CounterService>(
-          _counterServiceId,
-        );
-        final svcB = sessionB.context.resolve<CounterService>(
-          _counterServiceId,
-        );
+      final svcA = sessionA.context.resolve<CounterService>(_counterServiceId);
+      final svcB = sessionB.context.resolve<CounterService>(_counterServiceId);
 
-        expect(
-          identical(svcA, svcB),
-          isTrue,
-          reason: 'Both sessions must resolve THE SAME CounterService '
-              'instance when the factory closes over a plugin-level field. '
-              'This is now the explicit way to share state across sessions; '
-              'the closure capture is visible at the call site.',
-        );
+      expect(
+        identical(svcA, svcB),
+        isTrue,
+        reason:
+            'Both sessions must resolve THE SAME CounterService '
+            'instance when the factory closes over a plugin-level field. '
+            'This is now the explicit way to share state across sessions; '
+            'the closure capture is visible at the call site.',
+      );
 
-        svcA.bump();
-        svcA.bump();
-        svcA.bump();
+      svcA.bump();
+      svcA.bump();
+      svcA.bump();
 
-        expect(svcA.count, 3);
-        expect(
-          svcB.count,
-          3,
-          reason: 'Intentional cross-session sharing: session B sees '
-              'mutations made by session A because both resolve the same '
-              'instance behind the shared-factory closure.',
-        );
-      },
-    );
+      expect(svcA.count, 3);
+      expect(
+        svcB.count,
+        3,
+        reason:
+            'Intentional cross-session sharing: session B sees '
+            'mutations made by session A because both resolve the same '
+            'instance behind the shared-factory closure.',
+      );
+    });
 
-    test(
-      'identity is preserved across many sessions when the factory closes '
-      'over a field',
-      () async {
-        // Stronger identity-only assertion to catch any future regression
-        // that accidentally constructs fresh instances despite the closure
-        // capturing `_shared`.
-        final runtime = PluginRuntime(plugins: [SharedFactoryCounterPlugin()])
-          ..init();
-        final s1 = await runtime.createSession();
-        final s2 = await runtime.createSession();
-        final s3 = await runtime.createSession();
+    test('identity is preserved across many sessions when the factory closes '
+        'over a field', () async {
+      // Stronger identity-only assertion to catch any future regression
+      // that accidentally constructs fresh instances despite the closure
+      // capturing `_shared`.
+      final runtime = PluginRuntime(plugins: [SharedFactoryCounterPlugin()])
+        ..init();
+      final s1 = await runtime.createSession();
+      final s2 = await runtime.createSession();
+      final s3 = await runtime.createSession();
 
-        final a = s1.context.resolve<CounterService>(_counterServiceId);
-        final b = s2.context.resolve<CounterService>(_counterServiceId);
-        final c = s3.context.resolve<CounterService>(_counterServiceId);
+      final a = s1.context.resolve<CounterService>(_counterServiceId);
+      final b = s2.context.resolve<CounterService>(_counterServiceId);
+      final c = s3.context.resolve<CounterService>(_counterServiceId);
 
-        expect(identical(a, b), isTrue);
-        expect(identical(b, c), isTrue);
-      },
-    );
+      expect(identical(a, b), isTrue);
+      expect(identical(b, c), isTrue);
+    });
 
-    test(
-      'both plugin shapes compile and init without diagnostic',
-      () {
-        // Acceptance proof: both factory shapes route through the same
-        // `registerSingleton(Factory<T>)` signature. The ONLY observable
-        // discriminator is what the closure body references; the type
-        // system sees `Factory<T>` in both cases.
-        expect(
-          () => PluginRuntime(plugins: [InlineFactoryCounterPlugin()])..init(),
-          returnsNormally,
-        );
-        expect(
-          () => PluginRuntime(plugins: [SharedFactoryCounterPlugin()])..init(),
-          returnsNormally,
-        );
-      },
-    );
+    test('both plugin shapes compile and init without diagnostic', () {
+      // Acceptance proof: both factory shapes route through the same
+      // `registerSingleton(Factory<T>)` signature. The ONLY observable
+      // discriminator is what the closure body references; the type
+      // system sees `Factory<T>` in both cases.
+      expect(
+        () => PluginRuntime(plugins: [InlineFactoryCounterPlugin()])..init(),
+        returnsNormally,
+      );
+      expect(
+        () => PluginRuntime(plugins: [SharedFactoryCounterPlugin()])..init(),
+        returnsNormally,
+      );
+    });
 
     test(
       'the factory runs EAGERLY at registration time (not lazily on resolve)',
@@ -203,7 +194,8 @@ void main() {
         expect(
           factoryRuns,
           1,
-          reason: 'Factory must run at registration time (one session = '
+          reason:
+              'Factory must run at registration time (one session = '
               'one factory call), not on first resolve.',
         );
 

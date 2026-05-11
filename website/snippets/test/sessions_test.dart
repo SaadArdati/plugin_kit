@@ -6,7 +6,10 @@ void main() {
   group('theme-service-broadcast', () {
     test('ThemePlugin and ThemeAwarePlugin have correct ids', () {
       expect(ThemePlugin().pluginId, equals(const PluginId('theme')));
-      expect(ThemeAwarePlugin().pluginId, equals(const PluginId('theme_aware')));
+      expect(
+        ThemeAwarePlugin().pluginId,
+        equals(const PluginId('theme_aware')),
+      );
     });
   });
 

@@ -283,7 +283,7 @@ class RuntimeSettings {
     Map<PluginId, PluginConfig>? plugins,
     Map<Pin, ServiceSettings>? services,
   }) {
-  // #enddocregion settings-copy-with-2
+    // #enddocregion settings-copy-with-2
     return RuntimeSettings(
       plugins: plugins ?? {...this.plugins},
       services: services ?? {...this.services},

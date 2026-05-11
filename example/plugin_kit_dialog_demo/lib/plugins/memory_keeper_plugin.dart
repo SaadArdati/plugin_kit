@@ -16,7 +16,7 @@ class MemoryKeeperPlugin extends GlobalPlugin {
     registry.registerSingleton<Object>(
       CorePlugin.systemMessage,
       () => Object(),
-      priority: 50,
+      priority: Priority.normal,
       capabilities: const {
         UiConfigurableCapability(
           label: 'System Message (memory recall)',

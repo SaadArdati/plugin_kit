@@ -47,9 +47,7 @@ void exampleAppRoot() {
     MaterialApp(
       home: PluginRuntimeScope(
         plugins: [ChatPlugin(), AssistantPlugin()],
-        child: const PluginSessionScope(
-          child: ChatScreen(),
-        ),
+        child: const PluginSessionScope(child: ChatScreen()),
       ),
     ),
   );
@@ -182,8 +180,8 @@ class ChatController with PluginSessionListener {
 
   @override
   List<EventBinding> get subscriptions => [
-        EventBinding.on<ChatMessageReceived>(_onReceived),
-      ];
+    EventBinding.on<ChatMessageReceived>(_onReceived),
+  ];
 
   void _onReceived(ChatMessageReceived event) {
     // React to the incoming chat message.
@@ -256,9 +254,7 @@ class _EditorScreenState extends State<EditorScreen> {
   @override
   void initState() {
     super.initState();
-    _runtime = PluginRuntime(
-      plugins: [TerminalPlugin(), MinimapPlugin()],
-    );
+    _runtime = PluginRuntime(plugins: [TerminalPlugin(), MinimapPlugin()]);
     _runtime.init();
     _createSession();
   }
@@ -294,11 +290,7 @@ class _EditorScreenState extends State<EditorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Row(
-        children: [
-          for (final panel in _panels) _resolvePanel(panel),
-        ],
-      ),
+      body: Row(children: [for (final panel in _panels) _resolvePanel(panel)]),
     );
   }
 
@@ -326,10 +318,7 @@ Widget buildRuntimeScopeAutoCreate() {
 // #docregion flutter-plugin-kit-runtime-scope-value
 /// Demonstrates the external-ownership form of PluginRuntimeScope.
 Widget buildRuntimeScopeExternalOwnership(PluginRuntime runtime) {
-  return PluginRuntimeScope.value(
-    runtime: runtime,
-    child: const ChatScreen(),
-  );
+  return PluginRuntimeScope.value(runtime: runtime, child: const ChatScreen());
 }
 // #enddocregion flutter-plugin-kit-runtime-scope-value
 
@@ -352,10 +341,7 @@ Widget _circularProgress(BuildContext context) =>
 // #docregion flutter-plugin-kit-session-scope-runtime
 /// Demonstrates PluginSessionScope with an explicit runtime.
 Widget buildSessionScopeExplicitRuntime(PluginRuntime someRuntime) {
-  return PluginSessionScope(
-    runtime: someRuntime,
-    child: const ChatScreen(),
-  );
+  return PluginSessionScope(runtime: someRuntime, child: const ChatScreen());
 }
 // #enddocregion flutter-plugin-kit-session-scope-runtime
 
@@ -516,12 +502,7 @@ class _EditorScreenMigrationState extends State<EditorScreenMigration> {
   @override
   void initState() {
     super.initState();
-    _plugins = PluginRuntime(
-      plugins: [
-        ChatPlugin(),
-        AssistantPlugin(),
-      ],
-    );
+    _plugins = PluginRuntime(plugins: [ChatPlugin(), AssistantPlugin()]);
     _plugins.init();
     _createSession();
   }
@@ -566,10 +547,7 @@ Future<void> pumpEditorShell(
 /// The caller owns the runtime's lifetime; the scope holds a reference
 /// but does not dispose on unmount.
 Widget buildRuntimeScopeValueBlock(PluginRuntime runtime) {
-  return PluginRuntimeScope.value(
-    runtime: runtime,
-    child: const ChatScreen(),
-  );
+  return PluginRuntimeScope.value(runtime: runtime, child: const ChatScreen());
 }
 // #enddocregion flutter-plugin-kit-runtime-scope-value-block
 
@@ -615,4 +593,5 @@ class SessionEventCubit<E> {
     _sub.cancel();
   }
 }
+
 // #enddocregion flutter-plugin-kit-event-cubit

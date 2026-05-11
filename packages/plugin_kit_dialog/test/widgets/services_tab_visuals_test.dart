@@ -44,7 +44,10 @@ class _FlutterAuthoredPlugin extends GlobalPlugin {
     // Self-attached visuals via the new service_visual namespace.
     registry.registerSingleton<PluginKitVisual>(
       PluginKitVisualsPlugin.serviceVisualNamespace('tool.editor'),
-      () => const PluginKitVisual(icon: Icon(Icons.edit), color: Color(0xFF00FF00)),
+      () => const PluginKitVisual(
+        icon: Icon(Icons.edit),
+        color: Color(0xFF00FF00),
+      ),
     );
   }
 }

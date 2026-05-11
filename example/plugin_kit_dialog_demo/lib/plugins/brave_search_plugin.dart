@@ -16,7 +16,7 @@ class BraveSearchPlugin extends GlobalPlugin {
     registry.registerSingleton<Object>(
       WebSearchExplorerPlugin.provider,
       () => Object(),
-      priority: 90,
+      priority: 900,
       capabilities: const {
         UiConfigurableCapability(
           label: 'Search Provider (Brave)',

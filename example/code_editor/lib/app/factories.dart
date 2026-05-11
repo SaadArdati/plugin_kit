@@ -16,4 +16,5 @@ import 'package:flutter/widgets.dart';
 abstract class PanelWidgetFactory {
   Widget build(BuildContext context);
 }
+
 // #enddocregion factories-panel-widget-factory

@@ -23,6 +23,10 @@ class BaseMcpPlugin extends GlobalPlugin {
 
   @override
   void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<Object>(transport, () => Object(), priority: 0);
+    registry.registerSingleton<Object>(
+      transport,
+      () => Object(),
+      priority: Priority.lowest,
+    );
   }
 }

@@ -26,7 +26,7 @@ class ModelRouterPlugin extends GlobalPlugin {
     registry.registerSingleton<Object>(
       CorePlugin.model,
       () => Object(),
-      priority: 80,
+      priority: 800,
       capabilities: const {
         UiConfigurableCapability(
           label: 'Model & Provider (router fallback)',
@@ -54,7 +54,7 @@ class ModelRouterPlugin extends GlobalPlugin {
     registry.registerSingleton<Object>(
       WebSearchExplorerPlugin.provider,
       () => Object(),
-      priority: 60,
+      priority: 600,
       capabilities: const {
         UiConfigurableCapability(
           label: 'Search Provider (router fallback)',

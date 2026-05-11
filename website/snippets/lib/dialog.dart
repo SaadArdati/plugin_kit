@@ -183,7 +183,7 @@ void registerWithNamespace(ScopedServiceRegistry registry) {
   const agent = Namespace('agent');
 
   registry.registerSingleton<MyService>(
-    agent('temperature'),                  // ServiceId('agent.temperature')
+    agent('temperature'), // ServiceId('agent.temperature')
     () => const MyService(),
     capabilities: const {
       UiConfigurableCapability(
@@ -203,4 +203,5 @@ void registerWithNamespace(ScopedServiceRegistry registry) {
     },
   );
 }
+
 // #enddocregion dialog-reference-service-namespace

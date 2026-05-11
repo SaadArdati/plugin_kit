@@ -115,10 +115,7 @@ const groupField = GroupConfigField(
       max: 8192,
       isInteger: true,
     ),
-    BoolConfigField(
-      key: 'limits.strict',
-      label: 'Strict',
-    ),
+    BoolConfigField(key: 'limits.strict', label: 'Strict'),
   ],
 );
 // #enddocregion config-field-group
@@ -157,13 +154,11 @@ void registerFullCapability(ScopedServiceRegistry registry) {
             max: 2,
             step: 0.1,
           ),
-          BoolConfigField(
-            key: 'streaming',
-            label: 'Streaming',
-          ),
+          BoolConfigField(key: 'streaming', label: 'Streaming'),
         ],
       ),
     },
   );
 }
+
 // #enddocregion ui-configurable-capability-full

@@ -510,7 +510,7 @@ class ServiceRegistry {
     required PluginId pluginId,
     required ServiceId serviceId,
   }) {
-  // #enddocregion service-registry-resolve-after
+    // #enddocregion service-registry-resolve-after
     final list =
         _registry[serviceId] ??
         (throw StateError('No service registered for "$serviceId"'));
@@ -720,7 +720,7 @@ class ServiceRegistry {
     int priority = ServiceRegistry.defaultPriority,
     CapabilitySet capabilities = const {},
   }) {
-  // #enddocregion service-registry-register-singleton
+    // #enddocregion service-registry-register-singleton
     final instance = create();
     _registry[serviceId] ??= [];
     final list = _registry[serviceId]!;
@@ -787,7 +787,7 @@ class ServiceRegistry {
     required PluginId pluginId,
     required ServiceId serviceId,
   }) {
-  // #enddocregion service-registry-unregister
+    // #enddocregion service-registry-unregister
     final list = _registry[serviceId];
     if (list == null) return null;
 

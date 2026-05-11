@@ -26,7 +26,7 @@ class ChatPlugin extends GlobalPlugin {
 
   @override
   void register(ScopedServiceRegistry registry) {
-    registry.withPriority(100)
+    registry.withPriority(Priority.elevated)
       ..registerSingleton<Object>(
         CorePlugin.model,
         () => Object(),

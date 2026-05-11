@@ -41,9 +41,7 @@ void main() {
       final unbind = demonstrateBind(context);
       context.bus.on<UserLoggedInEvent>((env) {});
       count = 0; // reset to check bind fires
-      await context.bus.emit<UserLoggedInEvent>(
-        event: UserLoggedInEvent('x'),
-      );
+      await context.bus.emit<UserLoggedInEvent>(event: UserLoggedInEvent('x'));
       // bind is registered; just verify unbind returns a function
       expect(unbind, isA<Function>());
       count++; // suppress unused warning
@@ -124,10 +122,7 @@ void main() {
 
   group('events-stateful-emit', () {
     test('UserMessageReceived can be constructed with required fields', () {
-      const event = UserMessageReceived(
-        sessionId: 'sess-1',
-        text: 'Hello',
-      );
+      const event = UserMessageReceived(sessionId: 'sess-1', text: 'Hello');
       expect(event.sessionId, equals('sess-1'));
       expect(event.text, equals('Hello'));
     });

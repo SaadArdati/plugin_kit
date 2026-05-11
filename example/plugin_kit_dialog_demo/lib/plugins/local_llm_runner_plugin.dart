@@ -20,7 +20,7 @@ class LocalLlmRunnerPlugin extends GlobalPlugin {
     registry.registerSingleton<Object>(
       CorePlugin.model,
       () => Object(),
-      priority: 50,
+      priority: Priority.normal,
       capabilities: const {
         UiConfigurableCapability(
           label: 'Model & Provider (local runner)',

@@ -293,6 +293,10 @@ void assertThrowsLifecycleException() {
   } on PluginLifecycleException catch (e) {
     caught = e;
   }
-  assert(caught is PluginLifecycleException, 'expected PluginLifecycleException');
+  assert(
+    caught is PluginLifecycleException,
+    'expected PluginLifecycleException',
+  );
 }
+
 // #enddocregion testing-throws-lifecycle-exception

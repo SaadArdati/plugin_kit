@@ -17,7 +17,7 @@ class ThreadSummarizerPlugin extends GlobalPlugin {
     registry.registerSingleton<Object>(
       CorePlugin.systemMessage,
       () => Object(),
-      priority: 90,
+      priority: 900,
       capabilities: const {
         UiConfigurableCapability(
           label: 'System Message (rolling summary)',

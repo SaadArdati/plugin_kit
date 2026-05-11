@@ -35,4 +35,5 @@ class UiConfigurableCapability extends Capability {
     this.description,
   });
 }
+
 // #enddocregion ui-configurable-capability-ui-configurable-capability

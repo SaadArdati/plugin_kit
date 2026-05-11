@@ -398,7 +398,6 @@ void main() {
         isNotNull,
       );
     });
-
   });
 
   group('ScopedServiceRegistry positional ServiceId overloads', () {

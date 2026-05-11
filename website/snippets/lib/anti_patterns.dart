@@ -59,7 +59,10 @@ class MyRedactionPlugin extends SessionPlugin {
 
   @override
   void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<Redactor>(serviceId, () => _ComplianceRedactor());
+    registry.registerSingleton<Redactor>(
+      serviceId,
+      () => _ComplianceRedactor(),
+    );
   }
 
   @override
@@ -116,7 +119,10 @@ class BadPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     // DO NOT do this: resolution order is undefined during register-all.
     final _ = registry.raw.maybeResolve<Logger>(const ServiceId('logger'));
-    registry.registerSingleton<Logger>(const ServiceId('my_logger'), () => Logger());
+    registry.registerSingleton<Logger>(
+      const ServiceId('my_logger'),
+      () => Logger(),
+    );
   }
 }
 // #enddocregion anti-pattern-resolve-in-register-wrong

@@ -63,7 +63,9 @@ void main() {
       registerWithNumberField(scoped);
 
       const agent = Namespace('agent');
-      final wrapper = registry.resolveRaw<TemperatureService>(agent('temperature'));
+      final wrapper = registry.resolveRaw<TemperatureService>(
+        agent('temperature'),
+      );
       expect(wrapper.capabilities.hasType<UiConfigurableCapability>(), isTrue);
     });
   });
@@ -74,7 +76,9 @@ void main() {
       final scoped = registry.scopedFor(const PluginId('llm_plugin'));
       registerFullCapability(scoped);
 
-      final wrapper = registry.resolveRaw<MyService>(const ServiceId('llm_service'));
+      final wrapper = registry.resolveRaw<MyService>(
+        const ServiceId('llm_service'),
+      );
       final cap = wrapper.capabilities.getOfType<UiConfigurableCapability>();
       expect(cap, isNotNull);
       expect(cap!.fields, hasLength(3));

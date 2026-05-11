@@ -70,9 +70,7 @@ class SupportsLanguages extends Capability {
 
 // #docregion naming-settings-keys
 const exampleSettings = RuntimeSettings(
-  plugins: {
-    PluginId('linter_suite'): PluginConfig(enabled: true),
-  },
+  plugins: {PluginId('linter_suite'): PluginConfig(enabled: true)},
   services: {
     // Key is pluginId:serviceId in wire form, built via typed chain.
   },
@@ -107,4 +105,5 @@ void demonstrateNamespaceComposition() {
 
   print('$modelId $scopeId ${settings.services.length}');
 }
+
 // #enddocregion naming-namespace-composition

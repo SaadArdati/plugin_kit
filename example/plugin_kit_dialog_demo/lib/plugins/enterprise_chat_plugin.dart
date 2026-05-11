@@ -4,7 +4,7 @@ import 'chat_plugin.dart';
 import 'core_plugin.dart';
 
 /// Enterprise chat plugin that overrides the default chat stack with
-/// stricter defaults. Wins against the `chat` plugin (priority 120 > 100)
+/// stricter defaults. Wins against the `chat` plugin (1200 > Priority.elevated)
 /// on model, system message, and temperature so the inspector demonstrates
 /// a fully shadowed plugin.
 class EnterpriseChatPlugin extends GlobalPlugin {
@@ -16,7 +16,7 @@ class EnterpriseChatPlugin extends GlobalPlugin {
 
   @override
   void register(ScopedServiceRegistry registry) {
-    registry.withPriority(120)
+    registry.withPriority(1200)
       ..registerSingleton<Object>(
         CorePlugin.model,
         () => Object(),

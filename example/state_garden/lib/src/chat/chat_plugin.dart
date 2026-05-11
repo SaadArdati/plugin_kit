@@ -38,7 +38,7 @@ class AltChatPlugin extends SessionPlugin {
     registry.registerSingleton<ChatService>(
       ChatPlugin.serviceId,
       () => AltChatService(),
-      priority: 100,
+      priority: Priority.elevated,
     );
   }
 }

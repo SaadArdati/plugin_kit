@@ -28,11 +28,12 @@ void main() {
 
   group('locked-plugin', () {
     test('locked plugin cannot be disabled', () {
-      final runtime = PluginRuntime(plugins: [CorePlugin()])..init(
-        settings: const RuntimeSettings(
-          plugins: {PluginId('core'): PluginConfig(enabled: false)},
-        ),
-      );
+      final runtime = PluginRuntime(plugins: [CorePlugin()])
+        ..init(
+          settings: const RuntimeSettings(
+            plugins: {PluginId('core'): PluginConfig(enabled: false)},
+          ),
+        );
       expect(runtime.isPluginEnabled(const PluginId('core')), isTrue);
     });
   });

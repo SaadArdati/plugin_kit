@@ -6,10 +6,7 @@ void main() {
   group('runtime-settings-construct', () {
     test('builds settings with plugins and services', () {
       expect(settings.plugins, hasLength(2));
-      expect(
-        settings.plugins[const PluginId('sql_language')]?.enabled,
-        isTrue,
-      );
+      expect(settings.plugins[const PluginId('sql_language')]?.enabled, isTrue);
       expect(
         settings.plugins[const PluginId('experimental_router')]?.enabled,
         isFalse,
@@ -31,10 +28,7 @@ void main() {
     test('produces updated settings with new plugin config', () {
       const base = RuntimeSettings.empty();
       final updated = updateAnalyticsEnabled(base, false);
-      expect(
-        updated.plugins[const PluginId('analytics')]?.enabled,
-        isFalse,
-      );
+      expect(updated.plugins[const PluginId('analytics')]?.enabled, isFalse);
     });
   });
 

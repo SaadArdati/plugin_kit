@@ -19,16 +19,19 @@ void main() {
   });
 
   group('logging-try-catch-plugin-init', () {
-    test('safeInit rethrows PluginLifecycleException from a clean runtime', () async {
-      // A plain PluginRuntime with no failing plugins should complete without error.
-      final runtime = PluginRuntime();
-      try {
-        runtime.init();
-        // If we reach here, no exception was thrown — that is fine.
-      } on PluginLifecycleException catch (_) {
-        // A lifecycle exception from the empty runtime is also acceptable.
-      }
-    });
+    test(
+      'safeInit rethrows PluginLifecycleException from a clean runtime',
+      () async {
+        // A plain PluginRuntime with no failing plugins should complete without error.
+        final runtime = PluginRuntime();
+        try {
+          runtime.init();
+          // If we reach here, no exception was thrown — that is fine.
+        } on PluginLifecycleException catch (_) {
+          // A lifecycle exception from the empty runtime is also acceptable.
+        }
+      },
+    );
   });
 
   group('logging-crashing-plugin', () {

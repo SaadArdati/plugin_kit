@@ -20,7 +20,7 @@ class KagiSearchPlugin extends GlobalPlugin {
     registry.registerSingleton<Object>(
       WebSearchExplorerPlugin.provider,
       () => Object(),
-      priority: 110,
+      priority: 1100,
       capabilities: const {
         UiConfigurableCapability(
           label: 'Search Provider (Kagi)',

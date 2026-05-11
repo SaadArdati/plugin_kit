@@ -130,8 +130,10 @@ Widget buildChangeNotifierProviderExample(PluginSession session) {
     listenable: PluginEventNotifier<ChatMessagesChanged>(session),
     builder: (context, notifier) {
       final messages =
-          (notifier as PluginEventNotifier<ChatMessagesChanged>).value?.messages ??
-              const <ChatMessage>[];
+          (notifier as PluginEventNotifier<ChatMessagesChanged>)
+              .value
+              ?.messages ??
+          const <ChatMessage>[];
       return ChatView(
         title: 'notifier',
         messages: messages,
@@ -181,9 +183,10 @@ class _GetItChatScreenState extends State<GetItChatScreen> {
 
   @override
   Widget build(BuildContext context) => ChatView(
-        title: 'GetIt',
-        messages: _messages,
-        onSend: (text) => _session.emit(SendMessageRequested(text: text)),
-      );
+    title: 'GetIt',
+    messages: _messages,
+    onSend: (text) => _session.emit(SendMessageRequested(text: text)),
+  );
 }
+
 // #enddocregion state-bridge-get-it-screen

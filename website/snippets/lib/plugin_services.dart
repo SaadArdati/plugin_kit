@@ -231,9 +231,7 @@ class SimpleNotificationPlugin extends SessionPlugin {
 /// Demonstrates constructing a runtime, creating a session,
 /// resolving [NotificationService], and sending a notification.
 Future<void> runNotificationExample() async {
-  final runtime = PluginRuntime(
-    plugins: [SimpleNotificationPlugin()],
-  )..init();
+  final runtime = PluginRuntime(plugins: [SimpleNotificationPlugin()])..init();
 
   final session = await runtime.createSession();
 
