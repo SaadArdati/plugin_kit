@@ -28,6 +28,7 @@ jobs:
           flutter analyze example/state_garden
           flutter analyze example/code_editor
           flutter analyze example/plugin_kit_dialog_demo
+          flutter analyze example/model_embassy
 
       - name: Test
         run: |

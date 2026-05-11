@@ -17,22 +17,21 @@ Future<void> main() async {
   final runtime = PluginRuntime(plugins: [AnthropicPlugin()])..init();
   final session = await runtime.createSession();
 
+  // #docregion passports-and-visas-flow
   final passport = ModelPassport(
     modelFamily: 'anthropic',
     modelId: 'claude-sonnet-4-5-20250929',
   );
 
-  print('Passport: $passport');
-
-  // Present the passport. The visa office reviews it and, since Anthropic
-  // is registered, issues a visa.
   final visa = await session.request<AgentBoardingCall, ModelVisa?>(
     AgentBoardingCall(passport),
   );
 
-  print('Visa issued: $visa');
-
   final response = await visa!.client.chat('Hello from the embassy!');
+  // #enddocregion passports-and-visas-flow
+
+  print('Passport: $passport');
+  print('Visa issued: $visa');
   print('Chat response: $response');
 
   await runtime.dispose();

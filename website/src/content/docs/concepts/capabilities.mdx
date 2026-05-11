@@ -73,16 +73,7 @@ No instance of `SqlFormatter` was ever created.
 - `hasType<T>()`
 - `getOfType<T>()`
 
-```dart
-final caps = wrapper.capabilities;
-
-if (caps.hasType<IsSlowCapability>()) {
-  final slow = caps.getOfType<IsSlowCapability>()!;
-  if (slow.isSlow) {
-    // Warn the user before invoking this slot in a latency-sensitive path.
-  }
-}
-```
+<Code code={extractRegion(capabilitiesSnippets, 'capability-has-type-is-slow')} lang="dart" />
 
 Cleaner than manual casting, and clearer at the call site.
 

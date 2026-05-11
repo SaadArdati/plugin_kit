@@ -7,6 +7,7 @@ import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import { Code } from '@astrojs/starlight/components';
 import { extractRegion } from '../../../utils/excerpt.mjs';
 import runtimeSettings from '../../../../snippets/lib/runtime_settings.dart?raw';
+import passportsAndVisas from '../../../../../example/model_embassy/bin/01_passports_and_visas.dart?raw';
 
 `example/model_embassy/` teaches Plugin Kit through a model-routing metaphor. An agent presents a `ModelPassport` (model family, requirements). The embassy registers one `VisaOffice` per provider. The first office that can honour the passport issues a `ModelVisa` carrying a ready-to-use client. Offices that cannot serve the request return `null` so the next candidate gets a turn.
 
@@ -28,15 +29,7 @@ Replace the filename to run any other scenario. Each file is self-contained: eve
 
 The smallest version of the metaphor. One agent presents an Anthropic passport, one visa office is registered, the office issues a visa, and the agent uses the returned client.
 
-```dart
-final passport = ModelPassport(family: 'anthropic', id: 'claude-sonnet');
-
-final visa = await session.request<AgentBoardingCall, ModelVisa?>(
-  AgentBoardingCall(passport: passport),
-);
-
-await visa!.client.complete('Hello!');
-```
+<Code code={extractRegion(passportsAndVisas, 'passports-and-visas-flow')} lang="dart" />
 
 Concepts: [Service Registry](/concepts/service-registry/), [Event Bus](/concepts/event-bus/#request-and-response).
 
