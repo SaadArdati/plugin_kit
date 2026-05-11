@@ -38,6 +38,14 @@ function findDartFences(text) {
     if (openLine < 0) {
       if (/^```dart\s*$/.test(lines[i])) openLine = i;
     } else {
+      // Nested fence opener inside a body means the prior fence is
+      // missing its closer. Loud fail; never silently merge fences.
+      if (/^```\w+\s*$/.test(lines[i])) {
+        throw new Error(
+          `\`\`\`dart fence opened at line ${openLine + 1} was never closed ` +
+          `before another fence opener at line ${i + 1}. Add the missing \`\`\` closer.`,
+        );
+      }
       if (/^```\s*$/.test(lines[i])) {
         fences.push({ openLine, closeLine: i });
         openLine = -1;
@@ -50,7 +58,7 @@ function findDartFences(text) {
   return fences;
 }
 
-async function processFile(mdPath, entries, sources, check) {
+async function planFile(mdPath, entries, sources) {
   const absPath = resolve(REPO_ROOT, mdPath);
   if (!existsSync(absPath)) {
     throw new Error(`registry references missing file: ${mdPath}`);
@@ -113,14 +121,7 @@ async function processFile(mdPath, entries, sources, check) {
   for (; cursor < lines.length; cursor++) outLines.push(lines[cursor]);
 
   const next = outLines.join('\n');
-  if (next === text) return false;
-  if (check) {
-    console.error(`stale: ${mdPath}`);
-    return true;
-  }
-  await writeFile(absPath, next, 'utf8');
-  console.log(`updated: ${mdPath}`);
-  return true;
+  return { mdPath, absPath, current: text, next };
 }
 
 async function main() {
@@ -141,12 +142,28 @@ async function main() {
   }
 
   const sources = new Map();
-  let stale = 0;
+
+  // Two-pass atomic: compute every (mdPath, nextText) in memory first;
+  // only commit to disk if every file parsed cleanly. Prevents partial
+  // writes when one entry references a missing region.
+  const plans = [];
   for (const [mdPath, entries] of Object.entries(registry)) {
     if (!Array.isArray(entries)) {
       throw new Error(`registry[${mdPath}] must be an array; got ${typeof entries}`);
     }
-    if (await processFile(mdPath, entries, sources, check)) stale++;
+    plans.push(await planFile(mdPath, entries, sources));
+  }
+
+  let stale = 0;
+  for (const plan of plans) {
+    if (plan.next === plan.current) continue;
+    stale++;
+    if (check) {
+      console.error(`stale: ${plan.mdPath}`);
+      continue;
+    }
+    await writeFile(plan.absPath, plan.next, 'utf8');
+    console.log(`updated: ${plan.mdPath}`);
   }
 
   if (check && stale > 0) {

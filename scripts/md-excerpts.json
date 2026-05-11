@@ -1,0 +1,217 @@
+{
+  "README.md": [
+    {
+      "source": "website/snippets/lib/plugin_lifecycle.dart",
+      "region": "session-plugin-basic"
+    }
+  ],
+  "packages/plugin_kit/README.md": [
+    {
+      "source": "website/snippets/lib/plugin_lifecycle.dart",
+      "region": "session-plugin-basic"
+    },
+    null,
+    {
+      "source": "website/snippets/lib/plugin_services.dart",
+      "region": "session-stateful-plugin-service"
+    },
+    null,
+    null,
+    {
+      "source": "website/snippets/lib/event_bus.dart",
+      "region": "event-bus-mutate-stop"
+    },
+    null,
+    {
+      "source": "website/snippets/lib/runtime_settings.dart",
+      "region": "runtime-settings-pin-json"
+    },
+    {
+      "source": "website/snippets/lib/capabilities.dart",
+      "region": "capability-register-and-resolve"
+    },
+    null
+  ],
+  "packages/plugin_kit_dialog/README.md": [
+    {
+      "source": "website/snippets/lib/dialog.dart",
+      "region": "dialog-show-dialog"
+    },
+    {
+      "source": "website/snippets/lib/dialog.dart",
+      "region": "dialog-ui-configurable-capability"
+    },
+    {
+      "source": "website/snippets/lib/dialog.dart",
+      "region": "dialog-visuals-plugin"
+    },
+    {
+      "source": "website/snippets/lib/config_fields.dart",
+      "region": "config-field-extension"
+    },
+    {
+      "source": "website/snippets/lib/dialog.dart",
+      "region": "dialog-color-picker-renderer"
+    },
+    {
+      "source": "website/snippets/lib/dialog.dart",
+      "region": "dialog-show-dialog"
+    },
+    null,
+    null,
+    {
+      "source": "website/snippets/lib/config_fields.dart",
+      "region": "ui-configurable-capability-number"
+    }
+  ],
+  "packages/flutter_plugin_kit/README.md": [
+    {
+      "source": "website/snippets/lib/flutter_integration.dart",
+      "region": "flutter-runtime-scope-in-app"
+    },
+    {
+      "source": "website/snippets/lib/flutter_integration.dart",
+      "region": "flutter-builder-watch-event"
+    },
+    null,
+    {
+      "source": "website/snippets/lib/flutter_integration.dart",
+      "region": "flutter-plugin-event-notifier"
+    }
+  ],
+  "example/state_garden/README.md": [
+    {
+      "source": "example/state_garden/lib/src/chat/chat_service.dart",
+      "region": "chat-service"
+    }
+  ],
+  "skills/plugin-kit/anti-patterns.md": [
+    {
+      "source": "website/snippets/lib/anti_patterns.dart",
+      "region": "anti-pattern-direct-subscribe-wrong"
+    },
+    {
+      "source": "website/snippets/lib/anti_patterns.dart",
+      "region": "anti-pattern-string-settings-key-wrong"
+    },
+    {
+      "source": "website/snippets/lib/anti_patterns.dart",
+      "region": "anti-pattern-string-settings-key-fix"
+    },
+    {
+      "source": "website/snippets/lib/anti_patterns.dart",
+      "region": "anti-pattern-resolve-in-register-wrong"
+    },
+    {
+      "source": "website/snippets/lib/anti_patterns.dart",
+      "region": "anti-pattern-resolve-in-register-fix"
+    },
+    null,
+    null,
+    {
+      "source": "website/snippets/lib/anti_patterns.dart",
+      "region": "anti-pattern-cache-resolution-wrong"
+    },
+    {
+      "source": "website/snippets/lib/anti_patterns.dart",
+      "region": "anti-pattern-cache-resolution-fix"
+    },
+    {
+      "source": "example/state_garden/lib/src/chat/chat_plugin.dart",
+      "region": "chat-plugin-chat-plugin"
+    },
+    null,
+    null,
+    null,
+    {
+      "source": "website/snippets/lib/service_registry.dart",
+      "region": "service-registry-resolve-after"
+    },
+    {
+      "source": "website/snippets/lib/anti_patterns.dart",
+      "region": "anti-pattern-reserved-plugin-id"
+    },
+    null,
+    {
+      "source": "website/snippets/lib/anti_patterns.dart",
+      "region": "anti-pattern-mutable-fact-event-wrong"
+    }
+  ],
+  "skills/plugin-kit/patterns.md": [
+    {
+      "source": "website/snippets/lib/anti_patterns.dart",
+      "region": "anti-pattern-direct-subscribe-fix"
+    },
+    {
+      "source": "website/snippets/lib/service_registry.dart",
+      "region": "service-registry-enterprise-router-plugin"
+    },
+    {
+      "source": "website/snippets/lib/plugin_services.dart",
+      "region": "session-stateful-plugin-service"
+    },
+    {
+      "source": "website/snippets/lib/sessions.dart",
+      "region": "create-session-with-factory"
+    },
+    {
+      "source": "website/snippets/lib/naming.dart",
+      "region": "naming-namespace-composition"
+    },
+    {
+      "source": "website/snippets/lib/naming.dart",
+      "region": "naming-event-draft"
+    },
+    {
+      "source": "website/snippets/lib/service_registry.dart",
+      "region": "service-registry-resolve-after"
+    },
+    {
+      "source": "website/snippets/lib/service_registry.dart",
+      "region": "service-registry-resolve-after"
+    }
+  ],
+  "skills/plugin-kit/api-cheatsheet.md": [
+    {
+      "source": "website/snippets/lib/api_reference.dart",
+      "region": "api-cheatsheet-typed-handles-index"
+    },
+    null,
+    {
+      "source": "website/snippets/lib/capabilities.dart",
+      "region": "capability-in-plugin-register"
+    },
+    {
+      "source": "website/snippets/lib/api_reference.dart",
+      "region": "api-reference-request-patterns"
+    },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    {
+      "source": "website/snippets/lib/runtime_settings.dart",
+      "region": "runtime-settings-json"
+    },
+    null,
+    null,
+    null
+  ],
+  "skills/plugin-kit/testing.md": [
+    {
+      "source": "website/snippets/lib/custom_context.dart",
+      "region": "plugin-context-stub"
+    },
+    {
+      "source": "website/snippets/lib/testing.dart",
+      "region": "testing-stub-inject-fake"
+    },
+    {
+      "source": "website/snippets/lib/testing.dart",
+      "region": "testing-assert-cascade"
+    }
+  ]
+}

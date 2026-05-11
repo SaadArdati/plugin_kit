@@ -55,18 +55,7 @@ jobs:
         run: pnpm --filter ./website install
 
       - name: Check .md doc excerpts are in sync
-        run: |
-          node website/scripts/update-md-excerpts.mjs \
-            README.md \
-            packages/plugin_kit/README.md \
-            packages/plugin_kit_dialog/README.md \
-            packages/flutter_plugin_kit/README.md \
-            example/state_garden/README.md \
-            skills/plugin-kit/anti-patterns.md \
-            skills/plugin-kit/patterns.md \
-            skills/plugin-kit/api-cheatsheet.md \
-            skills/plugin-kit/testing.md \
-            --check
+        run: node scripts/update-md-excerpts.mjs --check
 
       - name: Build website (verifies MDX excerpts compile)
         run: cd website && pnpm build

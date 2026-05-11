@@ -70,7 +70,6 @@ API surface. Then:
 
 The chat service:
 
-<!-- code-excerpt "example/state_garden/lib/src/chat/chat_service.dart (chat-service)" -->
 ```dart
 class ChatService extends StatefulPluginService {
   ChatService();

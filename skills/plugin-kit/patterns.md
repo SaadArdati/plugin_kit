@@ -24,7 +24,6 @@ Not for additive shapes. If multiple registrants should each contribute (pipelin
 
 Pattern: register the behavior as a service in the registry; put a single subscription on a dispatcher (the plugin or one dispatcher service); the dispatcher resolves the winner per event and delegates.
 
-<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-direct-subscribe-fix)" -->
 ```dart
 // CORRECT: Register the redactor as a service; let the registry pick the winner.
 class MyRedactionPlugin extends SessionPlugin {
@@ -69,7 +68,6 @@ Constraint: during `Plugin.register()`, only the scoped registry is in scope; `P
 
 Pattern: capture the registry through a closure thunk; register lazily; defer use until first resolve (after register-all and attach-all complete).
 
-<!-- code-excerpt "website/snippets/lib/service_registry.dart (service-registry-enterprise-router-plugin)" -->
 ```dart
 class EnterpriseRouterPlugin extends GlobalPlugin {
   /// The plugin id for this router.
@@ -103,7 +101,6 @@ Contract: each session has its own service instance. State never leaks across se
 
 Mechanism: `register()` runs once per session for `SessionPlugin` (once per runtime for `GlobalPlugin`). Inline construction means each session evaluates the constructor expression fresh.
 
-<!-- code-excerpt "website/snippets/lib/plugin_services.dart (session-stateful-plugin-service)" -->
 ```dart
 class ChatThread extends StatefulPluginService<SessionPluginContext> {
   /// The accumulated messages for this session.
@@ -128,7 +125,6 @@ State that must outlive reconciliation: persist externally (file, database, in-m
 
 The session id comes from `context.extras`. `PluginRuntime.createSession` and `PluginRuntime.createSession` thread a `Map<String, Object>` through to the context's `extras` field; convention is to write a session id there when state needs to outlive a session lifecycle.
 
-<!-- code-excerpt "website/snippets/lib/sessions.dart (create-session-with-factory)" -->
 ```dart
 Future<void> createSessionWithFactory(PluginRuntime runtime) async {
   final session = await runtime.createSession(
@@ -162,7 +158,6 @@ For runtime composition (most call sites): `final modelId = agent('model');`.
 
 For const contexts (`static const` fields, const `RuntimeSettings` literals): `ServiceId.namespaced(...)` or raw `ServiceId('agent.model')`.
 
-<!-- code-excerpt "website/snippets/lib/naming.dart (naming-namespace-composition)" -->
 ```dart
 /// Composing namespaced service ids.
 void demonstrateNamespaceComposition() {
@@ -187,7 +182,6 @@ Use when: plugins should mutate, enrich, redact, or veto an action before it com
 
 Pattern: event payload has mutable fields by design. Emit and read the post-cascade envelope back.
 
-<!-- code-excerpt "website/snippets/lib/naming.dart (naming-event-draft)" -->
 ```dart
 /// A mutable draft event for outgoing messages, allowing handlers to mutate
 /// or veto the payload before it is sent.
@@ -211,7 +205,6 @@ Use when: a service wants to delegate to the next-priority registration for the 
 
 `registry.resolveAfter<T>(pluginId: self, serviceId: slot)`: walks priority-sorted list, finds the registration owned by `self`, returns the next enabled wrapper. Never returns self. Throws `StateError` if no fallback.
 
-<!-- code-excerpt "website/snippets/lib/service_registry.dart (service-registry-resolve-after)" -->
 ```dart
 class ChainRouter implements ModelRouter {
   /// The plugin id that owns this router.
@@ -247,7 +240,6 @@ class ChainRouter implements ModelRouter {
 
 There is no `maybeResolveAfter`. For genuinely optional fallback, wrap:
 
-<!-- code-excerpt "website/snippets/lib/service_registry.dart (service-registry-resolve-after)" -->
 ```dart
 class ChainRouter implements ModelRouter {
   /// The plugin id that owns this router.

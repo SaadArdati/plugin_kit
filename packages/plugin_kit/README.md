@@ -25,7 +25,6 @@ Pure Dart. No Flutter. Depends only on `collection` and `meta`.
 
 Two plugins claim the same `'greeter'` slot at different priorities. The runtime resolves to the winner. The host code never sees the competition.
 
-<!-- code-excerpt "website/snippets/lib/plugin_lifecycle.dart (session-plugin-basic)" -->
 ```dart
 class CasualPlugin extends SessionPlugin {
   @override
@@ -109,7 +108,6 @@ Behavior another plugin should override, settings-tune, or disable belongs in a 
 | Settings injection from `RuntimeSettings.services`. | `PluginService`. | All three. Override `injectSettings` only to react to changes; **must** call `super.injectSettings(settings, hash: hash)`. |
 | Lifecycle, events, or session-bound state. | `StatefulPluginService` (or aliases `SessionStatefulPluginService` / `GlobalStatefulPluginService`). | `registerSingleton` / `registerLazySingleton` only; factories rejected. `attach()` and `detach()` are pure user hooks (no `super`). Auto-tracked event helpers (`on`, `onRequest`, `bind`, `emit`) read `this.context` implicitly. |
 
-<!-- code-excerpt "website/snippets/lib/plugin_services.dart (session-stateful-plugin-service)" -->
 ```dart
 class ChatThread extends StatefulPluginService<SessionPluginContext> {
   /// The accumulated messages for this session.
@@ -181,7 +179,6 @@ The registry knows nothing about namespaces; they are pure composition into the 
 
 Typed, priority-ordered. Handlers receive an `EventEnvelope<T>`, read or mutate the payload via `e.event`, and call `e.stop(value)` to halt the cascade with a final value. There is one subscription primitive (`on<T>`); a "read-only observer" is just a handler that doesn't mutate.
 
-<!-- code-excerpt "website/snippets/lib/event_bus.dart (event-bus-mutate-stop)" -->
 ```dart
 Future<void> demonstrateMutateAndStop(EventBus bus) async {
   bus.on<MyEvent>((env) async {
@@ -227,7 +224,6 @@ await session.dispose();
 
 `RuntimeSettings` is JSON-serializable top-level configuration. Plugin entries are keyed by `PluginId`; service entries use `Pin` (an extension type wrapping the canonical `'pluginId:serviceId'` wire string). Wildcard overrides apply to whichever plugin currently wins resolution for a given `ServiceId`.
 
-<!-- code-excerpt "website/snippets/lib/runtime_settings.dart (runtime-settings-pin-json)" -->
 ```dart
 /// Demonstrates constructing [RuntimeSettings] with [Pin] keys and
 /// performing a JSON round-trip.
@@ -257,7 +253,6 @@ Hand the runtime a new `RuntimeSettings` and reconciliation runs serialized: new
 
 Discover what a service can do without instantiating it. `Capability` is an empty base class; subclass for whatever your app cares about, attach at registration time.
 
-<!-- code-excerpt "website/snippets/lib/capabilities.dart (capability-register-and-resolve)" -->
 ```dart
 void registerWithCapabilities(ScopedServiceRegistry registry) {
   registry.registerFactory<MyService>(

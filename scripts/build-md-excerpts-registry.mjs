@@ -41,6 +41,16 @@ function migrateFile(text, mdPath) {
       i++;
       let closed = false;
       while (i < lines.length) {
+        // A nested ```dart opener inside a fence body means the previous
+        // fence is missing its closer. This is a malformed Markdown file
+        // (probably a hand-edit error). Fail loudly so it gets fixed.
+        if (/^```\w+\s*$/.test(lines[i])) {
+          throw new Error(
+            `${mdPath}: \`\`\`dart fence opened at line ${fenceStart + 1} ` +
+            `was never closed before another fence opener at line ${i + 1}. ` +
+            `Add the missing \`\`\` closer.`,
+          );
+        }
         outLines.push(lines[i]);
         if (/^```\s*$/.test(lines[i])) {
           i++;
@@ -69,18 +79,27 @@ async function main() {
     process.exit(2);
   }
 
+  // Two-pass atomic: validate + migrate every file in memory first; only
+  // commit to disk if every file parsed cleanly. Otherwise we'd leave the
+  // tree half-stripped on a parse error in any one file.
+  const planned = [];
   const registry = {};
   for (const f of files) {
     const abs = resolve(REPO_ROOT, f);
     const original = await readFile(abs, 'utf8');
     const { text, entries } = migrateFile(original, f);
+    planned.push({ f, abs, original, text });
     registry[f] = entries;
-    if (text !== original) {
-      await writeFile(abs, text, 'utf8');
-      console.log(`stripped anchors: ${f}`);
+  }
+
+  for (const p of planned) {
+    if (p.text !== p.original) {
+      await writeFile(p.abs, p.text, 'utf8');
+      console.log(`stripped anchors: ${p.f}`);
     }
+    const entries = registry[p.f];
     const anchored = entries.filter((e) => e !== null).length;
-    console.log(`  ${f}: ${entries.length} dart fences (${anchored} anchored, ${entries.length - anchored} hand-written)`);
+    console.log(`  ${p.f}: ${entries.length} dart fences (${anchored} anchored, ${entries.length - anchored} hand-written)`);
   }
 
   await writeFile(REGISTRY, JSON.stringify(registry, null, 2) + '\n', 'utf8');

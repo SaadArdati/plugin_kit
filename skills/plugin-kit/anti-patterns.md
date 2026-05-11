@@ -22,7 +22,6 @@ Symptom in code -> anti-pattern number.
 
 Plugin classes register services and contain no behavior. `Plugin.attach` subscriptions are for wiring only (debug taps, internal bridges between services this plugin owns). Behavior another plugin should override, settings-tune, or disable belongs in a service.
 
-<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-direct-subscribe-wrong)" -->
 ```dart
 // WRONG: Multiple plugins subscribing directly to the same event for
 // winner-takes-all semantics. All handlers fire; both mutate; result depends
@@ -49,7 +48,6 @@ When direct subscription on multiple registrants IS correct: the slot is additiv
 
 ## 2. Hand-typed scoped keys or wildcard sentinels
 
-<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-string-settings-key-wrong)" -->
 ```dart
 // WRONG: Using raw strings as map keys.
 // RuntimeSettings.services is Map<Pin, ServiceSettings> -- String keys won't compile.
@@ -65,7 +63,6 @@ RuntimeSettings buildWrongSettings() {
 `RuntimeSettings.services` is `Map<Pin, ServiceSettings>`. The String form is JSON wire format only. String keys won't compile against the typed map; if they did via inference, they would leak the `:` and `*` sentinels into every callsite.
 
 Fix:
-<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-string-settings-key-fix)" -->
 ```dart
 // CORRECT: Use the typed chain or Pin constructors.
 final correctSettings = RuntimeSettings(
@@ -82,7 +79,6 @@ For Dart-side construction, prefer `pluginId.namespace('ns').service('leaf')` fo
 
 ## 3. Resolving from `register()`
 
-<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-resolve-in-register-wrong)" -->
 ```dart
 // WRONG: Resolving services during register(). At that point, other plugins
 // may not have registered yet. The behavior is undefined.
@@ -102,7 +98,6 @@ class BadPlugin extends SessionPlugin {
 Lifecycle is register-all then attach-all. During `register()`, other plugins may not have registered. Resolution from `register()` is undefined behavior.
 
 Fix: defer.
-<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-resolve-in-register-fix)" -->
 ```dart
 // CORRECT: Defer resolution via lazy singleton, or resolve in attach.
 class GoodPlugin extends SessionPlugin {
@@ -154,7 +149,6 @@ void attach(SessionPluginContext context) {
 
 ## 5. Caching resolved instances at attach time
 
-<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-cache-resolution-wrong)" -->
 ```dart
 // WRONG: Caching a resolved service in a field. The cache holds the winner
 // at attach time; a higher-priority plugin enabled later is invisible.
@@ -172,7 +166,6 @@ class CachingService extends StatefulPluginService {
 Caches the winner that existed at attach time. Higher-priority plugin enabled later registers a different `Logger`; this code keeps using the old one. Hot-swap silently defeated.
 
 Fix: resolve at point of use.
-<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-cache-resolution-fix)" -->
 ```dart
 // CORRECT: Resolve at the point of use. O(1) Map lookup.
 class NonCachingService extends StatefulPluginService {
@@ -192,7 +185,6 @@ Holding fields for components you registered yourself (your own state) is state 
 
 ## 6. Sharing service instances across sessions via captured field
 
-<!-- code-excerpt "example/state_garden/lib/src/chat/chat_plugin.dart (chat-plugin-chat-plugin)" -->
 ```dart
 class ChatPlugin extends SessionPlugin {
   static const PluginId id = PluginId('chat');
@@ -241,7 +233,6 @@ Reach for `context.bus.on(...)` only when the subscription's lifetime should NOT
 
 ## 8. Coupling to a plugin id for resolution
 
-<!-- code-excerpt "website/snippets/lib/service_registry.dart (service-registry-resolve-after)" -->
 ```dart
 class ChainRouter implements ModelRouter {
   /// The plugin id that owns this router.
@@ -279,7 +270,6 @@ Fix: resolve by `ServiceId`. Let priority and override do their job. The legitim
 
 ## 9. PluginId starting with `__pk_`
 
-<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-reserved-plugin-id)" -->
 ```dart
 // WRONG: PluginId values starting with '__pk_' are reserved.
 // runtime.addPlugin(ReservedPlugin()); // throws ArgumentError
@@ -303,7 +293,6 @@ PluginId('_my_internal')   // single-underscore is fine; only '__pk_' is reserve
 
 ## 10. Mutable fields on a fact event
 
-<!-- code-excerpt "website/snippets/lib/anti_patterns.dart (anti-pattern-mutable-fact-event-wrong)" -->
 ```dart
 // WRONG: Mutating a fact event. Facts are observations of things that already
 // happened; mutating them contradicts their semantics.

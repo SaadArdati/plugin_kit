@@ -37,7 +37,6 @@ Requires Dart `>=3.10.0`. For Flutter projects that want the scope widgets and `
 
 Two plugins claim the same `'greeter'` slot at different priorities. The runtime resolves to the winner. The host code never sees the competition.
 
-<!-- code-excerpt "website/snippets/lib/plugin_lifecycle.dart (session-plugin-basic)" -->
 ```dart
 class CasualPlugin extends SessionPlugin {
   @override

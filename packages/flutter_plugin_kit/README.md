@@ -25,7 +25,6 @@ Pulls in only `flutter` and `plugin_kit`.
 
 `ChatPlugin`, `AssistantPlugin`, and `ChatMessageReceived` below are stand-ins for plugins and events you write in your own app. A complete runnable version of this pattern (plus six other state-library variants) lives in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden).
 
-<!-- code-excerpt "website/snippets/lib/flutter_integration.dart (flutter-runtime-scope-in-app)" -->
 ```dart
 void exampleAppRoot() {
   runApp(
@@ -67,7 +66,6 @@ class _ChatScreenState extends State<ChatScreen>
 
 The `Builder`-only variant is even shorter:
 
-<!-- code-excerpt "website/snippets/lib/flutter_integration.dart (flutter-builder-watch-event)" -->
 ```dart
 Widget buildWatchEventExample() {
   return Builder(
@@ -105,7 +103,6 @@ It also implements `ValueListenable<E?>`, so `ValueListenableProvider`, `ValueLi
 
 No Cubit adapter is bundled; create one by subscribing to `session.on<E>`:
 
-<!-- code-excerpt "website/snippets/lib/flutter_integration.dart (flutter-plugin-event-notifier)" -->
 ```dart
 /// Example Bloc-style cubit that bridges session events.
 class PluginEventCubit<E> {

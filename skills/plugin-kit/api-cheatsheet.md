@@ -18,7 +18,6 @@ Dense reference. Source pointers at the end.
 
 Zero-cost extension types over `String`. At runtime they are the underlying String.
 
-<!-- code-excerpt "website/snippets/lib/api_reference.dart (api-cheatsheet-typed-handles-index)" -->
 ```dart
 /// Full typed-handles index: PluginId, Namespace, ServiceId, and Pin.
 void demonstrateTypedHandlesIndex() {
@@ -154,7 +153,6 @@ StatefulPluginService helpers (no context arg, reads `this.context`, auto-tracke
 Services registered against a `ServiceId` with a priority. Resolution returns highest-priority enabled wrapper.
 
 Registration from `Plugin.register`:
-<!-- code-excerpt "website/snippets/lib/capabilities.dart (capability-in-plugin-register)" -->
 ```dart
 void registerCapabilityInPlugin(ScopedServiceRegistry registry) {
   registry.registerSingleton<MyService>(
@@ -182,7 +180,6 @@ Factory:        constructor runs on every resolve. Takes Factory<T>. Cannot regi
 ```
 
 Resolution from a context:
-<!-- code-excerpt "website/snippets/lib/api_reference.dart (api-reference-request-patterns)" -->
 ```dart
 /// Demonstrates request/response patterns on a standalone bus.
 Future<void> demonstrateRequestPatterns(PluginContext context) async {
@@ -321,7 +318,6 @@ context.globalBus.emit(...);             // session plugin: reach the global bus
 
 ## RuntimeSettings (`settings.dart`)
 
-<!-- code-excerpt "website/snippets/lib/runtime_settings.dart (runtime-settings-json)" -->
 ```dart
 final settingsForJson = RuntimeSettings(
   plugins: {

@@ -29,7 +29,6 @@ The dialog is built from `plugin_kit` plugins itself. Every tab, header action, 
 
 ## Quick start
 
-<!-- code-excerpt "website/snippets/lib/dialog.dart (dialog-show-dialog)" -->
 ```dart
 Future<void> openConfigDialog(
   BuildContext context,
@@ -56,7 +55,6 @@ That's it. If your plugins already attach `UiConfigurableCapability`, the Servic
 
 Configurability is opt-in per registration. Attach a `UiConfigurableCapability` next to any service:
 
-<!-- code-excerpt "website/snippets/lib/dialog.dart (dialog-ui-configurable-capability)" -->
 ```dart
 void registerConfigurableService(ScopedServiceRegistry registry) {
   const agent = Namespace('agent');
@@ -107,7 +105,6 @@ Each field carries `key`, `label`, `helperText`, and `defaultValue`. Dotted keys
 
 Visuals are a Flutter-only concern, so the canonical attachment path is one locked `GlobalPlugin` (`PluginKitVisualsPlugin`) that the host app adds to the runtime alongside its other plugins. It carries three independent maps for the three things the dialog renders: plugin tiles, namespace section headers, and individual service cards.
 
-<!-- code-excerpt "website/snippets/lib/dialog.dart (dialog-visuals-plugin)" -->
 ```dart
 void addVisualsPlugin(PluginRuntime runtime, List<Plugin> myPlugins) {
   runtime
@@ -147,7 +144,6 @@ Because the visuals plugin lives in your host app (which has Flutter), Dart-only
 
 Need a color picker, file selector, or any other widget? Declare an `ExtensionConfigField` from anywhere (no Flutter needed at the field site):
 
-<!-- code-excerpt "website/snippets/lib/config_fields.dart (config-field-extension)" -->
 ```dart
 const extensionField = ExtensionConfigField(
   key: 'theme.accent',
@@ -159,7 +155,6 @@ const extensionField = ExtensionConfigField(
 
 Register a Flutter-side renderer for that key from your host app:
 
-<!-- code-excerpt "website/snippets/lib/dialog.dart (dialog-color-picker-renderer)" -->
 ```dart
 /// A custom field renderer for color values (Flutter-side).
 class ColorPickerRenderer implements ConfigFieldRenderer<ExtensionConfigField> {
@@ -204,7 +199,6 @@ If a renderer key is unknown when the dialog tries to resolve it, an inline plac
 
 Pass a `PluginKitDialogTheme` to override accents, surfaces, and badges:
 
-<!-- code-excerpt "website/snippets/lib/dialog.dart (dialog-show-dialog)" -->
 ```dart
 Future<void> openConfigDialog(
   BuildContext context,
@@ -285,8 +279,8 @@ BoolConfigField, GroupConfigField,
 ExtensionConfigField (rendererKey, args),
 ConfigField                          // sealed base
 ConfigFieldHandle                    // value/reset handle for renderers
+```
 
-<!-- code-excerpt "website/snippets/lib/config_fields.dart (ui-configurable-capability-number)" -->
 ```dart
 void registerWithNumberField(ScopedServiceRegistry registry) {
   const agent = Namespace('agent');

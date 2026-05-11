@@ -6,7 +6,6 @@ Test plugins, services, and event handlers without a full runtime.
 
 Three context factories in `types.dart`. All params optional; defaults are `ServiceRegistry.empty()`, fresh `EventBus()`, `{}`.
 
-<!-- code-excerpt "website/snippets/lib/custom_context.dart (plugin-context-stub)" -->
 ```dart
 PluginContext makeTestContext() {
   return PluginContext.stub(
@@ -18,7 +17,6 @@ PluginContext makeTestContext() {
 
 `ctx.registry` on a stub is the raw `ServiceRegistry`. Inject a fake using the named-arg registration form:
 
-<!-- code-excerpt "website/snippets/lib/testing.dart (testing-stub-inject-fake)" -->
 ```dart
 /// Demonstrates injecting a fake into [SessionPluginContext.stub]'s registry
 /// using the named-arg form of [ServiceRegistry.registerSingleton].
@@ -34,6 +32,12 @@ void demonstrateStubInjectFake() {
   final logger = ctx.registry.resolve<Logger>(const ServiceId('logger'));
   assert(logger is FakeLogger, 'expected FakeLogger');
 }
+```
+
+## Asserting cascade
+
+`emit` returns the post-cascade envelope. Inspect `event` for mutations, `stopped` for halts.
+
 ```dart
 /// Asserts cascade mutation and halt via [EventEnvelope].
 Future<void> testAssertCascade() async {
