@@ -155,12 +155,6 @@ class AnthropicService extends PluginService {
 // #enddocregion service-registry-settings-injection
 
 // #docregion service-registry-resolve-after
-/// A formatter that handles `.dart` files itself and defers anything else
-/// to the runner-up `Formatter` in the same slot.
-///
-/// Extending [StatefulPluginService] gets us a bound [context] for registry
-/// access plus framework-stamped [pluginId] and [serviceId], so the chain
-/// delegation reads naturally.
 class BetterDartFormatter extends StatefulPluginService implements Formatter {
   @override
   String format(String path, String input) {

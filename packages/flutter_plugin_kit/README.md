@@ -31,9 +31,7 @@ void exampleAppRoot() {
     MaterialApp(
       home: PluginRuntimeScope(
         plugins: [ChatPlugin(), AssistantPlugin()],
-        child: const PluginSessionScope(
-          child: ChatScreen(),
-        ),
+        child: const PluginSessionScope(child: ChatScreen()),
       ),
     ),
   );

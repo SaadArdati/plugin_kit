@@ -189,14 +189,18 @@ Future<void> demonstrateRequestPatterns(PluginContext context) async {
     return const SearchResults(results: ['result']);
   });
 
-  final response =
-      await context.bus.request<SearchQuery, SearchResults?>(const SearchQuery());
-  final maybe =
-      await context.bus.maybeRequest<SearchQuery, SearchResults?>(const SearchQuery());
-  final sync =
-      context.bus.requestSync<SearchQuery, SearchResults?>(const SearchQuery());
-  final maybeSync =
-      context.bus.maybeRequestSync<SearchQuery, SearchResults?>(const SearchQuery());
+  final response = await context.bus.request<SearchQuery, SearchResults?>(
+    const SearchQuery(),
+  );
+  final maybe = await context.bus.maybeRequest<SearchQuery, SearchResults?>(
+    const SearchQuery(),
+  );
+  final sync = context.bus.requestSync<SearchQuery, SearchResults?>(
+    const SearchQuery(),
+  );
+  final maybeSync = context.bus.maybeRequestSync<SearchQuery, SearchResults?>(
+    const SearchQuery(),
+  );
 
   print('$response $maybe $sync $maybeSync');
 }
@@ -322,16 +326,21 @@ context.globalBus.emit(...);             // session plugin: reach the global bus
 ```dart
 final settingsForJson = RuntimeSettings(
   plugins: {
-    const PluginId('chat'): const PluginConfig(enabled: true, config: {'api_key': 'xxx'}),
+    const PluginId('chat'): const PluginConfig(
+      enabled: true,
+      config: {'api_key': 'xxx'},
+    ),
     const PluginId('legacy'): const PluginConfig(enabled: false),
   },
   services: {
-    Pin('chat', ['agent', 'model']):
-        const ServiceSettings(config: {'temperature': 0.7}),
-    Pin.wildcard(['agent', 'tools']):
-        const ServiceSettings(priority: 200, config: {'verbose': true}),
-    Pin('legacy', ['search', 'engine']):
-        const ServiceSettings(enabled: false),
+    Pin('chat', ['agent', 'model']): const ServiceSettings(
+      config: {'temperature': 0.7},
+    ),
+    Pin.wildcard(['agent', 'tools']): const ServiceSettings(
+      priority: 200,
+      config: {'verbose': true},
+    ),
+    Pin('legacy', ['search', 'engine']): const ServiceSettings(enabled: false),
   },
 );
 

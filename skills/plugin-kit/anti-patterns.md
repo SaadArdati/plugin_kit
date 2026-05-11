@@ -89,7 +89,10 @@ class BadPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     // DO NOT do this: resolution order is undefined during register-all.
     final _ = registry.raw.maybeResolve<Logger>(const ServiceId('logger'));
-    registry.registerSingleton<Logger>(const ServiceId('my_logger'), () => Logger());
+    registry.registerSingleton<Logger>(
+      const ServiceId('my_logger'),
+      () => Logger(),
+    );
   }
 }
 ```
@@ -204,12 +207,6 @@ Reach for `context.bus.on(...)` only when the subscription's lifetime should NOT
 ## 7. Coupling to a plugin id for resolution
 
 ```dart
-/// A formatter that handles `.dart` files itself and defers anything else
-/// to the runner-up `Formatter` in the same slot.
-///
-/// Extending [StatefulPluginService] gets us a bound [context] for registry
-/// access plus framework-stamped [pluginId] and [serviceId], so the chain
-/// delegation reads naturally.
 class BetterDartFormatter extends StatefulPluginService implements Formatter {
   @override
   String format(String path, String input) {

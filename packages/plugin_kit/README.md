@@ -228,14 +228,12 @@ await session.dispose();
 /// performing a JSON round-trip.
 RuntimeSettings demonstrateSettingsWithPin() {
   final settings = RuntimeSettings(
-    plugins: {
-      const PluginId('formal'): const PluginConfig(enabled: false),
-    },
+    plugins: {const PluginId('formal'): const PluginConfig(enabled: false)},
     services: {
-      Pin('chat', ['agent', 'model']):
-          const ServiceSettings(config: {'temperature': 0.7}),
-      Pin.wildcard(['agent', 'tools']):
-          const ServiceSettings(priority: 200),
+      Pin('chat', ['agent', 'model']): const ServiceSettings(
+        config: {'temperature': 0.7},
+      ),
+      Pin.wildcard(['agent', 'tools']): const ServiceSettings(priority: 200),
     },
   );
 
@@ -257,7 +255,9 @@ void registerWithCapabilities(ScopedServiceRegistry registry) {
   registry.registerFactory<MyService>(
     const ServiceId('importer'),
     () => const MyService(),
-    capabilities: const {SupportsFileFormats({'jsx', 'dart'})},
+    capabilities: const {
+      SupportsFileFormats({'jsx', 'dart'}),
+    },
   );
 }
 

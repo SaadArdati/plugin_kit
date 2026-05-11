@@ -34,7 +34,10 @@ class MyRedactionPlugin extends SessionPlugin {
 
   @override
   void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<Redactor>(serviceId, () => _ComplianceRedactor());
+    registry.registerSingleton<Redactor>(
+      serviceId,
+      () => _ComplianceRedactor(),
+    );
   }
 
   @override
@@ -171,6 +174,7 @@ void demonstrateNamespaceComposition() {
 
   print('$modelId $scopeId ${settings.services.length}');
 }
+
 ```
 
 ## 5. Pre-commit interception
@@ -203,12 +207,6 @@ Use when: a service wants to delegate to the next-priority registration for the 
 `registry.resolveAfter<T>(pluginId: self, serviceId: slot)`: walks priority-sorted list, finds the registration owned by `self`, returns the next enabled wrapper. Never returns self. Throws `StateError` if no fallback.
 
 ```dart
-/// A formatter that handles `.dart` files itself and defers anything else
-/// to the runner-up `Formatter` in the same slot.
-///
-/// Extending [StatefulPluginService] gets us a bound [context] for registry
-/// access plus framework-stamped [pluginId] and [serviceId], so the chain
-/// delegation reads naturally.
 class BetterDartFormatter extends StatefulPluginService implements Formatter {
   @override
   String format(String path, String input) {
@@ -229,12 +227,6 @@ class BetterDartFormatter extends StatefulPluginService implements Formatter {
 There is no `maybeResolveAfter`. For genuinely optional fallback, wrap:
 
 ```dart
-/// A formatter that handles `.dart` files itself and defers anything else
-/// to the runner-up `Formatter` in the same slot.
-///
-/// Extending [StatefulPluginService] gets us a bound [context] for registry
-/// access plus framework-stamped [pluginId] and [serviceId], so the chain
-/// delegation reads naturally.
 class BetterDartFormatter extends StatefulPluginService implements Formatter {
   @override
   String format(String path, String input) {

@@ -8,10 +8,7 @@ Three context factories in `types.dart`. All params optional; defaults are `Serv
 
 ```dart
 PluginContext makeTestContext() {
-  return PluginContext.stub(
-    registry: ServiceRegistry.empty(),
-    bus: EventBus(),
-  );
+  return PluginContext.stub(registry: ServiceRegistry.empty(), bus: EventBus());
 }
 ```
 
