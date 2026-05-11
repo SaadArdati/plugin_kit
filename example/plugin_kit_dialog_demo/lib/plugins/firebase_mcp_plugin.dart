@@ -27,7 +27,7 @@ class FirebaseMcpPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Object>(
       firebase,
-      Object(),
+      () => Object(),
       capabilities: const {
         UiConfigurableCapability(
           label: 'Firebase MCP',

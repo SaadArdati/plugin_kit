@@ -188,7 +188,7 @@ void main() {
   // ===========================================================================
   group('on(): priority ordering', () {
     test(
-      'handlers execute in ascending priority order (lower first)',
+      'handlers execute in descending priority order (higher first)',
       () async {
         final order = <int>[];
 
@@ -203,7 +203,7 @@ void main() {
         }, priority: 20);
 
         await bus.emit<String>(event: 'test');
-        expect(order, [1, 2, 3]);
+        expect(order, [3, 2, 1]);
       },
     );
 
@@ -224,7 +224,7 @@ void main() {
       expect(order, ['first', 'second', 'third']);
     });
 
-    test('negative priorities run before zero', () async {
+    test('negative priorities run after zero (they are lower)', () async {
       final order = <String>[];
 
       bus.on<String>((event) {
@@ -235,7 +235,7 @@ void main() {
       }, priority: -10);
 
       await bus.emit<String>(event: 'test');
-      expect(order, ['negative', 'zero']);
+      expect(order, ['zero', 'negative']);
     });
   });
 
@@ -296,13 +296,14 @@ void main() {
     test('calling stop() halts propagation', () async {
       final order = <int>[];
 
+      // Higher priority runs first; if it stops, the lower one never runs.
       bus.on<String>((e) {
         order.add(1);
         e.stop('stopped-value');
-      }, priority: 0);
+      }, priority: 10);
       bus.on<String>((e) {
         order.add(2);
-      }, priority: 10);
+      }, priority: 0);
 
       final result = await bus.emit<String>(event: 'original');
       expect(order, [1]);
@@ -311,14 +312,16 @@ void main() {
     });
 
     test('event payload can be mutated by handlers', () async {
+      // Higher-priority handler mutates first; lower-priority handler
+      // observes the mutated value downstream.
       bus.on<EventA>((e) {
         e.event = EventA('${e.event.value}-modified');
-      }, priority: 0);
+      }, priority: 10);
 
       String? downstream;
       bus.on<EventA>((e) {
         downstream = e.event.value;
-      }, priority: 10);
+      }, priority: 0);
 
       await bus.emit<EventA>(event: EventA('original'));
       expect(downstream, 'original-modified');
@@ -386,7 +389,8 @@ void main() {
       }, priority: 0);
 
       await bus.emit<String>(event: 'test', identifier: 'agent1');
-      expect(order, ['general-p0', 'scoped-p5', 'general-p10']);
+      // Higher priority runs first across merged general + scoped lists.
+      expect(order, ['general-p10', 'scoped-p5', 'general-p0']);
     });
 
     test('emitting with identifier still runs general handlers', () async {
@@ -815,13 +819,14 @@ void main() {
     test('priority ordering works for request handlers', () async {
       bus.onRequest<String, String>((req) async {
         return 'low-priority';
-      }, priority: 10);
+      }, priority: 0);
       bus.onRequest<String, String>((req) async {
         return 'high-priority';
-      }, priority: 0);
+      }, priority: 10);
 
       final result = await bus.request<String, String>('query');
-      // Priority 0 runs first, returns non-null, so it wins
+      // Priority 10 runs first under descending dispatch, returns non-null,
+      // so it wins.
       expect(result, 'high-priority');
     });
 
@@ -848,17 +853,17 @@ void main() {
     });
 
     test(
-      'handler cascade: first non-null return wins, second handler not called',
+      'handler cascade: first non-null return wins, lower-priority not called',
       () async {
         var handler2Called = false;
         bus.onRequest<String, String>(
           (req) async => 'handler1-wins',
-          priority: 0,
+          priority: 10,
         );
         bus.onRequest<String, String>((req) async {
           handler2Called = true;
           return 'handler2';
-        }, priority: 10);
+        }, priority: 0);
 
         final result = await bus.request<String, String>('query');
         expect(result, 'handler1-wins');
@@ -930,9 +935,10 @@ void main() {
     });
 
     test('priority ordering works', () {
-      bus.onRequestSync<String, String>((req) => 'low', priority: 10);
-      bus.onRequestSync<String, String>((req) => 'high', priority: 0);
+      bus.onRequestSync<String, String>((req) => 'low', priority: 0);
+      bus.onRequestSync<String, String>((req) => 'high', priority: 10);
 
+      // Descending dispatch: priority 10 runs first, returns non-null, wins.
       expect(bus.requestSync<String, String>('query'), 'high');
     });
 
@@ -1081,7 +1087,8 @@ void main() {
       }, priority: 20);
 
       await bus.emit<String>(event: 'test', identifier: 'a');
-      expect(order, ['g-0', 's-5', 'g-10', 's-15', 'g-20']);
+      // Descending: higher priority runs first across both buckets.
+      expect(order, ['g-20', 's-15', 'g-10', 's-5', 'g-0']);
     });
 
     test('only general handlers run when no identifier provided', () async {
@@ -1204,15 +1211,16 @@ void main() {
     });
 
     test('handler exception during emit propagates to caller', () async {
+      // Higher-priority handler runs first and throws; lower-priority
+      // handler must NOT run because the exception propagates.
       bus.on<String>((event) {
         throw StateError('handler exploded');
-      }, priority: 0);
+      }, priority: 10);
 
-      // Second handler should NOT run because the exception propagates
       var secondHandlerCalled = false;
       bus.on<String>((event) {
         secondHandlerCalled = true;
-      }, priority: 10);
+      }, priority: 0);
 
       expect(() => bus.emit<String>(event: 'test'), throwsStateError);
       expect(secondHandlerCalled, isFalse);
@@ -1281,18 +1289,20 @@ void main() {
         );
 
         await bus.emit<String>(event: 'test', identifier: 'a');
-        // At equal priority, general list comes first due to <= in merge
+        // At equal priority, general list comes first due to >= in merge.
         expect(order, ['general', 'scoped']);
       },
     );
 
     test(
-      'returning non-null from first handler prevents all subsequent handlers',
+      'first handler in dispatch order stopping prevents all subsequent handlers',
       () async {
         var handler2Called = false;
         var handler3Called = false;
 
-        bus.on<String>((e) async => e.stop('intercepted'), priority: 0);
+        // Highest priority runs FIRST under descending dispatch. It stops
+        // the cascade; neither of the lower-priority handlers should run.
+        bus.on<String>((e) async => e.stop('intercepted'), priority: 20);
         bus.on<String>((e) async {
           handler2Called = true;
           e.stop('also-non-null');
@@ -1300,7 +1310,7 @@ void main() {
         }, priority: 10);
         bus.on<String>((e) async {
           handler3Called = true;
-        }, priority: 20);
+        }, priority: 0);
 
         final result = await bus.emit<String>(event: 'test');
         expect(result.event, 'intercepted');

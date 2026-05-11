@@ -1,0 +1,6 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Plugin Kit Demo / Code Editor" type="FlutterRunConfigurationType" factoryName="Flutter">
+    <option name="filePath" value="$PROJECT_DIR$/example/code_editor/lib/main.dart" />
+    <method v="2" />
+  </configuration>
+</component>

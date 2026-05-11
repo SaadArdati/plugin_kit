@@ -23,14 +23,15 @@ void main() {
   });
 
   group('event-bus-priority', () {
-    test('handler with priority 0 runs before priority 10', () async {
+    test('handler with priority 10 runs before priority 0', () async {
       final order = <int>[];
       context.bus.on<UserMessage>((env) => order.add(0), priority: 0);
       context.bus.on<UserMessage>((env) => order.add(10), priority: 10);
       await context.bus.emit<UserMessage>(
         event: const UserMessage(text: 'test'),
       );
-      expect(order, equals([0, 10]));
+      // Descending dispatch: higher priority runs first.
+      expect(order, equals([10, 0]));
     });
   });
 

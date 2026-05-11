@@ -81,7 +81,7 @@ void registerLinterWithCapabilities(ServiceRegistry registry) {
   registry.registerSingleton<CodeLinter>(
     pluginId: const PluginId('linter_suite'),
     serviceId: const ServiceId('linter'),
-    instance: CodeLinter(),
+    create: () => CodeLinter(),
     capabilities: {
       const SupportsLanguages(['dart', 'js']),
       const PartOfASuiteOfTools('super_suite'),
@@ -107,7 +107,7 @@ void lookupCapability(ServiceRegistry registry) {
 void registerCapabilityInPlugin(ScopedServiceRegistry registry) {
   registry.registerSingleton<MyService>(
     const ServiceId('my_service'),
-    const MyService(),
+    () => const MyService(),
     capabilities: const {ConfigurableCapability()},
   );
 }

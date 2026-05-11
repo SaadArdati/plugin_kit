@@ -9,7 +9,7 @@ The Concepts section is the mental-model side of Plugin Kit. Each page covers on
 
 ## How the pieces fit
 
-A **plugin** has an identity and a lifecycle. The runtime decides which plugins are enabled, calls their `register` hook to collect services into the registry, then calls `attach` to start them. **Plugin services** are the stateful classes a plugin owns; the registry stamps identity onto them and injects settings when they resolve.
+A **plugin** has an identity and a lifecycle. The runtime decides which plugins are enabled, calls their `register` hook to collect services into the registry, then calls `attach` to start them. **Plugin services** are the classes a plugin owns; the registry stamps identity onto them and injects settings when they resolve.
 
 The **service registry** is where competition happens. Two plugins can register for the same slot; the higher priority wins, and the loser stays reachable as a fallback. **Capabilities** are metadata that travel with each registration so host code can inspect what a slot supports without building anything.
 

@@ -26,7 +26,7 @@ class WelcomeDeskPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<EvilGreetingService>(
       const ServiceId('greeting_service'),
-      EvilGreetingService(),
+      () => EvilGreetingService(),
     );
   }
 }

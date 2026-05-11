@@ -16,7 +16,7 @@ class ThreadSummarizerPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Object>(
       CorePlugin.systemMessage,
-      Object(),
+      () => Object(),
       priority: 90,
       capabilities: const {
         UiConfigurableCapability(

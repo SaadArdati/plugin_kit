@@ -92,7 +92,7 @@ class MyPlugin extends SessionPlugin {
 
   @override
   void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<MyService>(const ServiceId('my'), MyService());
+    registry.registerSingleton<MyService>(const ServiceId('my'), () => MyService());
   }
 
   @override
@@ -128,7 +128,7 @@ Scope:
 - `GlobalPlugin<G extends GlobalPluginContext>`: one instance per runtime; lifetime equals runtime.
 - `SessionPlugin<S extends SessionPluginContext>`: one instance per `pluginId` shared across all sessions; lifetime equals runtime. `attach(S context)` runs once per session attach. Service instances inside are per-session because `register()` runs per-session and inline construction evaluates fresh.
 
-`super.attach()` / `super.detach()` are no-ops on both `Plugin` and `StatefulPluginService`. Don't call them. `super.injectSettings(settings, hash: hash)` IS required when overriding settings injection on `PluginService`.
+User hooks never call super. `attach`, `detach`, and `onSettingsInjected` are framework-orchestrated; `injectSettings` itself is `@nonVirtual`. Override `onSettingsInjected()` to react.
 
 Default-context generics are inferred. `extends SessionPlugin` infers `<SessionPluginContext>`; `extends GlobalPlugin` infers `<GlobalPluginContext>`; `PluginRuntime` and `PluginRuntime` default to `<GlobalPluginContext, SessionPluginContext>`; `PluginSession` defaults to `<SessionPluginContext>`. Spell the type parameters out only when using a custom context subclass.
 
@@ -157,7 +157,7 @@ Registration from `Plugin.register`:
 void registerCapabilityInPlugin(ScopedServiceRegistry registry) {
   registry.registerSingleton<MyService>(
     const ServiceId('my_service'),
-    const MyService(),
+    () => const MyService(),
     capabilities: const {ConfigurableCapability()},
   );
 }
@@ -170,13 +170,13 @@ bool checkConfigurable(ServiceRegistry registry) {
 }
 ```
 
-`ServiceRegistry.defaultPriority` is 50. Conventional priorities: 25 soft fallback, 50 default, 100 overrides default, 200 authoritative.
+`ServiceRegistry.defaultPriority` is `Priority.normal` (500). Higher wins; same polarity in `EventBus`. Named stops: `lowest`/`low`/`normal`/`elevated`/`high`/`system` = 0/100/500/1000/5000/10000.
 
-Wrapper kinds:
+Wrapper kinds (all take `Factory<T>`):
 ```
-Singleton:      constructor runs at registration call (the inline expression). One instance per register() call.
-LazySingleton:  constructor runs once on first resolve, then cached. Takes Factory<T>. Use for self-referential services that capture the registry.
-Factory:        constructor runs on every resolve. Takes Factory<T>. Cannot register StatefulPluginService here; lifecycle requires a tracked instance.
+Singleton:      runs ONCE at registration. Same instance on every resolve.
+LazySingleton:  runs once on first resolve, cached after. Use for self-referential services that capture the registry.
+Factory:        runs on every resolve. Rejects StatefulPluginService (lifecycle requires a tracked instance).
 ```
 
 Resolution from a context:
@@ -219,7 +219,7 @@ Capability tags attached at registration. Discover features without instantiatin
 class ConfigurableCapability extends Capability { const ConfigurableCapability(); }
 
 // In Plugin.register:
-registry.registerSingleton<MyService>(serviceId, MyService(),
+registry.registerSingleton<MyService>(serviceId, () => MyService(),
     capabilities: const {ConfigurableCapability()});
 
 // At resolve time:
@@ -236,8 +236,9 @@ class ModelRouter extends PluginService {
   String get defaultModel => config.getString('default_model') ?? 'gpt-4';
 
   @override
-  void injectSettings(Map<String, dynamic> settings, {String? hash}) {
-    super.injectSettings(settings, hash: hash);
+  void onSettingsInjected() {
+    // Framework has already updated `settings`, `settingsHash`, `config`.
+    // React here: re-derive cached values, reconnect upstreams, etc.
   }
 }
 
@@ -268,8 +269,8 @@ Events:
 ```dart
 on<MyEvent>(
   (envelope) => /* ... */,
-  priority: 0,           // higher = later in ascending cascade
-  identifier: null,      // null matches all; 'foo' scopes
+  priority: Priority.normal, // higher runs first; default is Priority.normal (500)
+  identifier: null,          // null matches all; 'foo' scopes
 );
 
 final envelope = await emit(MyEvent(...), identifier: null);

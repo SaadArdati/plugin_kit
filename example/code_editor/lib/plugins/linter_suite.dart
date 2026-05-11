@@ -99,7 +99,7 @@ class LinterSuitePlugin extends SessionPlugin {
     // TodoLinter: no config, register as eager singleton.
     registry.registerSingleton<TodoLinter>(
       const ServiceId('todo_linter'),
-      const TodoLinter(),
+      () => const TodoLinter(),
     );
 
     // LineLengthLinter: reads config, register as lazy singleton.
@@ -112,7 +112,7 @@ class LinterSuitePlugin extends SessionPlugin {
     // it, so the subscription is reconciled correctly on settings changes.
     registry.registerSingleton<_LinterSaveHook>(
       const ServiceId('save_hook'),
-      _LinterSaveHook(),
+      () => _LinterSaveHook(),
     );
   }
 }

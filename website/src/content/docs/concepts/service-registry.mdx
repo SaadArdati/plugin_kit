@@ -60,7 +60,7 @@ Resolve from a `PluginContext`, a `PluginSession`, or the registry directly. The
 
 ## Priority
 
-If multiple plugins register the same `serviceId`, the registry sorts them in descending priority order. Higher number wins. The default is `50`.
+If multiple plugins register the same `serviceId`, the registry sorts them in descending priority order. Higher number wins. The default is `Priority.normal` (500).
 
 <Code code={extractRegion(serviceRegistrySnippets, 'service-registry-priority-competing')} lang="dart" />
 
@@ -144,15 +144,6 @@ You can define your own capability types. The system does not care about the set
 
 Capabilities live on the slot registration, not inside the service instance, so you can inspect them without constructing anything.
 [Capabilities](/concepts/capabilities/) goes deeper.
-
-## One easy mistake
-
-Service priorities and event priorities run in opposite directions.
-
-- Registry: higher priority wins ("I win!")
-- Event bus: lower priority runs first ("I go first!")
-
-Remember that, and the rest of the system makes much more sense.
 
 ## Related reading
 

@@ -70,7 +70,7 @@ class ManifestPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<FormatterStub>(
       _namespace('formatter'),
-      FormatterStub(),
+      () => FormatterStub(),
       priority: 100,
       capabilities: {
         const FormatterCapability(['sql', 'dart', 'markdown']),
@@ -79,7 +79,7 @@ class ManifestPlugin extends SessionPlugin {
 
     registry.registerSingleton<LinterStub>(
       _namespace('linter'),
-      LinterStub(),
+      () => LinterStub(),
       priority: 100,
       capabilities: {
         const LinterCapability(['no_todos', 'max_line_length']),
@@ -88,7 +88,7 @@ class ManifestPlugin extends SessionPlugin {
 
     registry.registerSingleton<DebugAdapterStub>(
       _namespace('debug_adapter'),
-      DebugAdapterStub(),
+      () => DebugAdapterStub(),
       priority: 100,
       capabilities: {
         const DebugCapability(['dart_vm', 'flutter']),

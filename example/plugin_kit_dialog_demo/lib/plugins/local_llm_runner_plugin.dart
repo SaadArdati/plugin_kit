@@ -19,7 +19,7 @@ class LocalLlmRunnerPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Object>(
       CorePlugin.model,
-      Object(),
+      () => Object(),
       priority: 50,
       capabilities: const {
         UiConfigurableCapability(

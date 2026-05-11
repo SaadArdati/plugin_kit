@@ -114,17 +114,17 @@ Two plugins, one slot, one runtime, one winner. Now the parts.
 4. **Register competing services.**
 
    Both plugins register a `Greeter` for the same slot, identified by `const ServiceId('greeter')`. `FormalPlugin`
-   registers with `priority: 100`. `CasualPlugin` takes the default. When the host resolves
+   registers at `Priority.elevated`. `CasualPlugin` takes the default (`Priority.normal`). When the host resolves
    `Greeter`, it gets the higher priority.
 
    The `ScopedServiceRegistry` already knows which plugin is doing the registering, so you only supply the
-   `ServiceId` handle and the instance.
+   `ServiceId` handle and a factory that constructs the instance.
 
    ```dart
    registry.registerSingleton<Greeter>(
      const ServiceId('greeter'),
-     FormalGreeter(),
-     priority: 100,
+     () => FormalGreeter(),
+     priority: Priority.elevated,
    );
    ```
 
@@ -173,7 +173,7 @@ Two plugins, one slot, one runtime, one winner. Now the parts.
 The library only earns its weight when things change. Three quick experiments to convince yourself that something real is happening:
 
 - **Drop `FormalPlugin`** from the runtime's plugin list and re-run. Output flips to `Hello, world.` The host code did not change.
-- **Lower `FormalPlugin`'s priority below the default** (try `priority: 0`) and re-run. Output flips back to `Hello, world.` Same plugins, different winner.
+- **Lower `FormalPlugin`'s priority below the default** (try `priority: Priority.low` or `Priority.lowest`) and re-run. Output flips back to `Hello, world.` Same plugins, different winner.
 - **Soft-disable `FormalPlugin` via config.** Pass `RuntimeSettings` to the runtime and mark the formal plugin disabled.
  Both plugins still ship, both classes still exist, but the disabled one never wins:
 

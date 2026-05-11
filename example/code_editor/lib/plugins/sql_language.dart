@@ -224,25 +224,25 @@ class SqlLanguagePlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<SqlAnalyzer>(
       const ServiceId('sql_analyzer'),
-      SqlAnalyzer(),
+      () => SqlAnalyzer(),
     );
 
     registry.registerSingleton<SqlFormatter>(
       const ServiceId('sql_formatter'),
-      SqlFormatter(),
+      () => SqlFormatter(),
     );
 
     registry.registerSingleton<SqlKeywordLinter>(
       const ServiceId('sql_keyword_linter'),
-      const SqlKeywordLinter(),
+      () => const SqlKeywordLinter(),
     );
     registry.registerSingleton<_SqlSaveHook>(
       const ServiceId('save_hook'),
-      _SqlSaveHook(),
+      () => _SqlSaveHook(),
     );
     registry.registerSingleton<_SqlCompletionHandler>(
       const ServiceId('completion_handler'),
-      _SqlCompletionHandler(),
+      () => _SqlCompletionHandler(),
     );
   }
 }

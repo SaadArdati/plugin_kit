@@ -14,7 +14,7 @@ void main() {
       registry.registerSingleton<String>(
         pluginId: const PluginId('test'),
         serviceId: const ServiceId('greeting'),
-        instance: 'hello',
+        create: () => 'hello',
       );
       final context = PluginContext(registry: registry, bus: EventBus());
       expect(context.resolve<String>(const ServiceId('greeting')), 'hello');

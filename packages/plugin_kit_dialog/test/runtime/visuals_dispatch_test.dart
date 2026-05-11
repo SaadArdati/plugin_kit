@@ -26,7 +26,7 @@ class _SelfDecorating extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<PluginKitVisual>(
       PluginKitVisualsPlugin.pluginVisualNamespace(pluginId.value),
-      const PluginKitVisual(
+      () => const PluginKitVisual(
         label: 'Self-Decorating Plugin',
         icon: Icon(Icons.palette),
         color: Color(0xFFAA00AA),
@@ -34,7 +34,7 @@ class _SelfDecorating extends GlobalPlugin {
     );
     registry.registerSingleton<PluginKitVisual>(
       PluginKitVisualsPlugin.serviceVisualNamespace('tool.editor'),
-      const PluginKitVisual(icon: Icon(Icons.edit), color: Color(0xFF00FF00)),
+      () => const PluginKitVisual(icon: Icon(Icons.edit), color: Color(0xFF00FF00)),
     );
   }
 }
@@ -426,7 +426,7 @@ class _BuilderHost extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<PluginChipsBuilder>(
       PluginsTabPlugin.chipsBuilderId,
-      PluginChipsBuilder(),
+      () => PluginChipsBuilder(),
     );
   }
 }
@@ -445,8 +445,8 @@ class _OverridingChipsBuilderPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<PluginChipsBuilder>(
       PluginsTabPlugin.chipsBuilderId,
-      const _OverridingChipsBuilder(),
-      priority: 200,
+      () => const _OverridingChipsBuilder(),
+      priority: Priority.elevated,
     );
   }
 }
@@ -461,7 +461,7 @@ class _RegistersAgentModel extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Object>(
       const Namespace('agent')('model'),
-      Object(),
+      () => Object(),
     );
   }
 }

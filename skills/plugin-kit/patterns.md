@@ -10,7 +10,7 @@ session-bound state reacting to events -> StatefulPluginService with on<T> in at
 additive event-driven slot, all run -> direct subscription at staggered priority
 exactly-one-wins event-driven slot -> dispatcher pattern (#1)
 service that walks the registry chain -> lazy singleton + closure-captured registry (#2)
-per-session service state -> registerSingleton(id, T()) inline; externalize for durability (#3)
+per-session service state -> registerSingleton(id, () => T()); externalize for durability (#3)
 const-context namespace id -> ServiceId.namespaced(ns, 'id') (#4)
 mutate or veto before commit -> mutable draft event + bus.emit returning envelope (#5)
 higher-priority service with lower as fallback -> resolveAfter (#6)
@@ -34,7 +34,7 @@ class MyRedactionPlugin extends SessionPlugin {
 
   @override
   void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<Redactor>(serviceId, _ComplianceRedactor());
+    registry.registerSingleton<Redactor>(serviceId, () => _ComplianceRedactor());
   }
 
   @override
@@ -56,7 +56,7 @@ class _ComplianceRedactor implements Redactor {
 }
 ```
 
-A second plugin can `registerSingleton<Redactor>(redactorId, MyStricterRedactor(), priority: 100)` and win automatically. Disable just the redactor via `RuntimeSettings.services` keyed `const PluginId('telemetry').service(const ServiceId('telemetry.redactor'))`.
+A second plugin can `registerSingleton<Redactor>(redactorId, () => MyStricterRedactor(), priority: Priority.elevated)` and win automatically. Disable just the redactor via `RuntimeSettings.services` keyed `const PluginId('telemetry').service(const ServiceId('telemetry.redactor'))`.
 
 The dispatcher subscription is one handler. It does not multiply with competing registrations. The registry decides the winner per resolve.
 
@@ -80,11 +80,8 @@ class EnterpriseRouterPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerLazySingleton<ModelRouter>(
       const ServiceId('model_router'),
-      () => EnterpriseRouter(
-        ownerId: id,
-        registryThunk: () => registry.raw,
-      ),
-      priority: 100,
+      () => EnterpriseRouter(ownerId: id, registryThunk: () => registry.raw),
+      priority: Priority.elevated,
     );
   }
 }
@@ -99,7 +96,7 @@ Three details:
 
 Contract: each session has its own service instance. State never leaks across sessions.
 
-Mechanism: `register()` runs once per session for `SessionPlugin` (once per runtime for `GlobalPlugin`). Inline construction means each session evaluates the constructor expression fresh.
+Mechanism: `register()` runs once per session for `SessionPlugin` (once per runtime for `GlobalPlugin`). `registerSingleton<T>(id, Factory<T> create)` runs `create()` once at registration. An inline factory `() => T()` evaluates `T()` fresh per `register()` call, so each session gets its own instance.
 
 ```dart
 class ChatThread extends StatefulPluginService<SessionPluginContext> {
@@ -140,7 +137,7 @@ Future<void> createSessionWithFactory(PluginRuntime runtime) async {
 }
 ```
 
-Sharing across sessions: `registerSingleton(id, _sharedField)` shares one instance across every session that re-runs `register()`. For shared state, prefer `GlobalPlugin`. Sharing from a `SessionPlugin` via captured field is a code smell.
+For shared state across sessions, prefer `GlobalPlugin`. Sharing from a `SessionPlugin` via `() => _sharedField` works (closure capture is visible at the call site) but `GlobalPlugin`'s one-instance-per-runtime shape says it directly.
 
 ## 4. Const vs runtime ServiceId composition
 

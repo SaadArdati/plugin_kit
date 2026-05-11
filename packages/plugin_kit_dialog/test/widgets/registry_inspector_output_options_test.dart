@@ -280,7 +280,7 @@ class _StubPlugin extends GlobalPlugin {
   @override
   void register(ScopedServiceRegistry registry) {
     for (final cid in _serviceIds) {
-      registry.registerSingleton<Object>(ServiceId(cid), Object());
+      registry.registerSingleton<Object>(ServiceId(cid), () => Object());
     }
   }
 }
@@ -301,7 +301,7 @@ class _PriorityStubPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Object>(
       ServiceId(serviceId),
-      Object(),
+      () => Object(),
       priority: priority,
     );
   }

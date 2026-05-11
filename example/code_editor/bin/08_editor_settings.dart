@@ -51,7 +51,7 @@ class DiagnosticCollectorPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<DiagnosticCollector>(
       const ServiceId('diagnostic_collector'),
-      DiagnosticCollector(),
+      () => DiagnosticCollector(),
     );
   }
 }

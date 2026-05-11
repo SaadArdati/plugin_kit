@@ -25,7 +25,7 @@ class ModelRouterPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Object>(
       CorePlugin.model,
-      Object(),
+      () => Object(),
       priority: 80,
       capabilities: const {
         UiConfigurableCapability(
@@ -53,7 +53,7 @@ class ModelRouterPlugin extends GlobalPlugin {
 
     registry.registerSingleton<Object>(
       WebSearchExplorerPlugin.provider,
-      Object(),
+      () => Object(),
       priority: 60,
       capabilities: const {
         UiConfigurableCapability(
@@ -75,7 +75,7 @@ class ModelRouterPlugin extends GlobalPlugin {
 
     registry.registerSingleton<Object>(
       strategy,
-      Object(),
+      () => Object(),
       capabilities: const {
         UiConfigurableCapability(
           label: 'Routing Strategy',

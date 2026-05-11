@@ -17,7 +17,7 @@ class AnthropicPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<VisaOffice>(
       const ServiceId('visa_office'),
-      AnthropicVisaOffice(),
+      () => AnthropicVisaOffice(),
       priority: 100,
     );
   }
@@ -31,7 +31,7 @@ class OpenAIPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<VisaOffice>(
       const ServiceId('visa_office'),
-      OpenAIVisaOffice(),
+      () => OpenAIVisaOffice(),
       priority: 80,
     );
   }
@@ -45,7 +45,7 @@ class OllamaPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<VisaOffice>(
       const ServiceId('visa_office'),
-      OllamaVisaOffice(),
+      () => OllamaVisaOffice(),
       priority: 50,
     );
   }

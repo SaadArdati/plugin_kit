@@ -34,19 +34,14 @@ There is one subscription API: `on<T>()`. Every handler you register receives an
 
 A handler can read the payload, mutate it for downstream handlers, or call `e.stop(...)` to end the cascade. [Event Patterns](/concepts/events/) covers the practical shapes (observers, mutators, the pre-commit interception pattern) from inside plugin code; this page sticks to the model.
 
-## Priority, and why it goes the way it does
+## Priority
 
-Event handlers run in ascending priority order. Lower number runs first.
+Event handlers run in descending priority order. Higher number runs first.
 
 <Code code={extractRegion(eventBusSnippets, 'event-bus-priority')} lang="dart" />
 
-The first handler can mutate the payload so later handlers see the new value, or call `e.stop(...)` to halt 
-the cascade and pin the final result. The second handler only runs if the first one did not stop.
-
-<Aside type="note" title="The two priorities point opposite directions">
-Registry priorities: higher wins. Event priorities: lower runs first. The registry is
-a competition; the bus is a pipeline. The rest of the system follows from that pair.
-</Aside>
+The highest-priority handler can mutate the payload so later handlers see the new value, or call `e.stop(...)` to halt
+the cascade and pin the final result. Lower-priority handlers only run if no earlier one stopped. Default is `Priority.normal`; same convention and same default as the [service registry](/concepts/service-registry/#priority).
 
 ## Globally observing all events
 
@@ -67,7 +62,7 @@ The same bus also does typed request/response.
 The dispatch model:
 
 1. Merge general handlers with handlers scoped to the request's identifier (if any).
-2. Try them in ascending priority order.
+2. Try them in descending priority order (highest first).
 3. The first non-null response wins.
 
 That is why `Response` types are usually nullable. `return null` means "I concede, let the next handler try." 

@@ -27,7 +27,7 @@ class DebugOverridesPlugin extends GlobalPlugin {
     registry.withPriority(200)
       ..registerSingleton<Object>(
         CorePlugin.model,
-        Object(),
+        () => Object(),
         capabilities: const {
           UiConfigurableCapability(
             label: 'Model & Provider (debug)',
@@ -48,7 +48,7 @@ class DebugOverridesPlugin extends GlobalPlugin {
       )
       ..registerSingleton<Object>(
         ChatPlugin.temperature,
-        Object(),
+        () => Object(),
         capabilities: const {
           UiConfigurableCapability(
             label: 'Temperature (debug pin)',
@@ -68,7 +68,7 @@ class DebugOverridesPlugin extends GlobalPlugin {
       )
       ..registerSingleton<Object>(
         CorePlugin.systemMessage,
-        Object(),
+        () => Object(),
         capabilities: const {
           UiConfigurableCapability(
             label: 'System Message (debug)',
@@ -85,7 +85,7 @@ class DebugOverridesPlugin extends GlobalPlugin {
 
     registry.registerSingleton<Object>(
       debug,
-      Object(),
+      () => Object(),
       capabilities: const {
         UiConfigurableCapability(
           label: 'Retry Policy (debug)',

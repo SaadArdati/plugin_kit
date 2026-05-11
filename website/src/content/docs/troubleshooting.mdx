@@ -112,17 +112,9 @@ See the "Stateful services cannot be factories" Aside in [Service Registry](/con
 
 ### My service registers but won't resolve, or resolves to the wrong one
 
-**Cause.** Service slots are competitive. Multiple plugins can register the same `serviceId`, and the registry sorts them in descending priority order. Highest number wins. The default priority is `50`. If another plugin registered the same slot at, say, `100`, your `50` is correct but loses.
+**Cause.** Higher priority wins. Default is `Priority.normal` (500); another plugin at `Priority.elevated` will beat you.
 
-**Fix.** Decide what you want.
-
-- If you intended to win: register with a priority above any competitor (`priority: 100` or higher).
-- If you intended to be a fallback: register with a priority below any competitor (`priority: 10`).
-- If you want to know who is winning: call `registry.getRegistrations(serviceId)` and inspect priorities. The [Service Registry inspector](/reference/dialog-api/) tab in the dialog shows this live.
-
-Do not silently bump priority numbers in unrelated plugins. The library treats priority as a public, ordered competition; a plugin that quietly ratchets to `1000` to win a slot will surprise the next person who reads it. Pick a number that reads.
-
-See [Service Registry](/concepts/service-registry/) for the full priority model, and the priority direction question in the [FAQ](/faq/#why-do-registry-priority-and-event-priority-go-in-opposite-directions).
+**Fix.** Register at `Priority.elevated` (or `Priority.above(other)`) to win, `Priority.low` to be a fallback. `registry.getRegistrations(serviceId)` lists everything competing for the slot; the dialog's [Service Registry inspector](/reference/dialog-api/) shows it live.
 
 ## Event bus and request/response
 

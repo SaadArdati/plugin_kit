@@ -59,7 +59,7 @@ class MyRedactionPlugin extends SessionPlugin {
 
   @override
   void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<Redactor>(serviceId, _ComplianceRedactor());
+    registry.registerSingleton<Redactor>(serviceId, () => _ComplianceRedactor());
   }
 
   @override
@@ -116,7 +116,7 @@ class BadPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     // DO NOT do this: resolution order is undefined during register-all.
     final _ = registry.raw.maybeResolve<Logger>(const ServiceId('logger'));
-    registry.registerSingleton<Logger>(const ServiceId('my_logger'), Logger());
+    registry.registerSingleton<Logger>(const ServiceId('my_logger'), () => Logger());
   }
 }
 // #enddocregion anti-pattern-resolve-in-register-wrong
@@ -202,7 +202,7 @@ class SessionPlugin1 extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Logger>(
       const ServiceId('logger'),
-      _logger, // every session resolves the same instance
+      () => _logger, // every session resolves the same instance
     );
   }
 }
@@ -218,7 +218,7 @@ class SessionPlugin2 extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Logger>(
       const ServiceId('logger'),
-      Logger(), // fresh per session
+      () => Logger(), // fresh per session
     );
   }
 }

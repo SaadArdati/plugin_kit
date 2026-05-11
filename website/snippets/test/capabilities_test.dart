@@ -65,7 +65,7 @@ void main() {
       registry.registerSingleton<CodeLinter>(
         pluginId: const PluginId('linter_suite'),
         serviceId: const ServiceId('tooling.formatter'),
-        instance: CodeLinter(),
+        create: () => CodeLinter(),
       );
       final ctx = PluginContext.stub(registry: registry);
       expect(() => resolveToolingWrapper(ctx), returnsNormally);
@@ -78,7 +78,7 @@ void main() {
       registry.registerSingleton<CodeLinter>(
         pluginId: const PluginId('linter_suite'),
         serviceId: const ServiceId('formatter'),
-        instance: CodeLinter(),
+        create: () => CodeLinter(),
       );
       final ctx = PluginContext.stub(registry: registry);
       final result = getFormatterCapability(ctx);
@@ -92,7 +92,7 @@ void main() {
       registry.registerSingleton<CodeLinter>(
         pluginId: const PluginId('linter_suite'),
         serviceId: const ServiceId('formatter'),
-        instance: CodeLinter(),
+        create: () => CodeLinter(),
       );
       final ctx = PluginContext.stub(registry: registry);
       expect(() => warnIfSlow(ctx), returnsNormally);

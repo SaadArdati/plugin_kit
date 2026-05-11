@@ -59,11 +59,11 @@ class DartLanguagePlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<DartAnalyzer>(
       const ServiceId('dart_analyzer'),
-      DartAnalyzer(),
+      () => DartAnalyzer(),
     );
     registry.registerSingleton<_DartCompletionHandler>(
       const ServiceId('completion_handler'),
-      _DartCompletionHandler(),
+      () => _DartCompletionHandler(),
     );
   }
 }

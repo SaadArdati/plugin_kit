@@ -18,7 +18,7 @@ class ContextInjectorPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Object>(
       contextInjector,
-      Object(),
+      () => Object(),
       capabilities: const {
         UiConfigurableCapability(
           label: 'Context Injector',

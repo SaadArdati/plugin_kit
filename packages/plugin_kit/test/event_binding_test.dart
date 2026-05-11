@@ -40,12 +40,12 @@ void main() {
     );
 
     test(
-      'forwards priority to EventBus.on so handlers run in ascending order',
+      'forwards priority to EventBus.on so handlers run in descending order',
       () async {
         // Regression: bindings created with a non-default priority must
         // actually pass that priority through to the underlying
         // EventBus.on call. A binding constructed with priority=10 that
-        // forgets to forward it would land at priority 0, breaking any
+        // forgets to forward it would land at the default, breaking any
         // ordering the caller relied on.
         final runtime = PluginRuntime(plugins: [_ListenerTestPlugin()])
           ..init(settings: RuntimeSettings.empty());
@@ -63,15 +63,15 @@ void main() {
           priority: 10,
         );
 
-        // Attach high-priority first to demonstrate that physical order
-        // doesn't determine dispatch order — priority does.
-        addTearDown((await Future.value(high.attachTo(session))).cancel);
+        // Attach low-priority first to demonstrate that physical attach
+        // order doesn't determine dispatch order; priority does.
         addTearDown((await Future.value(low.attachTo(session))).cancel);
+        addTearDown((await Future.value(high.attachTo(session))).cancel);
 
         await session.emit(const _Tick(1));
-        // EventBus runs handlers in ascending priority order, so the
-        // priority-0 handler fires before the priority-10 handler.
-        expect(order, equals(['low', 'high']));
+        // EventBus runs handlers in descending priority order, so the
+        // priority-10 handler fires before the priority-0 handler.
+        expect(order, equals(['high', 'low']));
       },
     );
 

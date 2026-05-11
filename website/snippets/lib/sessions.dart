@@ -38,7 +38,7 @@ class ThemePlugin extends GlobalPlugin<GlobalPluginContext> {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<ThemeService>(
       const ServiceId('theme_service'),
-      ThemeService(),
+      () => ThemeService(),
     );
   }
 }

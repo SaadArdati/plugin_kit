@@ -24,7 +24,7 @@ class AutoRetryPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Object>(
       linear,
-      Object(),
+      () => Object(),
       capabilities: const {
         UiConfigurableCapability(
           label: 'Retry Policy (linear)',

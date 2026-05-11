@@ -68,7 +68,7 @@ class ConfiguredProviderPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<ConfigurableVisaOffice>(
       const ServiceId('visa_office'),
-      ConfigurableVisaOffice(),
+      () => ConfigurableVisaOffice(),
       priority: 100,
     );
   }

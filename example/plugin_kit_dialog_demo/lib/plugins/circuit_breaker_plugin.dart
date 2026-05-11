@@ -25,7 +25,7 @@ class CircuitBreakerPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Object>(
       circuitBreaker,
-      Object(),
+      () => Object(),
       capabilities: const {
         UiConfigurableCapability(
           label: 'Retry Policy (circuit breaker)',

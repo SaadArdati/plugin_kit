@@ -80,7 +80,7 @@ class AssignmentDeskPlugin extends SessionPlugin {
     // Three planners competing for the same slot; priority picks the winner.
     registry.registerSingleton<EvilPlanner>(
       const ServiceId('evil_planner'),
-      NefariousPlanner(),
+      () => NefariousPlanner(),
       priority: 100,
     );
     // Two more plugins register for the same slot. In a real system each
@@ -90,13 +90,13 @@ class AssignmentDeskPlugin extends SessionPlugin {
     registry.raw.registerSingleton<EvilPlanner>(
       pluginId: const PluginId('accounting'),
       serviceId: const ServiceId('evil_planner'),
-      instance: AccountingPlanner(),
+      create: () => AccountingPlanner(),
       priority: 50,
     );
     registry.raw.registerSingleton<EvilPlanner>(
       pluginId: const PluginId('intern_program'),
       serviceId: const ServiceId('evil_planner'),
-      instance: InternPlanner(),
+      create: () => InternPlanner(),
       priority: 10,
     );
 
@@ -123,12 +123,12 @@ class AssignmentDeskPlugin extends SessionPlugin {
     // Namespace: same serviceId under different namespaces.
     registry.registerSingleton<String>(
       const Namespace('trap_department')('motto'),
-      "If at first you don't succeed, add more lasers.",
+      () => "If at first you don't succeed, add more lasers.",
       priority: 50,
     );
     registry.registerSingleton<String>(
       const Namespace('cafeteria')('motto'),
-      "You don't want to know what's in the mystery meat.",
+      () => "You don't want to know what's in the mystery meat.",
       priority: 50,
     );
   }

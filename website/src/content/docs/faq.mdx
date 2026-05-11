@@ -9,10 +9,6 @@ This page answers the recurring "why does it work this way" questions. Symptom-d
 
 ## Design and architecture
 
-### Why do registry priority and event priority go in opposite directions?
-
-Registry priority is a competition: the highest number wins resolution. Event priority is a pipeline: the lowest number runs first, then the next, then the next. The two would feel unnatural unified because they are different shapes. The registry is "who is best for this slot." The bus is "what order do we cascade through." The library makes both directions explicit rather than picking one and forcing the other to read backwards. See [Service Registry](/concepts/service-registry/) and [Event Bus](/concepts/event-bus/) for the full model.
-
 ### Should I use Plugin Kit, Provider, Riverpod, Bloc, or GetIt?
 
 There's overlap. Plugin Kit's primary job is runtime-replaceable behavior at the plugin boundary: priority-resolved services, typed event coordination, and a settings model that survives session lifetimes. The registry doubles as DI; the bus doubles as a state-update channel. Provider, Riverpod, Bloc, and GetIt cover the same DI/state-update space at the app layer with mature widget integrations.

@@ -1,14 +1,13 @@
 import 'package:plugin_kit/plugin_kit.dart';
 import 'package:test/test.dart';
 
-// PluginService subclass that records every injectSettings call so tests
+// PluginService subclass that records every settings injection so tests
 // can assert which settings landed on the resolved instance.
 class _ConfigCaptureService extends PluginService {
   Map<String, dynamic>? capturedSettings;
 
   @override
-  void injectSettings(Map<String, dynamic> settings, {String? hash}) {
-    super.injectSettings(settings, hash: hash);
+  void onSettingsInjected() {
     capturedSettings = settings;
   }
 }
@@ -30,7 +29,7 @@ class _ConfigPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<_ConfigCaptureService>(
       _agentModel,
-      _ConfigCaptureService(),
+      () => _ConfigCaptureService(),
       priority: priority,
     );
   }
@@ -255,7 +254,7 @@ void main() {
           .scopedFor(const PluginId('beta'))
           .registerSingleton<_ConfigCaptureService>(
             const ServiceId('agent.model'),
-            _ConfigCaptureService(),
+            () => _ConfigCaptureService(),
             priority: 75, // intended native priority
           );
 
@@ -299,7 +298,7 @@ void main() {
           .scopedFor(const PluginId('gamma'))
           .registerSingleton<_ConfigCaptureService>(
             const ServiceId('agent.model'),
-            _ConfigCaptureService(),
+            () => _ConfigCaptureService(),
             priority: 300,
           );
 

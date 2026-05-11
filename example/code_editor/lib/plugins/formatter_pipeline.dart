@@ -41,7 +41,7 @@ class FormatterPipelinePlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<_BasePipelineHook>(
       const ServiceId('pipeline_hook'),
-      _BasePipelineHook(),
+      () => _BasePipelineHook(),
     );
   }
 }
@@ -78,7 +78,7 @@ class SqlFormatterPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<_SqlFormatterHook>(
       const ServiceId('sql_formatter_hook'),
-      _SqlFormatterHook(),
+      () => _SqlFormatterHook(),
     );
   }
 }
@@ -108,7 +108,7 @@ class DartFormatterPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<_DartFormatterHook>(
       const ServiceId('dart_formatter_hook'),
-      _DartFormatterHook(),
+      () => _DartFormatterHook(),
     );
   }
 }

@@ -15,7 +15,7 @@ void main() {
       registry.registerSingleton<String>(
         pluginId: const PluginId('alpha'),
         serviceId: const ServiceId('svc'),
-        instance: 'alpha impl',
+        create: () => 'alpha impl',
         priority: 100,
       );
 
@@ -43,13 +43,13 @@ void main() {
       registry.registerSingleton<String>(
         pluginId: const PluginId('alpha'),
         serviceId: const ServiceId('svc'),
-        instance: 'alpha impl',
+        create: () => 'alpha impl',
         priority: 100,
       );
       registry.registerSingleton<String>(
         pluginId: const PluginId('beta'),
         serviceId: const ServiceId('svc'),
-        instance: 'beta impl',
+        create: () => 'beta impl',
         priority: 50,
       );
 
@@ -68,19 +68,19 @@ void main() {
       registry.registerSingleton<String>(
         pluginId: const PluginId('alpha'),
         serviceId: const ServiceId('svc'),
-        instance: 'alpha impl',
+        create: () => 'alpha impl',
         priority: 100,
       );
       registry.registerSingleton<String>(
         pluginId: const PluginId('beta'),
         serviceId: const ServiceId('svc'),
-        instance: 'beta impl',
+        create: () => 'beta impl',
         priority: 80,
       );
       registry.registerSingleton<String>(
         pluginId: const PluginId('gamma'),
         serviceId: const ServiceId('svc'),
-        instance: 'gamma impl',
+        create: () => 'gamma impl',
         priority: 60,
       );
 
@@ -108,13 +108,13 @@ void main() {
       registry.registerSingleton<String>(
         pluginId: const PluginId('alpha'),
         serviceId: const ServiceId('svc'),
-        instance: 'alpha impl',
+        create: () => 'alpha impl',
         priority: 100,
       );
       registry.registerSingleton<String>(
         pluginId: const PluginId('beta'),
         serviceId: const ServiceId('svc'),
-        instance: 'beta impl',
+        create: () => 'beta impl',
         priority: 50,
       );
 
@@ -147,13 +147,13 @@ void main() {
       registry.registerSingleton<String>(
         pluginId: const PluginId('alpha'),
         serviceId: const ServiceId('svc'),
-        instance: 'alpha impl',
+        create: () => 'alpha impl',
         priority: 100,
       );
       registry.registerSingleton<String>(
         pluginId: const PluginId('beta'),
         serviceId: const ServiceId('svc'),
-        instance: 'beta impl',
+        create: () => 'beta impl',
         priority: 50,
       );
 
@@ -216,13 +216,13 @@ void main() {
       registry.registerSingleton<String>(
         pluginId: const PluginId('alpha'),
         serviceId: const ServiceId('svc'),
-        instance: 'alpha impl',
+        create: () => 'alpha impl',
         priority: 100,
       );
       registry.registerSingleton<String>(
         pluginId: const PluginId('beta'),
         serviceId: const ServiceId('svc'),
-        instance: 'beta impl',
+        create: () => 'beta impl',
         priority: 50,
       );
 
@@ -251,13 +251,13 @@ void main() {
       registry.registerSingleton<String>(
         pluginId: const PluginId('alpha'),
         serviceId: const ServiceId('svc'),
-        instance: 'alpha impl',
+        create: () => 'alpha impl',
         priority: 100,
       );
       registry.registerSingleton<String>(
         pluginId: const PluginId('beta'),
         serviceId: const ServiceId('svc'),
-        instance: 'beta impl',
+        create: () => 'beta impl',
         priority: 50,
       );
 
@@ -290,7 +290,7 @@ void main() {
         registry.registerSingleton<String>(
           pluginId: const PluginId('alpha'),
           serviceId: const ServiceId('svc'),
-          instance: 'alpha impl',
+          create: () => 'alpha impl',
           priority: 100,
         );
 
@@ -313,7 +313,7 @@ void main() {
       registry.registerSingleton<String>(
         pluginId: const PluginId('alpha'),
         serviceId: const ServiceId('svc'),
-        instance: 'alpha impl',
+        create: () => 'alpha impl',
       );
 
       final before = registry.getPluginServices(const PluginId('alpha'));
@@ -391,7 +391,7 @@ void main() {
       registry.registerSingleton<_StatefulFixture>(
         pluginId: const PluginId('alpha'),
         serviceId: const ServiceId('stateful'),
-        instance: _StatefulFixture(),
+        create: () => _StatefulFixture(),
       );
       expect(
         registry.resolve<_StatefulFixture>(const ServiceId('stateful')),
@@ -399,39 +399,6 @@ void main() {
       );
     });
 
-    test('registerSingleton<Object>(.., Function tear-off) trips a debug '
-        'assert because the value would be the function, not an instance', () {
-      // Regression guard against the most common shape mistake from the
-      // earlier factory-shape API. `Object.new` (and any other Function
-      // value) compiles when T == Object because every Function is itself
-      // an Object, but the resulting registration holds the function
-      // reference instead of an instance. The assert catches it in debug
-      // builds before the misuse can ship. T == dynamic is excluded by
-      // the bound `T extends Object` so the type checker rejects it at
-      // the call site - no runtime check needed.
-      final registry = ServiceRegistry();
-      expect(
-        () => registry.registerSingleton<Object>(
-          pluginId: const PluginId('alpha'),
-          serviceId: const ServiceId('svc'),
-          instance: Object.new,
-        ),
-        throwsA(isA<AssertionError>()),
-      );
-
-      // Tighter T silently accepts the same call because the assert only
-      // triggers when T is Object (a tear-off of the right shape can be
-      // a legitimate value when the type narrows it). This documents the
-      // boundary of the guard.
-      expect(
-        () => registry.registerSingleton<void Function()>(
-          pluginId: const PluginId('alpha'),
-          serviceId: const ServiceId('svc2'),
-          instance: () {},
-        ),
-        returnsNormally,
-      );
-    });
   });
 
   group('ScopedServiceRegistry positional ServiceId overloads', () {
@@ -442,7 +409,7 @@ void main() {
         final scope = ScopedServiceRegistry(raw, const PluginId('alpha'));
 
         const svc = ServiceId.namespaced(Namespace('agent'), 'model');
-        scope.registerSingleton<String>(svc, 'impl', priority: 80);
+        scope.registerSingleton<String>(svc, () => 'impl', priority: 80);
 
         expect(raw.resolve<String>(const ServiceId('agent.model')), 'impl');
       },
@@ -485,7 +452,7 @@ void main() {
       final scope = ScopedServiceRegistry(raw, const PluginId('alpha'));
 
       const svc = ServiceId('thing');
-      scope.registerSingleton<String>(svc, 'impl');
+      scope.registerSingleton<String>(svc, () => 'impl');
 
       final wrapper = raw.resolveRaw<String>(const ServiceId('thing'));
       expect(wrapper.priority, ServiceRegistry.defaultPriority);
@@ -498,7 +465,7 @@ void main() {
       final scope = ScopedServiceRegistry(raw, const PluginId('alpha'));
 
       const svc = ServiceId.namespaced(Namespace('agent'), 'model');
-      scope.withPriority(120).registerSingleton<String>(svc, 'impl');
+      scope.withPriority(120).registerSingleton<String>(svc, () => 'impl');
 
       final wrapper = raw.resolveRaw<String>(const ServiceId('agent.model'));
       expect(wrapper.priority, 120);
@@ -511,8 +478,8 @@ void main() {
       const a = ServiceId.namespaced(Namespace('agent'), 'model');
       const b = ServiceId.namespaced(Namespace('agent'), 'temperature');
       scope.withPriority(100)
-        ..registerSingleton<String>(a, 'a')
-        ..registerSingleton<String>(b, 'b', priority: 80);
+        ..registerSingleton<String>(a, () => 'a')
+        ..registerSingleton<String>(b, () => 'b', priority: 80);
 
       expect(
         raw.resolveRaw<String>(const ServiceId('agent.model')).priority,
@@ -532,7 +499,7 @@ void main() {
       scope
           .withPriority(100)
           .withPriority(50)
-          .registerSingleton<String>(svc, 'impl');
+          .registerSingleton<String>(svc, () => 'impl');
 
       expect(raw.resolveRaw<String>(const ServiceId('thing')).priority, 50);
     });

@@ -17,7 +17,7 @@ class ChatPlugin extends SessionPlugin {
 
   @override
   void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<ChatService>(serviceId, ChatService());
+    registry.registerSingleton<ChatService>(serviceId, () => ChatService());
   }
 }
 // #enddocregion chat-plugin-chat-plugin
@@ -37,7 +37,7 @@ class AltChatPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<ChatService>(
       ChatPlugin.serviceId,
-      AltChatService(),
+      () => AltChatService(),
       priority: 100,
     );
   }

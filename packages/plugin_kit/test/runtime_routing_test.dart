@@ -25,7 +25,7 @@ class TestGlobalPlugin extends GlobalPlugin {
     lifecycleCalls.add('register');
     registry.registerSingleton<String>(
       ServiceId('${pluginId}_service'),
-      'Instance from $pluginId',
+      () => 'Instance from $pluginId',
       priority: 100,
     );
   }
@@ -109,7 +109,7 @@ class TestSessionPlugin extends SessionPlugin {
     lifecycleCalls.add('register');
     registry.registerSingleton<String>(
       ServiceId('${pluginId}_service'),
-      'Instance from $pluginId',
+      () => 'Instance from $pluginId',
       priority: 100,
     );
   }

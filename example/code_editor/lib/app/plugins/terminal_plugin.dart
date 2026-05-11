@@ -255,7 +255,7 @@ class TerminalPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<PanelWidgetFactory>(
       ServiceSlots.panel('terminal'),
-      _TerminalPanelFactory(),
+      () => _TerminalPanelFactory(),
     );
   }
 }

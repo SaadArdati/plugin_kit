@@ -58,7 +58,7 @@ The raw, non-scoped registry. Every plugin gets a [`ScopedServiceRegistry`](#sco
 
 ```dart
 class ServiceRegistry {
-  static const int defaultPriority = 50;
+  static const int defaultPriority = Priority.normal; // 500
 
   ServiceRegistry({List<LocalPluginOverride> overrides = const []});
   ServiceRegistry.empty();
@@ -67,7 +67,7 @@ class ServiceRegistry {
 }
 ```
 
-`defaultPriority` is `50`. Higher wins on resolution. The middle-of-the-road default lets later plugins boost or lower against it without negotiating an absolute scale.
+`defaultPriority` is `Priority.normal` (500). Higher wins. `EventBus` uses the same polarity and default.
 
 ### Registration
 
@@ -262,14 +262,16 @@ The stamp happens in `_provideAndInject` inside `ServiceRegistry`, which is the 
 
 `settingsHash` is a stable hash of the current settings. The registry uses it to skip redundant `injectSettings` calls on singleton and lazy-singleton wrappers when nothing changed.
 
-### `injectSettings`
+### Settings injection
 
 ```dart
-@mustCallSuper
+@nonVirtual
 void injectSettings(Map<String, dynamic> settings, {String? hash});
+
+void onSettingsInjected() {}
 ```
 
-The registry calls this on resolve when an override applies, specifically when a matching `LocalPluginOverride` carries non-empty settings. For singleton and lazy-singleton wrappers the call is gated by `settingsHash`: if the new hash matches the current one, the registry skips the redundant injection. Factory wrappers see one injection per resolve because each resolve returns a fresh instance. Test code occasionally calls `injectSettings` directly to seed a service without going through the runtime. Override to react to settings changes; always call `super.injectSettings(settings, hash: hash)` first so `settings`, `settingsHash`, and `config` stay consistent.
+`injectSettings` is `@nonVirtual`. The registry calls it on resolve when an override applies; it updates `settings` / `settingsHash` / `config`, then fires `onSettingsInjected()`. Override `onSettingsInjected` to react. Singleton and lazy-singleton wrappers gate on `settingsHash` to skip redundant injections; factory wrappers run injection on every resolve.
 
 ## `StatefulPluginService`
 

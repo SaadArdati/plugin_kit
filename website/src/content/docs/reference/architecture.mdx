@@ -87,7 +87,7 @@ If you remember nothing else: `register` collects, the build phase resolves the 
 
 ## Priority resolution
 
-The registry stores registrations in a sorted list keyed by `serviceId`. The sort is descending by priority, with `defaultPriority = 50`.
+The registry stores registrations in a sorted list keyed by `serviceId`. The sort is descending by priority, with `defaultPriority = Priority.normal` (500).
 
 | Operation | Behavior |
 |---|---|
@@ -151,7 +151,7 @@ The bus does not swallow handler exceptions. If a handler throws, the caller see
   bind callbacks (skipped if internal)
         │
         ▼
-  merged general + identifier handlers, ascending priority
+  merged general + identifier handlers, descending priority
         │
         ▼  for each handler:
    observe → mutate → optionally stop()

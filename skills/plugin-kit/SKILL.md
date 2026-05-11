@@ -18,13 +18,11 @@ Plugin classes register services and contain no behavior. `Plugin.attach` subscr
 
 ```
 needs settings injection from RuntimeSettings.services?
-  no -> plain Dart class. registerFactory (fresh per resolve), or registerSingleton (shared).
+  no -> plain Dart class. registerFactory / registerSingleton / registerLazySingleton.
   yes -> needs lifecycle, events, or session-bound state?
-    no -> PluginService. registerFactory / registerSingleton / registerLazySingleton.
-          Override injectSettings(settings, hash:) only if reacting to changes; MUST call super.injectSettings.
-    yes -> StatefulPluginService. registerSingleton or registerLazySingleton ONLY (factories rejected).
-           attach() / detach() are pure user hooks: no super, no args.
-           Auto-tracked helpers: on, onRequest, onRequestSync, bind, emit. Read this.context implicitly.
+    no -> PluginService. Override onSettingsInjected() to react.
+    yes -> StatefulPluginService. registerSingleton / registerLazySingleton ONLY.
+           Auto-tracked helpers: on, onRequest, onRequestSync, bind, emit (read this.context).
 ```
 
 For event-driven slots:
@@ -60,9 +58,9 @@ Plugin and service code stays the same. The mixins are widget-side adapters; the
 
 ## Conventions
 
-1. `super.attach()` and `super.detach()` are no-ops on both `Plugin` and `StatefulPluginService`. Don't call them. The framework runs `_runAttach` and `_runDetach` orchestration around your hook (binds context, attaches owned services, cancels tracked subscriptions). `super.injectSettings(settings, hash: hash)` IS required when overriding settings injection on `PluginService`.
+1. User hooks never call super. `attach`, `detach`, and `onSettingsInjected` are pure user hooks; the framework orchestrates around them. `injectSettings` itself is `@nonVirtual` and runs bookkeeping; override `onSettingsInjected()` to react.
 
-2. `registerSingleton(id, T())` constructs inline. Each session re-runs `register()` and the constructor expression evaluates fresh, producing one instance per session. `registerSingleton(id, _field)` shares one instance across every session that re-runs `register()`. For shared state across sessions, use `GlobalPlugin` or capture deliberately. `registerLazySingleton` and `registerFactory` take `Factory<T>` because they defer construction. The registry is one `Map<ServiceId, _>`; namespacing is composition into the `ServiceId` string, not a separate registry.
+2. `registerSingleton<T>(id, Factory<T> create)` runs the factory once at registration. `register()` runs per session for `SessionPlugin`, so an inline `() => T()` gives one instance per session; `() => _shared` shares. `registerLazySingleton` defers to first resolve; `registerFactory` re-runs every resolve. Namespacing is composition into the `ServiceId` string, not a separate registry.
 
 3. Plugin helpers require explicit `context` as first arg. Plugin instances are shared across sessions; no `this.context` exists because storing one would lie when a second session attaches. StatefulPluginService instances scope to whichever plugin owns them: a `SessionPlugin`'s services construct fresh per session (because `register()` runs per session); a `GlobalPlugin`'s services construct once per runtime. Either way each instance binds to one context for its lifetime, so `this.context` is safe and helpers read it implicitly.
 
@@ -72,17 +70,19 @@ Plugin and service code stays the same. The mixins are widget-side adapters; the
 
 6. Settings reconciliation: newly-enabled plugins run `register()` then `attach`; staying-enabled plugins get `onPluginSettingsChanged(oldContext, newContext)`; newly-disabled plugins detach and unregister. Plugin instances persist; service instances are recreated. See api-cheatsheet.md for full phase order.
 
-7. Events: mutable T fields on the event class when interception is the contract (pre-commit drafts, stream-wrapping). Final T fields when the event is a fact or notification. Mutability is a contract signal to handlers, not a default.
+7. Priority: higher wins / runs first in both subsystems. Default is `Priority.normal`. Named stops `lowest`/`low`/`normal`/`elevated`/`high`/`system`; `Priority.above(other, by: N)` / `Priority.below(other)` for relative.
 
-8. Default-context generics are inferred. `extends SessionPlugin` infers `<SessionPluginContext>`; `extends GlobalPlugin` infers `<GlobalPluginContext>`; `PluginRuntime` and `PluginRuntime` infer `<GlobalPluginContext, SessionPluginContext>`; `PluginSession` infers `<SessionPluginContext>`. Specify generics only when using a custom context subclass.
+8. Events: mutable T fields on the event class when interception is the contract (pre-commit drafts, stream-wrapping). Final T fields when the event is a fact or notification. Mutability is a contract signal to handlers, not a default.
+
+9. Default-context generics are inferred. `extends SessionPlugin` infers `<SessionPluginContext>`; `extends GlobalPlugin` infers `<GlobalPluginContext>`; `PluginRuntime` and `PluginRuntime` infer `<GlobalPluginContext, SessionPluginContext>`; `PluginSession` infers `<SessionPluginContext>`. Specify generics only when using a custom context subclass.
 
    `StatefulPluginService<PKC extends PluginContext>` has a wider bound because it can host both global and session services. Bare `extends StatefulPluginService` infers `<PluginContext>`, which limits `this.context` to the base type. Two ergonomic typedef aliases ship with the library: `extends SessionStatefulPluginService` (alias for `StatefulPluginService<SessionPluginContext>`) and `extends GlobalStatefulPluginService` (alias for `StatefulPluginService<GlobalPluginContext>`). The aliases are pure syntactic sugar; the explicit `extends StatefulPluginService<S>` form still works and is required when `S` is a custom context subclass.
 
-9. `enabledPlugins` is settings-intent (what `RuntimeSettings` says is on); `attachedPlugins` is runtime-effective (what the runtime actually attached after dependency cascade). Use `enabledPlugins` for settings UI; `attachedPlugins` for "is it actually running." Per-scope underliers and full semantics in api-cheatsheet.md.
+10. `enabledPlugins` is settings-intent (what `RuntimeSettings` says is on); `attachedPlugins` is runtime-effective (what the runtime actually attached after dependency cascade). Use `enabledPlugins` for settings UI; `attachedPlugins` for "is it actually running." Per-scope underliers and full semantics in api-cheatsheet.md.
 
-10. `PluginId` values starting with `__pk_` are reserved for internal sentinels (`PluginId.wildcard.value == '__pk_wildcard__'`, `PluginId.winnerScoped.value == '__pk_winner__'`). `PluginRuntime.addPlugin` rejects any user-supplied id with that prefix. Pick any other naming; plugin ids conventionally read as lowercase_snake_case (`chat`, `model_router`).
+11. `PluginId` values starting with `__pk_` are reserved for internal sentinels (`PluginId.wildcard.value == '__pk_wildcard__'`, `PluginId.winnerScoped.value == '__pk_winner__'`). `PluginRuntime.addPlugin` rejects any user-supplied id with that prefix. Pick any other naming; plugin ids conventionally read as lowercase_snake_case (`chat`, `model_router`).
 
-11. Request/response failure is a typed exception. `context.bus.request<R, S>(req)` and `requestSync<R, S>(req)` throw `RequestUnavailableException` when no handler is registered or every handler conceded with null on a non-nullable `S`. `maybeRequest` and `maybeRequestSync` convert ONLY that exception to null; handler-thrown exceptions propagate. `null` means "request unavailable," not "handler crashed." Catch `RequestUnavailableException` when you need to distinguish.
+12. Request/response failure is a typed exception. `context.bus.request<R, S>(req)` and `requestSync<R, S>(req)` throw `RequestUnavailableException` when no handler is registered or every handler conceded with null on a non-nullable `S`. `maybeRequest` and `maybeRequestSync` convert ONLY that exception to null; handler-thrown exceptions propagate. `null` means "request unavailable," not "handler crashed." Catch `RequestUnavailableException` when you need to distinguish.
 
 ## Reading guide
 

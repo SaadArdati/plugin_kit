@@ -95,7 +95,7 @@ void registerAllThree(ScopedServiceRegistry registry) {
 
   registry.registerSingleton<AppConfig>(
     const ServiceId('config'),
-    AppConfig.load(),
+    () => AppConfig.load(),
   );
 }
 // #enddocregion service-registry-register-all-three
@@ -103,7 +103,9 @@ void registerAllThree(ScopedServiceRegistry registry) {
 // #docregion service-registry-resolve
 void resolveFromContext(PluginContext context) {
   final db = context.resolve<Database>(const ServiceId('main_db'));
-  final maybeLogger = context.maybeResolve<AppConfig>(const ServiceId('config'));
+  final maybeLogger = context.maybeResolve<AppConfig>(
+    const ServiceId('config'),
+  );
   print('$db $maybeLogger');
 }
 // #enddocregion service-registry-resolve
@@ -113,15 +115,15 @@ void registerWithPriority(ServiceRegistry registry) {
   registry.registerSingleton<Formatter>(
     pluginId: const PluginId('core'),
     serviceId: const ServiceId('code_formatter'),
-    instance: DefaultFormatter(),
-    priority: 50,
+    create: () => DefaultFormatter(),
+    priority: Priority.normal,
   );
 
   registry.registerSingleton<Formatter>(
     pluginId: const PluginId('my_better_formatter'),
     serviceId: const ServiceId('code_formatter'),
-    instance: PrettierFormatter(),
-    priority: 100,
+    create: () => PrettierFormatter(),
+    priority: Priority.elevated,
   );
 }
 // #enddocregion service-registry-priority
@@ -132,7 +134,7 @@ void registerNamespacedService(ScopedServiceRegistry registry) {
 
   registry.registerSingleton<PanelWidgetFactory>(
     panel('console'), // ServiceId('panel.console')
-    ConsolePanelFactory(),
+    () => ConsolePanelFactory(),
   );
 }
 
@@ -188,7 +190,7 @@ void useScopedRegistry(ServiceRegistry registry) {
   final scoped = registry.scopedFor(const PluginId('my_plugin'));
   scoped.registerSingleton<AppConfig>(
     const ServiceId('config'),
-    AppConfig.load(),
+    () => AppConfig.load(),
   );
 }
 // #enddocregion service-registry-scoped-for
@@ -217,22 +219,19 @@ class EnterpriseRouterPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerLazySingleton<ModelRouter>(
       const ServiceId('model_router'),
-      () => EnterpriseRouter(
-        ownerId: id,
-        registryThunk: () => registry.raw,
-      ),
-      priority: 100,
+      () => EnterpriseRouter(ownerId: id, registryThunk: () => registry.raw),
+      priority: Priority.elevated,
     );
   }
 }
 // #enddocregion service-registry-enterprise-router-plugin
 
 // #docregion service-registry-resolve-basic
-/// Demonstrates basic resolve and maybeResolve from a PluginContext.
-void resolveBasic(PluginContext context) {
+void getLoggerDB(PluginContext context) {
   final db = context.resolve<Database>(const ServiceId('main_db'));
-  final maybeLogger =
-      context.maybeResolve<AppConfig>(const ServiceId('logger'));
+  final maybeLogger = context.maybeResolve<AppConfig>(
+    const ServiceId('logger'),
+  );
   print('$db $maybeLogger');
 }
 // #enddocregion service-registry-resolve-basic
@@ -245,16 +244,16 @@ void registerCompetingFormatters(ServiceRegistry registry) {
   registry.registerSingleton<Formatter>(
     pluginId: const PluginId('core'),
     serviceId: const ServiceId('code_formatter'),
-    instance: DefaultFormatter(),
-    priority: 50,
+    create: () => DefaultFormatter(),
+    priority: Priority.normal,
   );
 
   // plugin: my_better_formatter
   registry.registerSingleton<Formatter>(
     pluginId: const PluginId('my_better_formatter'),
     serviceId: const ServiceId('code_formatter'),
-    instance: PrettierFormatter(),
-    priority: 100,
+    create: () => PrettierFormatter(),
+    priority: Priority.elevated,
   );
 }
 // #enddocregion service-registry-priority-competing
@@ -271,7 +270,7 @@ void registerAndResolvePanel(
   // regular register / resolve methods.
   registry.registerSingleton<PanelWidgetFactory>(
     panel('console'), // ServiceId('panel.console')
-    ConsolePanelFactory(),
+    () => ConsolePanelFactory(),
   );
 
   final factory = context.resolve<PanelWidgetFactory>(panel('console'));
@@ -283,7 +282,9 @@ void registerAndResolvePanel(
 /// Demonstrates resolveRaw to inspect a wrapper without instantiating.
 void resolveRawExample(PluginContext context) {
   const tooling = Namespace('tooling');
-  final wrapper = context.registry.resolveRaw<ModelRouter>(tooling('formatter'));
+  final wrapper = context.registry.resolveRaw<ModelRouter>(
+    tooling('formatter'),
+  );
   print(wrapper.pluginId);
   print(wrapper.priority);
   print(wrapper.capabilities);
@@ -295,7 +296,7 @@ void resolveRawExample(PluginContext context) {
 void registerGreeter(ScopedServiceRegistry registry) {
   registry.registerSingleton<AppConfig>(
     const ServiceId('greeter'),
-    AppConfig.load(),
+    () => AppConfig.load(),
   );
 }
 // #enddocregion service-registry-naming-register
@@ -307,7 +308,7 @@ void registerModelClient(ScopedServiceRegistry registry) {
 
   registry.registerSingleton<AppConfig>(
     agent('model'), // ServiceId('agent.model')
-    AppConfig.load(),
+    () => AppConfig.load(),
   );
 }
 // #enddocregion service-registry-naming-namespace
@@ -331,13 +332,12 @@ void demonstrateRegistrationModes(ScopedServiceRegistry registry) {
   registry.registerFactory<ReadmeService>(
     const ServiceId('my_service_factory'),
     () => ReadmeServiceImpl(),
-    priority: 50,
   );
 
   // Singleton: same instance for every resolve.
   registry.registerSingleton<ReadmeService>(
     const ServiceId('my_service_singleton'),
-    ReadmeServiceImpl(),
+    () => ReadmeServiceImpl(),
   );
 
   // Lazy singleton: constructed on first resolve.
@@ -362,4 +362,5 @@ void demonstrateResolution(PluginContext context) {
 
   print('$service $fallback');
 }
+
 // #enddocregion service-registry-readme-registration

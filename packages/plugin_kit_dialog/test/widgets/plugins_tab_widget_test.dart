@@ -28,7 +28,7 @@ PluginKitDialogController _stubController({
   runtime.globalRegistry.registerSingleton<PluginChipsBuilder>(
     pluginId: const PluginId('test'),
     serviceId: PluginsTabPlugin.chipsBuilderId,
-    instance: PluginChipsBuilder(),
+    create: () => PluginChipsBuilder(),
   );
 
   final controller = PluginKitDialogController(

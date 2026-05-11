@@ -116,11 +116,6 @@
       "source": "website/snippets/lib/anti_patterns.dart",
       "region": "anti-pattern-cache-resolution-fix"
     },
-    {
-      "source": "example/state_garden/lib/src/chat/chat_plugin.dart",
-      "region": "chat-plugin-chat-plugin"
-    },
-    null,
     null,
     null,
     {

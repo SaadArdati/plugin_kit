@@ -45,7 +45,7 @@ class SavedEventProbePlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<SavedEventProbe>(
       const ServiceId('saved_event_probe'),
-      SavedEventProbe(),
+      () => SavedEventProbe(),
     );
   }
 }

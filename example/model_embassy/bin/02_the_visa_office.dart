@@ -67,7 +67,7 @@ class VerboseAnthropicPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<VisaOffice>(
       const ServiceId('visa_office'),
-      VerboseVisaOffice(),
+      () => VerboseVisaOffice(),
       priority: 100,
     );
   }

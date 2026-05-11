@@ -15,7 +15,7 @@ class MemoryKeeperPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Object>(
       CorePlugin.systemMessage,
-      Object(),
+      () => Object(),
       priority: 50,
       capabilities: const {
         UiConfigurableCapability(

@@ -21,7 +21,7 @@ class WebSearchExplorerPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Object>(
       provider,
-      Object(),
+      () => Object(),
       priority: 100,
       capabilities: const {
         UiConfigurableCapability(

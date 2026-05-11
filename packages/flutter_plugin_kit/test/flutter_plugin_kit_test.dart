@@ -41,7 +41,7 @@ class _ThrowOnDetachPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<_ThrowOnDetachService>(
       const ServiceId('throw_on_detach_service'),
-      _ThrowOnDetachService(),
+      () => _ThrowOnDetachService(),
     );
   }
 }
@@ -71,7 +71,7 @@ class _ThrowStateErrorPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<_ThrowOnDetachWithStateError>(
       const ServiceId('throw_state_error_service'),
-      _ThrowOnDetachWithStateError(),
+      () => _ThrowOnDetachWithStateError(),
     );
   }
 }

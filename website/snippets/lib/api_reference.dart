@@ -245,7 +245,7 @@ void registerAgentModel(ScopedServiceRegistry registry) {
 
   registry.registerSingleton<SearchResults>(
     agent('model'), // ServiceId('agent.model')
-    const SearchResults(),
+    () => const SearchResults(),
   );
 }
 // #enddocregion naming-namespace-agent-model
@@ -297,7 +297,7 @@ class CheatsheetPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<CheatsheetService>(
       const ServiceId('cheatsheet'),
-      const CheatsheetService(),
+      () => const CheatsheetService(),
     );
   }
 
@@ -344,7 +344,7 @@ void registerAndCheckConfigurable(
 ) {
   registry.registerSingleton<CheatsheetService>(
     const ServiceId('cheatsheet'),
-    const CheatsheetService(),
+    () => const CheatsheetService(),
     capabilities: const {ConfigurableCapabilityCheatsheet()},
   );
 
@@ -364,8 +364,7 @@ class CheatsheetModelRouter extends PluginService {
 
   /// Reacts to settings changes by invalidating any cached state.
   @override
-  void injectSettings(Map<String, dynamic> settings, {String? hash}) {
-    super.injectSettings(settings, hash: hash);
+  void onSettingsInjected() {
     // Invalidate cached model selection on settings change.
     cachedModel = defaultModel;
   }
@@ -478,8 +477,8 @@ void demonstrateContextStubInject() {
   ctx.registry.registerSingleton<CheatsheetService>(
     pluginId: const PluginId('test'),
     serviceId: const ServiceId('cheatsheet'),
-    instance: const CheatsheetService(),
-    priority: 1000,
+    create: () => const CheatsheetService(),
+    priority: Priority.system,
   );
   final svc = ctx.resolve<CheatsheetService>(const ServiceId('cheatsheet'));
   print('resolved: ${svc.runtimeType}');

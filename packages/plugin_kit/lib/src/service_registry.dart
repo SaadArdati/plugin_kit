@@ -263,9 +263,10 @@ final class SingletonWrapper<T extends Object> extends RegistrationWrapper<T> {
 /// ```
 class ServiceRegistry {
   /// Default resolution priority used by every registration method when
-  /// `priority` is not supplied. Higher values win; 50 sits in the middle of
-  /// the range so later plugins can boost or lower relative to it.
-  static const int defaultPriority = 50;
+  /// `priority` is not supplied. Higher values win; [Priority.normal]
+  /// sits mid-stack so later plugins can boost (via [Priority.elevated],
+  /// [Priority.high], or [Priority.above]) or lower relative to it.
+  static const int defaultPriority = Priority.normal;
 
   /// Active overrides for settings injection, priority changes, and disabling.
   ///
@@ -687,43 +688,40 @@ class ServiceRegistry {
       ..sort((a, b) => b.priority.compareTo(a.priority));
   }
 
-  /// Register an eager singleton service with a pre-created [instance].
+  /// Register an eager singleton service via a [Factory] that constructs
+  /// the instance.
   ///
-  /// The [instance] is stored in a [SingletonWrapper] and returned on every
-  /// resolve. Construct it inline at the call site
-  /// (`registerSingleton(instance: MyService())`); each `register` call
-  /// produces a fresh instance for that registry, which is the correct
-  /// behavior for session plugins. Contrast with [registerFactory], where
-  /// a closure runs on every resolve, and [registerLazySingleton], where a
-  /// closure runs once on first resolve. Replaces any existing registration
-  /// from the same [pluginId].
+  /// The factory runs ONCE at registration time. The resulting instance is
+  /// stored in a [SingletonWrapper] and returned on every resolve. Use an
+  /// inline expression to get a fresh instance per `register()` call:
+  ///
+  /// ```dart
+  /// registry.registerSingleton<MyService>(
+  ///   pluginId: pluginId,
+  ///   serviceId: serviceId,
+  ///   create: () => MyService(),
+  /// );
+  /// ```
+  ///
+  /// For SessionPlugins, `register()` runs per session, so each session gets
+  /// its own instance. To share an instance across sessions, the factory
+  /// must visibly close over a long-lived value (e.g. `() => _shared`); the
+  /// closure capture is the discriminator at the call site.
+  ///
+  /// Contrast with [registerFactory] (factory runs on every resolve) and
+  /// [registerLazySingleton] (factory runs once on first resolve, not at
+  /// registration). Replaces any existing registration from the same
+  /// [pluginId].
   // #docregion service-registry-register-singleton
   void registerSingleton<T extends Object>({
     required PluginId pluginId,
     required ServiceId serviceId,
-    required T instance,
+    required Factory<T> create,
     int priority = ServiceRegistry.defaultPriority,
     CapabilitySet capabilities = const {},
   }) {
   // #enddocregion service-registry-register-singleton
-    // Guard against the most common shape mistake from the previous
-    // factory-shape API: `registerSingleton<Object>(instance: Object.new,
-    // ...)` (or any tear-off through the scoped positional form,
-    // `registry.registerSingleton<Object>(id, Object.new)`) compiles
-    // because every Function is itself an Object, but the registered
-    // "instance" is the function value, not an `Object()`. Tighter Ts
-    // (e.g. `MyService`) reject Function values at the call site, so this
-    // only catches the placeholder-style misuse where T widens all the
-    // way to Object. `T == dynamic` is rejected by the bound `T extends
-    // Object` at the call site, so we don't need to check it here.
-    assert(
-      T != Object || instance is! Function,
-      'registerSingleton<Object>("$serviceId", ...) was given a Function '
-      'value (${instance.runtimeType}). Did you mean to invoke it? '
-      'Pass an instance (e.g. `MyService()`), not a tear-off '
-      '(`MyService.new`). The type checker can\'t catch this when T '
-      'widens to Object.',
-    );
+    final instance = create();
     _registry[serviceId] ??= [];
     final list = _registry[serviceId]!;
 
@@ -1029,20 +1027,29 @@ class ScopedServiceRegistry {
 
   /// Register a singleton service using a typed [ServiceId] handle.
   ///
-  /// Construct [instance] inline at the call site
-  /// (`registry.registerSingleton(id, MyService())`). For session plugins,
-  /// `register` runs once per session, so each session gets its own
-  /// instance and there is no cross-session sharing.
+  /// The [create] factory runs once at registration time. Use an inline
+  /// expression so each `register()` call gives a fresh instance:
+  ///
+  /// ```dart
+  /// registry.registerSingleton<MyService>(id, () => MyService());
+  /// ```
+  ///
+  /// For session plugins, `register` runs once per session, so each session
+  /// gets its own instance and there is no cross-session sharing. To share
+  /// across sessions, have the factory close over a long-lived value (e.g.
+  /// `() => _sharedField`); the closure capture is visible at the call
+  /// site, so the choice between fresh-per-session and shared-across-sessions
+  /// is explicit, not implicit.
   // #docregion service-registry-register-singleton-2
   void registerSingleton<T extends Object>(
     ServiceId service,
-    T instance, {
+    Factory<T> create, {
     int? priority,
     CapabilitySet capabilities = const {},
   }) => raw.registerSingleton<T>(
     pluginId: pluginId,
     serviceId: service,
-    instance: instance,
+    create: create,
     priority: priority ?? defaultPriority ?? ServiceRegistry.defaultPriority,
     capabilities: capabilities,
   );

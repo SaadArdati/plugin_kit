@@ -60,7 +60,7 @@ class SqlIndentPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<SqlIndentFormatter>(
       const ServiceId('sql_formatter'),
-      SqlIndentFormatter(),
+      () => SqlIndentFormatter(),
       priority: 100,
     );
   }

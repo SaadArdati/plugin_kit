@@ -36,11 +36,11 @@ class CorePlugin extends GlobalPlugin {
 
   @override
   void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<Object>(info, Object(), priority: 0);
+    registry.registerSingleton<Object>(info, () => Object(), priority: 0);
 
     registry.registerSingleton<Object>(
       model,
-      Object(),
+      () => Object(),
       priority: 10,
       capabilities: const {
         UiConfigurableCapability(
@@ -58,7 +58,7 @@ class CorePlugin extends GlobalPlugin {
 
     registry.registerSingleton<Object>(
       systemMessage,
-      Object(),
+      () => Object(),
       priority: 10,
       capabilities: const {
         UiConfigurableCapability(

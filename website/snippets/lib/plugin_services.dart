@@ -85,8 +85,7 @@ class CachedFormatter extends StatefulPluginService {
   String? compiledTemplate;
 
   @override
-  void injectSettings(Map<String, dynamic> settings, {String? hash}) {
-    super.injectSettings(settings, hash: hash);
+  void onSettingsInjected() {
     compiledTemplate = null;
   }
 }
@@ -223,7 +222,7 @@ class SimpleNotificationPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<NotificationService>(
       const ServiceId('notification_service'),
-      NotificationService(),
+      () => NotificationService(),
     );
   }
 }
@@ -319,7 +318,7 @@ class ServerStreamPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<ServerStreamBridge>(
       const ServiceId('server_stream_bridge'),
-      ServerStreamBridge(),
+      () => ServerStreamBridge(),
     );
   }
 }
@@ -355,7 +354,7 @@ class NotificationPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<NotificationService>(
       const ServiceId('notification_service'),
-      NotificationService(),
+      () => NotificationService(),
     );
   }
 }

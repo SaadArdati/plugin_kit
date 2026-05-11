@@ -307,12 +307,10 @@ There are no setters. The class wraps a `Map<String, dynamic>` and only
 exposes read accessors. The registry replaces the entire `config` field on
 the service when settings change; it does not mutate the existing node.
 
-To react to changed settings, override `PluginService.injectSettings(...)`
-(and call `super.injectSettings(...)` first so the new map and `config` are
-in place before your override runs), or override
-`Plugin.onPluginSettingsChanged(...)` for plugin-wide reactions. Treating
-`config` as a snapshot for the current resolution is safe; holding a stale
-reference after a settings change returns old data but never panics.
+To react to changed settings, override `PluginService.onSettingsInjected()`,
+or `Plugin.onPluginSettingsChanged(...)` for plugin-wide reactions.
+Treating `config` as a snapshot for the current resolution is safe; holding
+a stale reference after a settings change returns old data but never panics.
 
 ### `ConfigNode.hashSettings`
 

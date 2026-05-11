@@ -46,7 +46,7 @@ class CasualPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Greeter>(
       const ServiceId('greeter'),
-      CasualGreeter(),
+      () => CasualGreeter(),
     );
   }
 }
@@ -59,8 +59,8 @@ class FormalPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Greeter>(
       const ServiceId('greeter'),
-      FormalGreeter(),
-      priority: 100, // wins
+      () => FormalGreeter(),
+      priority: Priority.elevated, // wins (beats Priority.normal default)
     );
   }
 }

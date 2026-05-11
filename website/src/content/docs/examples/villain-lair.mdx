@@ -53,9 +53,9 @@ Concepts: [Plugin Services](/concepts/plugin-services/).
 
 ### 06. Priorities ([`bin/06_priorities.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/06_priorities.dart))
 
-The two priority systems run in opposite directions. Event bus priority is a pipeline (lower runs first). Registry priority is a competition (higher wins). One scenario shows both, including a priority-3 handler that stops the cascade with `envelope.stop()`.
+Both priority systems use the same polarity: higher runs first, higher wins. The event bus invokes the highest-priority handler first so it can mutate or stop the cascade; the registry resolves to the highest-priority registration. One scenario shows both, including a high-priority handler that stops the cascade with `envelope.stop()`.
 
-Concepts: [Event Bus](/concepts/event-bus/#priority-and-why-it-goes-the-way-it-does), [Service Registry](/concepts/service-registry/#priority).
+Concepts: [Event Bus](/concepts/event-bus/#priority), [Service Registry](/concepts/service-registry/#priority).
 
 ### 07. Session Management ([`bin/07_sessions.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair/bin/07_sessions.dart))
 

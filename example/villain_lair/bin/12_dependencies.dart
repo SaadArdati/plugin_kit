@@ -22,7 +22,7 @@ class GetawayCarPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<String>(
       const ServiceId('vehicle'),
-      '1997 Minivan (painted black, poorly)',
+      () => '1997 Minivan (painted black, poorly)',
       priority: 50,
     );
   }
@@ -40,7 +40,7 @@ class VaultCrackerPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<String>(
       const ServiceId('vault_tool'),
-      'Industrial Drill (disguised as a large thermos)',
+      () => 'Industrial Drill (disguised as a large thermos)',
       priority: 50,
     );
   }
@@ -62,7 +62,7 @@ class HeistCoordinatorPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<String>(
       const ServiceId('plan'),
-      'Step 1: Arrive. '
+      () => 'Step 1: Arrive. '
       'Step 2: Crack vault. '
       'Step 3: Leave. '
       'Step 4: Gary ruins everything.',
@@ -84,7 +84,7 @@ class GarysTeleporterPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<String>(
       const ServiceId('device'),
-      'Teleporter (made of staplers and duct tape)',
+      () => 'Teleporter (made of staplers and duct tape)',
       priority: 50,
     );
   }
@@ -102,7 +102,7 @@ class LairCorePlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<String>(
       const ServiceId('power'),
-      'Nuclear Fusion Reactor (Mr. Whiskers naps on it)',
+      () => 'Nuclear Fusion Reactor (Mr. Whiskers naps on it)',
       priority: 100,
     );
   }

@@ -125,7 +125,7 @@ class CommandCenterPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<OperationLog>(
       const ServiceId('operation_log'),
-      OperationLog(),
+      () => OperationLog(),
       priority: 100,
     );
   }

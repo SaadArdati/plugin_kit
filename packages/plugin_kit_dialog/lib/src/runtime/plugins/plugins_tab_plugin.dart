@@ -25,7 +25,7 @@ class PluginsTabPlugin extends GlobalPlugin<DialogGlobalContext> {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<PluginChipsBuilder>(
       chipsBuilderId,
-      PluginChipsBuilder(),
+      () => PluginChipsBuilder(),
     );
   }
 

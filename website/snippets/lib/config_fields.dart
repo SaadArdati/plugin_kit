@@ -21,7 +21,7 @@ void registerWithNumberField(ScopedServiceRegistry registry) {
 
   registry.registerSingleton<TemperatureService>(
     agent('temperature'), // ServiceId('agent.temperature')
-    TemperatureService(),
+    () => TemperatureService(),
     capabilities: const {
       UiConfigurableCapability(
         label: 'Temperature',
@@ -136,7 +136,7 @@ const extensionField = ExtensionConfigField(
 void registerFullCapability(ScopedServiceRegistry registry) {
   registry.registerSingleton<MyService>(
     const ServiceId('llm_service'),
-    const MyService(),
+    () => const MyService(),
     capabilities: const {
       UiConfigurableCapability(
         label: 'LLM Settings',

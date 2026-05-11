@@ -12,6 +12,7 @@ export 'src/plugin/exceptions.dart';
 // they can share library-private hooks (context binding, per-context
 // subscription tracking).
 export 'src/plugin/plugin.dart';
+export 'src/priority.dart';
 export 'src/service_registry.dart';
 export 'src/session_listener.dart';
 export 'src/settings.dart';

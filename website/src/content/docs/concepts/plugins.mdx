@@ -81,7 +81,7 @@ That stricture pays off in three ways.
 - **Safe dependency declarations.** A plugin auto-disables when its dependency is missing. As long as your plugin does no work until called, it can be disabled without leaving zombies.
 - **Lazy initialization.** Work runs only when something asks for it. Toggling a plugin off and on does not re-run startup code; it just removes and re-adds its services.
 
-`Plugin.attach` and `Plugin.detach` are pure user hooks: the framework wraps them with orchestration (context binding, owned `StatefulPluginService` attach/detach, subscription cleanup), so there is no `super.attach` / `super.detach` to call. The one hook that does require `super` is `PluginService.injectSettings(...)`. See [Plugin Services](/concepts/plugin-services/).
+`Plugin.attach`, `Plugin.detach`, and `PluginService.onSettingsInjected` are pure user hooks. The framework orchestrates around them; never call super. See [Plugin Services](/concepts/plugin-services/).
 
 ## Declaring dependencies
 

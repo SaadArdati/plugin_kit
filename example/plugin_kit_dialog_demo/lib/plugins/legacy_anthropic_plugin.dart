@@ -18,7 +18,7 @@ class LegacyAnthropicPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Object>(
       CorePlugin.model,
-      Object(),
+      () => Object(),
       priority: 30,
       capabilities: const {
         UiConfigurableCapability(

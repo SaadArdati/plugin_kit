@@ -118,7 +118,7 @@ class TerminalPlugin extends SessionPlugin {
     const panel = Namespace('panel');
     registry.registerSingleton<PanelWidgetFactory>(
       panel('terminal'), // ServiceId('panel.terminal')
-      TerminalPanelFactory(),
+      () => TerminalPanelFactory(),
     );
   }
 }
@@ -161,8 +161,8 @@ class FakeSearchPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<SearchService>(
       const ServiceId('search'),
-      FakeSearch(),
-      priority: 1000, // beat any other registrant
+      () => FakeSearch(),
+      priority: Priority.system, // beat any other registrant
     );
   }
 }

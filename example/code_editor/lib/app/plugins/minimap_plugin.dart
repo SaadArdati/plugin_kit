@@ -191,7 +191,7 @@ class MinimapPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<PanelWidgetFactory>(
       ServiceSlots.panel('minimap'),
-      _MinimapPanelFactory(),
+      () => _MinimapPanelFactory(),
     );
   }
 }

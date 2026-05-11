@@ -20,9 +20,9 @@ There are three tiers, escalating by which plugin_kit features the behavior actu
 
 If your plugin class is getting fat, that is almost always a hint that the work belongs in one of these three tiers, not on the plugin. Plain classes register as factories (fresh instance per `context.resolve<T>()`) or as singletons when sharing the instance is safe. `PluginService` and `StatefulPluginService` register as singletons or lazy singletons; the stateful variant rejects factories because the runtime needs an instance to track.
 
-This page is the natural next step after [Adding a Plugin](/guides/adding-a-plugin/): the plugin class stays focused on wiring, services carry settings, state, and long-lived behavior.
+The plugin class stays focused on wiring, services carry settings, state, and long-lived behavior.
 
-## `PluginService`
+## Plugin Services
 
 `PluginService` gives you three things.
 
@@ -41,30 +41,21 @@ They are `late` fields, they will throw a `LateInitializationError` if
 accessed via the constructor.
 </Aside>
 
-## `StatefulPluginService`
+## Stateful Plugin Service
 
 `StatefulPluginService` extends `PluginService` with session lifecycle. It adds `attach(context)`, `detach()`, a bound `context`, and automatic subscription tracking.
 
 <Code code={extractRegion(pluginServicesSnippets, 'stateful-plugin-service-basic')} lang="dart" />
 
-`attach()` and `detach()` are pure user hooks: no super call, no `context` parameter. The framework binds and unbinds `this.context` around them via library-private `_bindContext` / `_unbindContext`, and cancels every tracked subscription and binding after `detach()` returns. Helpers (`on`, `onRequest`, `bind`, `emit`, `resolve`, etc.) read `this.context` implicitly, so subscriptions inside `attach()` are always bucketed correctly.
-
-The one method that does require super is `injectSettings(...)`, which carries the actual settings injection logic. See "Reacting to settings changes" below.
+`attach()`, `detach()`, and `onSettingsInjected()` are pure user hooks: the framework binds and unbinds `this.context` around them, cancels every tracked subscription and binding after `detach()` returns, and runs settings bookkeeping before `onSettingsInjected()` fires. Helpers (`on`, `onRequest`, `bind`, `emit`, `resolve`, etc.) read `this.context` implicitly, so subscriptions inside `attach()` are always bucketed correctly.
 
 ## Reacting to settings changes
 
-`PluginService.injectSettings(...)` is the handoff point for effective config. The base implementation
-stores the raw settings, builds a fresh `ConfigNode`, and updates the cached hash.
-
-If your service needs to react when settings change (to throw away a compiled cache, 
-for example), override it and call `super`.
+Override `onSettingsInjected()` to react when settings change. By the time it runs, `config` and `settings` already hold the new values.
 
 <Code code={extractRegion(pluginServicesSnippets, 'stateful-plugin-service-inject-settings')} lang="dart" />
 
-For singletons and lazy singletons, the registry hashes effective settings and
-only re-injects when they actually changed. Each individual `config.getX(...)` read is O(1): a hash-map
-lookup plus at most one type check. The O(n) cost (a deep hash over the new settings) only
-pays out when `injectSettings` actually runs again.
+Singletons and lazy singletons skip redundant re-injections via a `settingsHash` check; factory wrappers re-inject on every resolve.
 
 ## Subscription tracking
 

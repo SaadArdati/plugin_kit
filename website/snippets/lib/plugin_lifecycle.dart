@@ -31,7 +31,7 @@ class CasualPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Greeter>(
       const ServiceId('greeter'),
-      CasualGreeter(),
+      () => CasualGreeter(),
     );
   }
 }
@@ -44,8 +44,8 @@ class FormalPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Greeter>(
       const ServiceId('greeter'),
-      FormalGreeter(),
-      priority: 100, // wins
+      () => FormalGreeter(),
+      priority: Priority.elevated, // wins (beats Priority.normal default)
     );
   }
 }
@@ -225,7 +225,7 @@ class CasualSessionPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Greeter>(
       const ServiceId('greeter'),
-      CasualGreeter(),
+      () => CasualGreeter(),
     );
   }
 
@@ -248,7 +248,10 @@ class IntroductionCasualPlugin extends SessionPlugin {
 
   @override
   void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<Greeter>(const ServiceId('greeter'), CasualGreeter());
+    registry.registerSingleton<Greeter>(
+      const ServiceId('greeter'),
+      () => CasualGreeter(),
+    );
   }
 }
 
@@ -261,8 +264,8 @@ class IntroductionFormalPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Greeter>(
       const ServiceId('greeter'),
-      FormalGreeter(),
-      priority: 100, // wins
+      () => FormalGreeter(),
+      priority: Priority.elevated, // wins (beats Priority.normal default)
     );
   }
 }
@@ -274,15 +277,12 @@ class IntroductionFormalPlugin extends SessionPlugin {
 // #docregion getting-started-disable-plugin
 /// Demonstrates disabling a plugin via RuntimeSettings.
 Future<void> runWithDisabledPlugin() async {
-  final runtime = PluginRuntime(
-    plugins: [CasualPlugin(), FormalPlugin()],
-  )..init(
+  final runtime = PluginRuntime(plugins: [CasualPlugin(), FormalPlugin()])
+    ..init(
       // Can be user-driven via JSON config, a settings UI, or any other config
       // system you build on top. Hard-coded here for demo purposes.
       settings: const RuntimeSettings(
-        plugins: {
-          PluginId('formal'): PluginConfig(enabled: false),
-        },
+        plugins: {PluginId('formal'): PluginConfig(enabled: false)},
       ),
     );
   final session = await runtime.createSession();
@@ -295,9 +295,8 @@ Future<void> runWithDisabledPlugin() async {
 // #docregion settings-init-with-settings
 /// Demonstrates initializing a runtime with explicit settings.
 void initWithSettings(RuntimeSettings settings) {
-  final runtime = PluginRuntime(
-    plugins: [CasualPlugin(), FormalPlugin()],
-  )..init(settings: settings);
+  final runtime = PluginRuntime(plugins: [CasualPlugin(), FormalPlugin()])
+    ..init(settings: settings);
   print('enabled: ${runtime.enabledPluginIds}');
 }
 // #enddocregion settings-init-with-settings
@@ -337,10 +336,7 @@ Future<void> snapshotThenReconcile(
 // #docregion runtime-construct-and-session
 /// Demonstrates the full construct → init → createSession lifecycle.
 Future<void> constructAndSession() async {
-  final runtime = PluginRuntime(plugins: [
-    CasualPlugin(),
-    FormalPlugin(),
-  ]);
+  final runtime = PluginRuntime(plugins: [CasualPlugin(), FormalPlugin()]);
 
   runtime.init(settings: const RuntimeSettings.empty());
 
@@ -351,14 +347,12 @@ Future<void> constructAndSession() async {
 // #enddocregion runtime-construct-and-session
 
 // #docregion plugins-dependencies-override
-/// Demonstrates declaring plugin dependencies via the override getter.
 class FormatterPlugin extends SessionPlugin {
   @override
   PluginId get pluginId => const PluginId('formatter');
 
   @override
-  Set<PluginId> get dependencies =>
-      const {PluginId('formatter_pipeline')};
+  Set<PluginId> get dependencies => const {PluginId('formatter_pipeline')};
 
   @override
   void register(ScopedServiceRegistry registry) {}
@@ -388,4 +382,5 @@ Future<void> broadcastInvalidateCache(GlobalPluginContext context) async {
     const InvalidateCacheEvent(),
   );
 }
+
 // #enddocregion sessions-broadcast-invalidate-cache

@@ -19,7 +19,7 @@ class EnterpriseChatPlugin extends GlobalPlugin {
     registry.withPriority(120)
       ..registerSingleton<Object>(
         CorePlugin.model,
-        Object(),
+        () => Object(),
         capabilities: const {
           UiConfigurableCapability(
             label: 'Model & Provider (enterprise)',
@@ -55,7 +55,7 @@ class EnterpriseChatPlugin extends GlobalPlugin {
       )
       ..registerSingleton<Object>(
         ChatPlugin.temperature,
-        Object(),
+        () => Object(),
         capabilities: const {
           UiConfigurableCapability(
             label: 'Temperature (enterprise clamp)',
@@ -75,7 +75,7 @@ class EnterpriseChatPlugin extends GlobalPlugin {
       )
       ..registerSingleton<Object>(
         CorePlugin.systemMessage,
-        Object(),
+        () => Object(),
         capabilities: const {
           UiConfigurableCapability(
             label: 'System Message (enterprise)',

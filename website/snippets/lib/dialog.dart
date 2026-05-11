@@ -64,7 +64,7 @@ void registerConfigurableService(ScopedServiceRegistry registry) {
 
   registry.registerSingleton<MyService>(
     agent('temperature'),
-    const MyService(),
+    () => const MyService(),
     capabilities: const {
       UiConfigurableCapability(
         label: 'Temperature',
@@ -122,7 +122,7 @@ void addVisualsPlugin(PluginRuntime runtime, List<Plugin> myPlugins) {
 void registerWithExtensionField(ScopedServiceRegistry registry) {
   registry.registerSingleton<MyService>(
     const ServiceId('theme_service'),
-    const MyService(),
+    () => const MyService(),
     capabilities: const {
       UiConfigurableCapability(
         label: 'Theme',
@@ -184,7 +184,7 @@ void registerWithNamespace(ScopedServiceRegistry registry) {
 
   registry.registerSingleton<MyService>(
     agent('temperature'),                  // ServiceId('agent.temperature')
-    const MyService(),
+    () => const MyService(),
     capabilities: const {
       UiConfigurableCapability(
         label: 'Temperature',

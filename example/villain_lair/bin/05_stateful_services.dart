@@ -217,7 +217,7 @@ class CafeteriaPlugin extends SessionPlugin {
     // lifecycle. Factories won't work here.
     registry.registerSingleton<SentientCoffeeMachine>(
       const ServiceId('coffee_machine'),
-      SentientCoffeeMachine(),
+      () => SentientCoffeeMachine(),
     );
   }
 }

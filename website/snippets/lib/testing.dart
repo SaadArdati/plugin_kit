@@ -59,8 +59,8 @@ void demonstrateStubInjectFake() {
   ctx.registry.registerSingleton<Logger>(
     pluginId: const PluginId('test'),
     serviceId: const ServiceId('logger'),
-    instance: FakeLogger(),
-    priority: 1000, // beats anything the SUT registers
+    create: () => FakeLogger(),
+    priority: Priority.system, // beats anything the SUT registers
   );
 
   final logger = ctx.registry.resolve<Logger>(const ServiceId('logger'));
@@ -219,7 +219,7 @@ class ChatBufferPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<ChatBuffer>(
       const ServiceId('buffer'),
-      ChatBuffer(),
+      () => ChatBuffer(),
     );
   }
 }

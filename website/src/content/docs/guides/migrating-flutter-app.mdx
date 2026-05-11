@@ -174,10 +174,10 @@ on the Flutter side of the bridge, not inside plugin events.
 
 If events cross a server boundary, make them serializable. For requests where
 you want more than one handler to get a chance, declare the response type as
-nullable. Handlers run in ascending priority order; a non-null return claims
-the call and stops dispatch, while returning `null` concedes to the next
-handler. With a non-nullable response there is no cascade; the first handler
-in priority order always wins.
+nullable. Handlers run in descending priority order (highest first); a non-null
+return claims the call and stops dispatch, while returning `null` concedes to
+the next handler. With a non-nullable response there is no cascade; the first
+handler in priority order always wins.
 
 ## Provider and ChangeNotifier
 

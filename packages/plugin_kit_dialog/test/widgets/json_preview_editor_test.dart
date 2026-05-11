@@ -280,7 +280,7 @@ class _JsonPreviewPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Object>(
       ServiceId.namespaced(Namespace('main_agent'), 'agent_service'),
-      Object(),
+      () => Object(),
     );
   }
 }

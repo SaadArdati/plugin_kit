@@ -61,7 +61,7 @@ void registerConfigurableService(ScopedServiceRegistry registry) {
 
   registry.registerSingleton<MyService>(
     agent('temperature'),
-    const MyService(),
+    () => const MyService(),
     capabilities: const {
       UiConfigurableCapability(
         label: 'Temperature',
@@ -287,7 +287,7 @@ void registerWithNumberField(ScopedServiceRegistry registry) {
 
   registry.registerSingleton<TemperatureService>(
     agent('temperature'), // ServiceId('agent.temperature')
-    TemperatureService(),
+    () => TemperatureService(),
     capabilities: const {
       UiConfigurableCapability(
         label: 'Temperature',

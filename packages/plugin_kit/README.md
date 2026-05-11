@@ -34,7 +34,7 @@ class CasualPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Greeter>(
       const ServiceId('greeter'),
-      CasualGreeter(),
+      () => CasualGreeter(),
     );
   }
 }
@@ -47,8 +47,8 @@ class FormalPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<Greeter>(
       const ServiceId('greeter'),
-      FormalGreeter(),
-      priority: 100, // wins
+      () => FormalGreeter(),
+      priority: Priority.elevated, // wins (beats Priority.normal default)
     );
   }
 }
@@ -105,8 +105,8 @@ Behavior another plugin should override, settings-tune, or disable belongs in a 
 | Need | Base class | Registration |
 |---|---|---|
 | No settings, no events, no lifecycle. | Plain Dart class. | `registerFactory` / `registerSingleton` / `registerLazySingleton` |
-| Settings injection from `RuntimeSettings.services`. | `PluginService`. | All three. Override `injectSettings` only to react to changes; **must** call `super.injectSettings(settings, hash: hash)`. |
-| Lifecycle, events, or session-bound state. | `StatefulPluginService` (or aliases `SessionStatefulPluginService` / `GlobalStatefulPluginService`). | `registerSingleton` / `registerLazySingleton` only; factories rejected. `attach()` and `detach()` are pure user hooks (no `super`). Auto-tracked event helpers (`on`, `onRequest`, `bind`, `emit`) read `this.context` implicitly. |
+| Settings injection from `RuntimeSettings.services`. | `PluginService`. | All three. Override `onSettingsInjected()` to react to changes (no super, no args; read `config` / `settings` directly). |
+| Lifecycle, events, or session-bound state. | `StatefulPluginService` (or aliases `SessionStatefulPluginService` / `GlobalStatefulPluginService`). | `registerSingleton` / `registerLazySingleton` only; factories rejected. `attach()`, `detach()`, and `onSettingsInjected()` are pure user hooks (no `super`). Auto-tracked event helpers (`on`, `onRequest`, `bind`, `emit`) read `this.context` implicitly. |
 
 ```dart
 class ChatThread extends StatefulPluginService<SessionPluginContext> {
@@ -135,16 +135,15 @@ Priority-based, keyed by typed `ServiceId` handles. Inside a plugin's `register`
 registry.registerFactory<MyService>(
   const ServiceId('my_service'),
   () => MyServiceImpl(),
-  priority: 50,
 );
 
-// Singleton: same instance for every resolve.
+// Singleton: factory runs ONCE at registration; same instance for every resolve.
 registry.registerSingleton<MyService>(
   const ServiceId('my_service'),
-  MyServiceImpl(),
+  () => MyServiceImpl(),
 );
 
-// Lazy singleton: constructed on first resolve.
+// Lazy singleton: factory runs once on first resolve, cached after.
 registry.registerLazySingleton<MyService>(
   const ServiceId('my_service'),
   () => MyServiceImpl(),
@@ -160,15 +159,15 @@ final fallback = context.resolveAfter<MyService>(
 );
 ```
 
-Higher priority wins. Default is `50` (`ServiceRegistry.defaultPriority`). Use a higher priority to override; a lower one to register a fallback that only wins when nothing else does.
+Higher priority wins, in both the registry and the event bus. Default is `Priority.normal` (500). Reach for the named stops on `Priority` (`elevated`, `high`, ...) when you want a discoverable override level, or `Priority.above(other)` / `Priority.below(other)` for relative positioning. Raw ints work too.
 
 Build dotted/namespaced ids with `Namespace`:
 
 ```dart
 const agent = Namespace('agent');
 
-registry.registerSingleton<Model>(agent('model'), GptModel());
-registry.registerSingleton<Tools>(agent.namespace('mcp')('tools'), McpTools());
+registry.registerSingleton<Model>(agent('model'), () => GptModel());
+registry.registerSingleton<Tools>(agent.namespace('mcp')('tools'), () => McpTools());
 
 context.resolve<Model>(agent('model'));
 ```

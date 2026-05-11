@@ -64,7 +64,7 @@ class DebuggerPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<DebugAdapterService>(
       const ServiceId('debug_adapter'),
-      DebugAdapterService(),
+      () => DebugAdapterService(),
     );
   }
 

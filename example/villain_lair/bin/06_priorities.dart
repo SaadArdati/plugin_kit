@@ -1,12 +1,13 @@
-/// # 06: Priorities (Event Bus vs Service Registry)
+/// # 06: Priorities (Event Bus and Service Registry, one polarity)
 ///
-/// Two priority systems that go in opposite directions:
-/// - Event bus: lower number runs earlier in the cascade
-/// - Service registry: higher number wins resolution
+/// Both priority systems use the same convention: higher runs first /
+/// higher wins. The event bus dispatches the highest-priority handler
+/// first so it can mutate or stop the cascade; the registry resolves to
+/// the highest-priority registration.
 ///
 /// Covers:
-/// - Staggered observers at priorities 0 / 5 / 10 / 99
-/// - A priority-3 handler that stops the cascade via `envelope.stop()`
+/// - Staggered observers across the named [Priority] bands
+/// - A high-priority handler that stops the cascade via `envelope.stop()`
 /// - Inspecting `EventEnvelope.stopped` on the return of `emit()`
 /// - Competing `registerSingleton` entries resolved by priority
 /// - `resolveAfter` for chain-of-responsibility fallback
@@ -63,8 +64,9 @@ class GarysTraps implements TrapService {
 
 /// Registers three competing trap services (registry priority) and wires
 /// four `HeroSpotted` handlers at staggered bus priorities. A `CoffeeBreak`
-/// event flips a closure-local flag that the priority-3 handler uses to stop
-/// the cascade. No plugin fields; all state flows through events.
+/// event flips a closure-local flag that the high-priority Coffee Protocol
+/// handler uses to stop the cascade. No plugin fields; all state flows
+/// through events.
 class PriorityDemoPlugin extends SessionPlugin {
   @override
   PluginId get pluginId => const PluginId('priority_demo');
@@ -74,30 +76,32 @@ class PriorityDemoPlugin extends SessionPlugin {
     // Three trap services competing for the 'trap' slot. In a real system
     // each would come from its own plugin; we use registry.raw here as a
     // teaching shortcut to keep all three registrations in one file.
+    // Higher priority wins: Doug's laser grid is the primary.
     registry.raw.registerSingleton<TrapService>(
       pluginId: const PluginId('doug'),
       serviceId: const ServiceId('trap'),
-      instance: LaserGrid(),
-      priority: 100,
+      create: () => LaserGrid(),
+      priority: Priority.elevated, // primary
     );
     registry.raw.registerSingleton<TrapService>(
       pluginId: const PluginId('engineering'),
       serviceId: const ServiceId('trap'),
-      instance: TrapdoorFloor(),
-      priority: 50,
+      create: () => TrapdoorFloor(),
+      priority: Priority.normal, // mid-stack backup
     );
     registry.raw.registerSingleton<TrapService>(
       pluginId: const PluginId('gary'),
       serviceId: const ServiceId('trap'),
-      instance: GarysTraps(),
-      priority: 10,
+      create: () => GarysTraps(),
+      priority: Priority.low, // last-resort
     );
   }
 
   @override
   void attach(SessionPluginContext context) {
     // Closure state: whether a coffee break is currently active. Toggled by
-    // CoffeeBreak events, read by the priority-3 handler. Not a plugin field.
+    // CoffeeBreak events, read by the Coffee Protocol handler. Not a plugin
+    // field.
     var coffeeBreakActive = false;
 
     context.bus.on<CoffeeBreak>((e) {
@@ -105,45 +109,46 @@ class PriorityDemoPlugin extends SessionPlugin {
       print('☕ Coffee break started for ${e.event.department}.');
     });
 
-    // Priority 0: coffee machine runs first.
-    context.bus.on<HeroSpotted>((e) {
-      print(
-        '[Priority 0, Coffee Machine] Hero "${e.event.heroName}" '
-        'spotted. Is anyone on break?',
-      );
-    }, priority: 0);
-
-    // Priority 3: coffee protocol handler. Stops the cascade while a break is
-    // active so security/Doug/Gary never see the alert.
+    // High priority: Coffee Protocol stops the cascade before anyone else
+    // sees the alert, while a coffee break is active. Higher = runs first.
     context.bus.on<HeroSpotted>((envelope) async {
       if (!coffeeBreakActive) return;
       print(
-        '[Priority 3, Coffee Protocol] HOLD EVERYTHING. '
+        '[Priority.high, Coffee Protocol] HOLD EVERYTHING. '
         "It's coffee time. The hero can wait.",
       );
       envelope.stop(envelope.event);
       return;
-    }, priority: 3);
+    }, priority: Priority.high);
 
-    // Priority 5: security.
+    // Elevated: Coffee Machine pings before security/Doug. It only observes;
+    // it does not stop.
     context.bus.on<HeroSpotted>((e) {
       print(
-        '[Priority 5, Security] Acknowledged: ${e.event.heroName} '
+        '[Priority.elevated, Coffee Machine] Hero "${e.event.heroName}" '
+        'spotted. Is anyone on break?',
+      );
+    }, priority: Priority.elevated);
+
+    // Normal: Security gets the alert in the mid-stack default slot.
+    context.bus.on<HeroSpotted>((e) {
+      print(
+        '[Priority.normal, Security] Acknowledged: ${e.event.heroName} '
         'is in ${e.event.location}.',
       );
-    }, priority: 5);
+    }, priority: Priority.normal);
 
-    // Priority 10: Doug activates traps.
+    // Low: Doug activates traps after security has logged the sighting.
     context.bus.on<HeroSpotted>((e) {
-      print('[Priority 10, Doug] Activating traps in ${e.event.location}!');
-    }, priority: 10);
+      print('[Priority.low, Doug] Activating traps in ${e.event.location}!');
+    }, priority: Priority.low);
 
-    // Priority 99: Gary, eventually.
+    // Lowest: Gary notices last, when everyone else has already reacted.
     context.bus.on<HeroSpotted>((_) {
       print(
-        "[Priority 99, Gary] Wait, what's happening? *looks up from phone*",
+        "[Priority.lowest, Gary] Wait, what's happening? *looks up from phone*",
       );
-    }, priority: 99);
+    }, priority: Priority.lowest);
   }
 }
 
@@ -151,13 +156,15 @@ Future<void> main() async {
   final runtime = PluginRuntime(plugins: [PriorityDemoPlugin()])..init();
   final session = await runtime.createSession();
 
-  // Part 1: Event bus priority. Handlers at 0/5/10/99 all run in order.
-  print('=== Part 1: Event Bus Priority (lower runs first) ===\n');
+  // Part 1: Event bus priority. Handlers run highest-first: Coffee Machine
+  // (elevated) -> Security (normal) -> Doug (low) -> Gary (lowest). Coffee
+  // Protocol (high) only fires when a break is active.
+  print('=== Part 1: Event Bus Priority (higher runs first) ===\n');
   await session.emit(const HeroSpotted('Captain Valiant', location: 'Lobby'));
 
-  // Part 1b: A CoffeeBreak event puts the coffee protocol handler on alert.
-  // The next HeroSpotted is stopped at priority 3, before the priority-5 or
-  // priority-10 handlers see it.
+  // Part 1b: A CoffeeBreak event puts the Coffee Protocol handler on alert.
+  // The next HeroSpotted is stopped at Priority.high, before Coffee Machine,
+  // Security, Doug, or Gary see it.
   print('\n=== Part 1b: Coffee Break Stops the Cascade ===\n');
   await session.emit(const CoffeeBreak('Trap Department'));
   final response = await session.emit(
@@ -166,7 +173,7 @@ Future<void> main() async {
   print('Event stopped? ${response.stopped}');
   print('Doug never got the alert. The hero escaped. Again.\n');
 
-  // Part 2: Service registry priority. Opposite direction: higher wins.
+  // Part 2: Service registry priority. Same polarity: higher wins.
   print('=== Part 2: Service Registry Priority (higher wins) ===\n');
   final registry = session.registry;
 
@@ -187,8 +194,8 @@ Future<void> main() async {
   print("Gary's trap: ${garysContribution.activate("Captain Valiant")}");
 
   print('\n=== Summary ===');
-  print('Event bus:    lower number = runs earlier (pipeline)');
-  print('Registry:     higher number = wins (competition)');
+  print('Event bus:  higher priority runs first (intercept early, stop early)');
+  print('Registry:   higher priority wins (override late, beat the default)');
 
   await runtime.dispose();
 }

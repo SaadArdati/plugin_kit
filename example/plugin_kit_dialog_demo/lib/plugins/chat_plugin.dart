@@ -29,7 +29,7 @@ class ChatPlugin extends GlobalPlugin {
     registry.withPriority(100)
       ..registerSingleton<Object>(
         CorePlugin.model,
-        Object(),
+        () => Object(),
         capabilities: const {
           UiConfigurableCapability(
             label: 'Model & Provider',
@@ -60,7 +60,7 @@ class ChatPlugin extends GlobalPlugin {
       )
       ..registerSingleton<Object>(
         temperature,
-        Object(),
+        () => Object(),
         capabilities: const {
           UiConfigurableCapability(
             label: 'Temperature',
@@ -80,7 +80,7 @@ class ChatPlugin extends GlobalPlugin {
       )
       ..registerSingleton<Object>(
         CorePlugin.systemMessage,
-        Object(),
+        () => Object(),
         capabilities: const {
           UiConfigurableCapability(
             label: 'System Message',

@@ -116,7 +116,7 @@ class _CounterPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<_CounterService>(
       const ServiceId('counter'),
-      _CounterService(),
+      () => _CounterService(),
     );
   }
 }
@@ -154,11 +154,11 @@ class _PartialAttachFailurePlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<_ThrowingAttachService>(
       const ServiceId('throwing'),
-      _ThrowingAttachService(),
+      () => _ThrowingAttachService(),
     );
     registry.registerSingleton<_HealthyAttachService>(
       const ServiceId('healthy'),
-      _HealthyAttachService(),
+      () => _HealthyAttachService(),
     );
   }
 
@@ -209,11 +209,11 @@ class _PartialDetachFailurePlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<_ThrowingDetachService>(
       const ServiceId('throwing'),
-      _ThrowingDetachService(),
+      () => _ThrowingDetachService(),
     );
     registry.registerSingleton<_RecordingDetachService>(
       const ServiceId('recording'),
-      _RecordingDetachService(),
+      () => _RecordingDetachService(),
     );
   }
 
@@ -272,7 +272,7 @@ class _SubCancelThrowingPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<_SubCancelThrowingService>(
       const ServiceId('sub_cancel'),
-      _SubCancelThrowingService(),
+      () => _SubCancelThrowingService(),
     );
   }
 
@@ -323,7 +323,7 @@ class _ReentrantOnCancelPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<_ReentrantOnCancelService>(
       const ServiceId('reentrant'),
-      _ReentrantOnCancelService(),
+      () => _ReentrantOnCancelService(),
     );
   }
 
@@ -355,7 +355,7 @@ class _TwoStepFailurePlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<_AttachThrowingMarkerService>(
       const ServiceId('attach_thrower'),
-      _AttachThrowingMarkerService(),
+      () => _AttachThrowingMarkerService(),
     );
   }
 
@@ -396,7 +396,7 @@ class _TwoThrowingCancelsPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<_TwoThrowingCancelsService>(
       const ServiceId('two_throwers'),
-      _TwoThrowingCancelsService(),
+      () => _TwoThrowingCancelsService(),
     );
   }
 }

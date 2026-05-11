@@ -52,7 +52,7 @@ class MrWhiskersPlugin extends GlobalPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<String>(
       const ServiceId('species'),
-      'Cat (allegedly). Possible elder god.',
+      () => 'Cat (allegedly). Possible elder god.',
       priority: 999,
     );
   }

@@ -335,7 +335,7 @@ class AiAssistPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<PanelWidgetFactory>(
       ServiceSlots.panel('ai_assist'),
-      _AiAssistPanelFactory(),
+      () => _AiAssistPanelFactory(),
     );
   }
 }

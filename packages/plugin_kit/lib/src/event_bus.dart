@@ -98,12 +98,12 @@ typedef EventBindingCallback = void Function(EventEnvelope<dynamic> event);
 /// Typed, priority-ordered event bus for decoupled inter-plugin
 /// communication.
 ///
-/// Events are dispatched by Dart type (`T`); handlers run in ascending
-/// priority order (lower numbers first), so higher-priority handlers
-/// intercept before lower-priority ones see the event. A handler can stop
-/// dispatch by calling [EventEnvelope.stop] with a final result. Events
-/// optionally carry an [identifier] (an agent id, etc.); both general and
-/// identifier-specific handlers merge during dispatch.
+/// Events are dispatched by Dart type (`T`); handlers run in descending
+/// priority order (higher numbers first), so the highest-priority handler
+/// intercepts before lower-priority handlers see the event. A handler can
+/// stop dispatch by calling [EventEnvelope.stop] with a final result.
+/// Events optionally carry an [identifier] (an agent id, etc.); both
+/// general and identifier-specific handlers merge during dispatch.
 ///
 /// [onRequest]/[request] provide typed RPC-style communication, while
 /// [bind] observes every non-internal event for logging, debugging, or
@@ -130,11 +130,16 @@ typedef EventBindingCallback = void Function(EventEnvelope<dynamic> event);
 /// );
 /// ```
 ///
-/// Priority convention: ascending. A handler with `priority: 0` runs before
-/// `priority: 10`. This is the opposite of [ServiceRegistry], where higher
-/// numbers win during resolution. The rationale: event handlers form an
-/// ordered pipeline (first handler can intercept) while service resolution
-/// is a competition (highest priority wins).
+/// Priority convention: higher runs first. A handler at
+/// `Priority.elevated` (1000) runs before one at `Priority.normal` (500).
+/// Matches [ServiceRegistry]: in both subsystems, higher numbers mean more
+/// authority. The highest-priority handler intercepts first and can mutate
+/// or stop the cascade before lower-priority handlers see the event.
+///
+/// Use [Priority]'s named stops (`Priority.normal`, `Priority.elevated`, …)
+/// for discoverable values and `Priority.above(other)` for relative
+/// positioning. Raw integers work too. Default priority is
+/// `Priority.normal`.
 ///
 /// Each [PluginSession] owns its own event bus instance. When the session
 /// is disposed, [dispose] clears all handlers and bindings. For
@@ -196,12 +201,13 @@ class EventBus {
   /// mutate `e.event` (downstream handlers see the change) and call
   /// [EventEnvelope.stop] to halt the cascade and set the final result.
   ///
-  /// Handlers are dispatched in ascending priority order (lower numbers
-  /// first). When [identifier] is supplied, identifier-scoped handlers
-  /// merge with general handlers in the same priority-ordered sequence.
+  /// Handlers are dispatched in descending priority order (higher numbers
+  /// first), matching [ServiceRegistry] resolution. When [identifier] is
+  /// supplied, identifier-scoped handlers merge with general handlers in
+  /// the same priority-ordered sequence.
   StreamSubscription on<T>(
     EventHandler<T> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   }) {
     _checkNotDisposed();
@@ -244,7 +250,7 @@ class EventBus {
   /// ```
   StreamSubscription onSync<T>(
     SyncEventHandler<T> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   }) {
     // Wrap the sync handler as a FutureOr handler so it shares the same
@@ -277,7 +283,7 @@ class EventBus {
   /// Dispatch model (mirrors [emit]):
   ///
   ///   * General handlers and `identifier`-scoped handlers are merged
-  ///     into a single ascending-priority sequence (lower priority
+  ///     into a single descending-priority sequence (higher priority
   ///     number runs first).
   ///   * Each handler is invoked with the wrapped request. A handler
   ///     claims the call by returning a non-null [Response];
@@ -378,7 +384,7 @@ class EventBus {
   /// ```
   StreamSubscription onRequest<Request, Response>(
     RequestHandler<Request, Response> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   }) {
     _checkNotDisposed();
@@ -515,7 +521,7 @@ class EventBus {
   /// ```
   StreamSubscription onRequestSync<Request, Response>(
     SyncRequestHandler<Request, Response> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   }) {
     // Wrap the sync handler as a FutureOr handler so it shares the same
@@ -540,9 +546,9 @@ class EventBus {
   /// Emit an event and await all handlers.
   ///
   /// Wraps [event] in an [EventEnvelope], then runs registered handlers in
-  /// ascending priority order. Dispatch stops when a handler calls
-  /// [EventEnvelope.stop] or when every handler has run. Returns the
-  /// envelope with its final state.
+  /// descending priority order (higher priority runs first). Dispatch stops
+  /// when a handler calls [EventEnvelope.stop] or when every handler has
+  /// run. Returns the envelope with its final state.
   // #docregion event-bus-emit
   Future<EventEnvelope<T>> emit<T>({
     required T event,
@@ -636,13 +642,13 @@ class EventBus {
   }
 
   /// Merge the general list with the (optional) identifier-scoped list into
-  /// a single ascending-priority sequence.
+  /// a single descending-priority sequence (higher priority first).
   ///
-  /// Both inputs are assumed already sorted by priority. Used by [emit],
-  /// [request], and [requestSync] so all three dispatch paths agree on
-  /// ordering.
+  /// Both inputs are assumed already sorted by descending priority. Used by
+  /// [emit], [request], and [requestSync] so all three dispatch paths agree
+  /// on ordering.
   ///
-  /// Always returns a NEW list — never the underlying bucket — so callers
+  /// Always returns a NEW list, never the underlying bucket, so callers
   /// can iterate safely while a handler cancels (and thus mutates the
   /// underlying bucket) mid-dispatch.
   List<E> _mergePrioritized<E extends _PriorityEntry>(List<E> a, List<E>? b) {
@@ -652,7 +658,7 @@ class EventBus {
     final merged = <E>[];
     int i = 0, j = 0;
     while (i < a.length && j < b.length) {
-      if (a[i].priority <= b[j].priority) {
+      if (a[i].priority >= b[j].priority) {
         merged.add(a[i++]);
       } else {
         merged.add(b[j++]);
@@ -663,10 +669,11 @@ class EventBus {
     return merged;
   }
 
-  /// Insert [entry] into [list] keeping it sorted by ascending priority.
+  /// Insert [entry] into [list] keeping it sorted by descending priority
+  /// (higher priority at the front; dispatch iterates the front-to-back).
   void _insertPrioritized<E extends _PriorityEntry>(List<E> list, E entry) {
     // Simple insertion; lists are expected to be small.
-    final index = list.indexWhere((e) => entry.priority < e.priority);
+    final index = list.indexWhere((e) => entry.priority > e.priority);
     if (index == -1) {
       list.add(entry);
     } else {

@@ -186,7 +186,7 @@ class GitPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<PanelWidgetFactory>(
       ServiceSlots.panel('changes'),
-      _GitPanelFactory(),
+      () => _GitPanelFactory(),
     );
   }
 }

@@ -52,7 +52,8 @@ abstract class PluginService {
   /// Creates a service with empty injected settings.
   PluginService() : _settings = const {};
 
-  /// Inject settings from the registry.
+  /// Inject settings from the registry. Framework entry point and
+  /// orchestrator; do not override.
   ///
   /// Called by [ServiceRegistry.resolve] (and variants) when the service is
   /// created or refreshed. The [settings] map is already scoped to this
@@ -60,14 +61,29 @@ abstract class PluginService {
   /// lazy-singleton services the registry passes a pre-computed [hash] to
   /// skip redundant updates; when null it is computed from [settings].
   ///
-  /// Override to react to settings changes, but always call
-  /// `super.injectSettings(settings, hash: hash)`.
-  @mustCallSuper
+  /// This method does the bookkeeping (settings storage, hash, config
+  /// rebuild) and then calls the user-overridable [onSettingsInjected]
+  /// hook. To react to settings changes, override [onSettingsInjected] and
+  /// read [config] / [settings] there; no super call is needed.
+  @nonVirtual
   void injectSettings(Map<String, dynamic> settings, {String? hash}) {
     _settingsHash = hash ?? ConfigNode.hashSettings(settings);
     _settings = settings;
     config = ConfigNode({...settings});
+    onSettingsInjected();
   }
+
+  /// User-overridable hook fired AFTER [injectSettings] finishes writing
+  /// [settings], [settingsHash], and [config]. Default is a no-op.
+  ///
+  /// Override to react to settings changes (re-derive cached values, swap
+  /// upstream connections, etc.). Read fresh values via [config] (typed)
+  /// or [settings] (raw); the framework has already updated both by the
+  /// time this runs.
+  ///
+  /// No super call needed; the framework runs the bookkeeping before
+  /// invoking this hook.
+  void onSettingsInjected() {}
 }
 
 /// A [PluginService] with session lifecycle and automatic subscription

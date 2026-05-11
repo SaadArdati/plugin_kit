@@ -69,8 +69,10 @@ class PluginKitVisualsPlugin extends GlobalPlugin {
       serviceVisualNamespace(serviceId.value);
 
   /// Registration priority used so host overrides beat self-attached
-  /// visuals (default registry priority).
-  static const int dialogVisualsAdapterPriority = 100;
+  /// visuals registered at the default registry priority
+  /// ([Priority.normal]). Sits at the [Priority.elevated] band: the
+  /// conventional "I am an override" stop.
+  static const int dialogVisualsAdapterPriority = Priority.elevated;
 
   /// Stable plugin id for registry lookup.
   static const id = PluginId('plugin_kit_visuals');
@@ -103,21 +105,21 @@ class PluginKitVisualsPlugin extends GlobalPlugin {
     for (final MapEntry(key: pid, value: visual) in pluginVisuals.entries) {
       registry.registerSingleton<PluginKitVisual>(
         visualFor(pid),
-        visual,
+        () => visual,
         priority: dialogVisualsAdapterPriority,
       );
     }
     for (final MapEntry(key: ns, value: visual) in namespaceVisuals.entries) {
       registry.registerSingleton<PluginKitVisual>(
         visualOf(ns),
-        visual,
+        () => visual,
         priority: dialogVisualsAdapterPriority,
       );
     }
     for (final MapEntry(key: svc, value: visual) in serviceVisuals.entries) {
       registry.registerSingleton<PluginKitVisual>(
         visualOfService(svc),
-        visual,
+        () => visual,
         priority: dialogVisualsAdapterPriority,
       );
     }

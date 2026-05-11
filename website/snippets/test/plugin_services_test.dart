@@ -89,7 +89,7 @@ class _AssistantReadyPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<AssistantRuntimeService>(
       const ServiceId('assistant_runtime'),
-      AssistantRuntimeService(),
+      () => AssistantRuntimeService(),
     );
   }
 }
@@ -102,7 +102,7 @@ class _AssistantRequestPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<AssistantRequestService>(
       const ServiceId('assistant_request'),
-      AssistantRequestService(),
+      () => AssistantRequestService(),
     );
   }
 }

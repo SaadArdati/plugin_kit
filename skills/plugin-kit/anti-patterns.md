@@ -11,12 +11,11 @@ Symptom in code -> anti-pattern number.
 - `registry.resolve(...)` or `context.resolve(...)` inside `register()` -> #3
 - Plugin helpers without `context` arg (`on(handler)` not `on(context, handler)`) -> #4
 - `final svc = context.resolve<X>(...)` cached at attach, used later in handlers -> #5
-- `registerSingleton(id, _field)` with a plugin-level captured field -> #6
-- `context.bus.on(` inside a `Plugin.attach` or `StatefulPluginService.attach` -> #7
-- `resolveByPlugin(...)` or otherwise coupling resolution to a plugin id -> #8
-- `PluginId('__pk_*')` literal anywhere outside the library -> #9
-- Mutable fields on a fact/notification event -> #10
-- `super.attach(...)` or `super.detach(...)` calls in user overrides -> SKILL.md convention #1
+- `context.bus.on(` inside a `Plugin.attach` or `StatefulPluginService.attach` -> #6
+- `resolveByPlugin(...)` or otherwise coupling resolution to a plugin id -> #7
+- `PluginId('__pk_*')` literal anywhere outside the library -> #8
+- Mutable fields on a fact/notification event -> #9
+- `super.attach(...)` / `super.detach(...)` / `super.injectSettings(...)` calls in user overrides -> SKILL.md convention #1
 
 ## 1. Replaceable behavior on Plugin.attach instead of in a service
 
@@ -90,7 +89,7 @@ class BadPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     // DO NOT do this: resolution order is undefined during register-all.
     final _ = registry.raw.maybeResolve<Logger>(const ServiceId('logger'));
-    registry.registerSingleton<Logger>(const ServiceId('my_logger'), Logger());
+    registry.registerSingleton<Logger>(const ServiceId('my_logger'), () => Logger());
   }
 }
 ```
@@ -183,36 +182,7 @@ Resolution is O(1) Map lookup plus at most one priority sort. Cost is negligible
 
 Holding fields for components you registered yourself (your own state) is state ownership, not the same thing.
 
-## 6. Sharing service instances across sessions via captured field
-
-```dart
-class ChatPlugin extends SessionPlugin {
-  static const PluginId id = PluginId('chat');
-  static const ServiceId serviceId = ServiceId('service');
-
-  @override
-  PluginId get pluginId => id;
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<ChatService>(serviceId, ChatService());
-  }
-}
-```
-
-Convention is inline construction in `register()` so each session evaluates the constructor expression fresh. Captured field defeats this: every session resolves the same instance. Session A's `messages` IS session B's. Sealed-session semantics break.
-
-Fix: construct inline.
-```dart
-registry.registerSingleton<ChatService>(
-  const ServiceId('chat'),
-  ChatService(),
-);
-```
-
-For genuinely shared state across sessions, use `GlobalPlugin`. One-instance-per-runtime is its native shape.
-
-## 7. Raw `context.bus.on(...)` instead of the helper
+## 6. Raw `context.bus.on(...)` instead of the helper
 
 ```dart
 @override
@@ -231,7 +201,7 @@ on<MyEvent>((e) => /* ... */);            // StatefulPluginService: reads this.c
 
 Reach for `context.bus.on(...)` only when the subscription's lifetime should NOT match the plugin/service. Rare.
 
-## 8. Coupling to a plugin id for resolution
+## 7. Coupling to a plugin id for resolution
 
 ```dart
 class ChainRouter implements ModelRouter {
@@ -266,9 +236,9 @@ class ChainRouter implements ModelRouter {
 
 The registry resolves by `ServiceId` and priority decides the winner. There is no `resolveByPlugin` API. Wanting one means coupling to a plugin that may be disabled, replaced, or renamed.
 
-Fix: resolve by `ServiceId`. Let priority and override do their job. The legitimate case for naming a specific plugin is `resolveAfter(pluginId: self, serviceId: slot)`, which is cursor-based skip-self for chain delegation, not "give me their instance."
+Fix: resolve by `ServiceId`. Let priority and override do their job. The legitimate case for naming a specific plugin is `resolveAfter(pluginId: self, serviceId: slot)`, which is cursor-based skip-self for chain delegation (patterns.md #6), not "give me their instance."
 
-## 9. PluginId starting with `__pk_`
+## 8. PluginId starting with `__pk_`
 
 ```dart
 // WRONG: PluginId values starting with '__pk_' are reserved.
@@ -291,7 +261,7 @@ PluginId('my_internal')    // fine
 PluginId('_my_internal')   // single-underscore is fine; only '__pk_' is reserved
 ```
 
-## 10. Mutable fields on a fact event
+## 9. Mutable fields on a fact event
 
 ```dart
 // WRONG: Mutating a fact event. Facts are observations of things that already

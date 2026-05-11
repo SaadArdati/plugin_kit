@@ -189,7 +189,7 @@ class RunnerPlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<PanelWidgetFactory>(
       ServiceSlots.panel('console'),
-      _ConsolePanelFactory(),
+      () => _ConsolePanelFactory(),
     );
   }
 }

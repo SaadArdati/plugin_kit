@@ -50,7 +50,7 @@ class MarkdownLanguagePlugin extends SessionPlugin {
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<MarkdownAnalyzer>(
       const ServiceId('markdown_analyzer'),
-      MarkdownAnalyzer(),
+      () => MarkdownAnalyzer(),
     );
   }
 }

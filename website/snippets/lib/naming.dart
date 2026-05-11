@@ -87,7 +87,7 @@ const linter = PluginId('linter_suite');
 // #docregion naming-service-settings
 const serviceSettingsExample = ServiceSettings(
   config: {'channel': 'slack', 'max_retries': 3},
-  priority: 100,
+  priority: Priority.elevated,
 );
 // #enddocregion naming-service-settings
 
