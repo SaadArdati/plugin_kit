@@ -6,7 +6,10 @@ description: Optional Flutter ergonomics on top of plugin_kit. Scope widgets, a 
 import { Aside, Card, CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
 import { Code } from '@astrojs/starlight/components';
 import { extractRegion } from '../../../utils/excerpt.mjs';
+import PubVersion from '../../../components/PubVersion.astro';
 import flutterIntegrationSource from '../../../../snippets/lib/flutter_integration.dart?raw';
+
+<PubVersion />
 
 `flutter_plugin_kit` is the optional Flutter companion to [`plugin_kit`](https://github.com/SaadArdati/plugin_kit/tree/main/packages/plugin_kit). It packages the patterns a Flutter shell uses around a `PluginRuntime` (carrying it through the tree, subscribing to session events from a `State`, exposing the latest event to a state-management library) into a small set of types you opt into where they pay for themselves.
 
@@ -22,8 +25,8 @@ Both ship in this monorepo. Use whichever is cheaper for the shape of your app.
 
 ```yaml
 dependencies:
-  plugin_kit: ^1.0.0
-  flutter_plugin_kit: ^0.1.0
+  plugin_kit: ^PUBVER_plugin_kit
+  flutter_plugin_kit: ^PUBVER_flutter_plugin_kit
 ```
 
 ## What's in the box

@@ -6,8 +6,11 @@ description: A drop-in Flutter customization surface for any PluginRuntime. Thre
 import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 import { Code } from '@astrojs/starlight/components';
 import { extractRegion } from '../../../utils/excerpt.mjs';
+import PubVersion from '../../../components/PubVersion.astro';
 import dialogSnippets from '../../../../../website/snippets/lib/dialog.dart?raw';
 import configFieldsSnippets from '../../../../../website/snippets/lib/config_fields.dart?raw';
+
+<PubVersion />
 
 Plugin Kit Dialog is a Flutter dialog that inspects and edits any [`PluginRuntime`](/concepts/runtime/) at runtime. Drop it in once and your users get a three-tab UI for toggling plugins, editing service config, and inspecting the registry. You write zero settings-screens-per-plugin code.
 
@@ -17,8 +20,8 @@ The dialog is built from `plugin_kit` plugins itself. Every tab, header action, 
 
 ```yaml
 dependencies:
-  plugin_kit: ^1.0.0
-  plugin_kit_dialog: ^0.1.0
+  plugin_kit: ^PUBVER_plugin_kit
+  plugin_kit_dialog: ^PUBVER_plugin_kit_dialog
 ```
 
 `plugin_kit` carries the dart-only declaration types ([`UiConfigurableCapability`](#declaring-configurable-services), `ConfigField`, etc.). `plugin_kit_dialog` adds the Flutter UI on top.
