@@ -14,7 +14,7 @@ import '../widgets/chat_view.dart';
 /// constructor, exposes the most recent event payload as [ChangeNotifier]
 /// state via [PluginEventNotifier.value], and cancels the subscription in
 /// [PluginEventNotifier.dispose]. There is no `_disposed` flag, no
-/// [notifyListeners] call, and no [StreamSubscription] field to maintain.
+/// [notifyListeners] call, and no [EventSubscription] field to maintain.
 ///
 /// The widget passes the notifier through `ChangeNotifierProvider.value`
 /// because the notifier is constructed once per screen and the provider

@@ -118,7 +118,7 @@ abstract class StatefulPluginService<PKC extends PluginContext>
     extends PluginService {
   /// Subscriptions cancelled automatically by the framework after [detach]
   /// returns.
-  final List<StreamSubscription> activeSubscriptions = [];
+  final List<EventSubscription> activeSubscriptions = [];
 
   /// Bindings registered through [StatefulPluginServiceHelper.bind].
   /// Each entry is the cancel callback returned by `EventBus.bind`; the
@@ -171,7 +171,7 @@ abstract class StatefulPluginService<PKC extends PluginContext>
   /// [ConcurrentModificationError] mid-loop.
   Future<List<(String, Object, StackTrace)>> _unbindContext() async {
     final stepFailures = <(String, Object, StackTrace)>[];
-    final subsSnapshot = [...activeSubscriptions];
+    final List<EventSubscription> subsSnapshot = [...activeSubscriptions];
     activeSubscriptions.clear();
     for (final sub in subsSnapshot) {
       try {

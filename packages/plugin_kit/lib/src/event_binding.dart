@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:plugin_kit/plugin_kit.dart';
 
 /// Portable descriptor of "subscribe to events of type [E] on a session."
@@ -18,7 +16,7 @@ abstract class EventBinding {
   ///
   /// The caller is responsible for cancelling the returned subscription
   /// when the observer is no longer needed.
-  StreamSubscription<void> attachTo(PluginSession session);
+  EventSubscription attachTo(PluginSession session);
 
   /// Builds an [EventBinding] that delivers the unwrapped event payload
   /// of type [E] to [handler] on each emission of an [E]-typed event.
@@ -39,7 +37,7 @@ class _OnBinding<E> implements EventBinding {
   final String? identifier;
 
   @override
-  StreamSubscription<void> attachTo(PluginSession session) {
+  EventSubscription attachTo(PluginSession session) {
     return session.on<E>(
       (envelope) => handler(envelope.event),
       priority: priority,

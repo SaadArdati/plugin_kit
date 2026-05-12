@@ -96,6 +96,43 @@ The next most common cause is a dependency that is not enabled. The runtime auto
 
 Once the plugin is enabled and its dependencies are satisfied, check the lifecycle: did your `attach` handler actually run, and did you pass `context` to the `Plugin` helpers? See the first entry on this page.
 
+### `runtime.init` throws `StateError` saying a plugin or service id is unknown
+
+**Cause.** A `RuntimeSettings` you passed (often loaded from cached user storage) references a plugin id or service id that this runtime does not know about. Common when an app upgrade renames or removes a plugin: the cached settings written by the prior version still reference the old id, so the strict default surfaces the drift loudly.
+
+The runtime validates three things at every `init` / `createSession` / `updateSettings` call:
+
+- Plugin ids used in `RuntimeSettings.plugins` keys.
+- Plugin ids used in the plugin half of `RuntimeSettings.services` pin keys.
+- Service ids in plugin-scoped pins, checked after register-all (so a renamed slot on a still-existing plugin is caught too).
+
+`Pin.wildcard(...)` pins are exempt from the service-id pass by design (they target whoever wins).
+
+**Fix.** Pick the response that matches your environment:
+
+```dart
+runtime.init(
+  // The default. Use during development and CI so typos and renamed
+  // ids surface immediately.
+  unknownReferencePolicy: UnknownReferencePolicy.throwError,
+);
+
+runtime.init(
+  // Recommended for production load paths that read cached settings
+  // across app upgrades. Unknown entries are dropped and one severe
+  // log entry per pass lists them; known entries still apply.
+  unknownReferencePolicy: UnknownReferencePolicy.logAndSkip,
+);
+
+runtime.init(
+  // Silent drop. Use only when another channel (a settings UI, a
+  // drift telemetry hook) already informs the user about the drop.
+  unknownReferencePolicy: UnknownReferencePolicy.ignore,
+);
+```
+
+The policy is set once on `init` and is read by every subsequent `createSession` / `updateSessionSettings` / `updateGlobalSettings` call on the same runtime.
+
 ## Service resolution issues
 
 ### `registerFactory` for a `StatefulPluginService` throws on registration

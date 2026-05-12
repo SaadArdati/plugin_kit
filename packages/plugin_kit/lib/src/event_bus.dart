@@ -4,6 +4,24 @@ import 'dart:async';
 
 import 'package:plugin_kit/plugin_kit.dart';
 
+/// Cancel-only handle returned by [EventBus.on], [EventBus.onSync],
+/// [EventBus.onRequest], and [EventBus.onRequestSync].
+///
+/// Distinct from [EventBinding] (which is a declarative descriptor used
+/// before the subscription is materialized). An [EventSubscription] is
+/// the live token returned AFTER a handler has been attached; cancel it
+/// to remove the handler.
+///
+/// Bus subscriptions are not backed by a Dart [Stream] and don't support
+/// backpressure, data callbacks, or `asFuture`. Modelling them as a
+/// dedicated handle avoids the previous fragility of returning a
+/// [StreamSubscription] whose non-cancel methods all threw at runtime.
+abstract interface class EventSubscription {
+  /// Cancel the subscription. Idempotent: calling cancel twice is a no-op
+  /// after the first removes the handler.
+  Future<void> cancel();
+}
+
 /// Wrapper around an event payload passed to each handler during dispatch.
 ///
 /// Handlers can read [event], mutate it for downstream handlers, or call
@@ -43,18 +61,6 @@ class EventEnvelope<T> {
     event = value;
     _stopped = true;
   }
-}
-
-/// Internal-only event response that is not exposed to [EventBindingCallback]s.
-///
-/// Used for system-internal events that should not be observed by external
-/// binding callbacks (e.g., lifecycle events).
-class InternalPluginEventResponse<T> extends EventEnvelope<T> {
-  /// Creates an internal-only event response.
-  InternalPluginEventResponse({
-    required super.event,
-    required super.identifier,
-  });
 }
 
 /// Handler function for events of type [T].
@@ -205,7 +211,7 @@ class EventBus {
   /// first), matching [ServiceRegistry] resolution. When [identifier] is
   /// supplied, identifier-scoped handlers merge with general handlers in
   /// the same priority-ordered sequence.
-  StreamSubscription on<T>(
+  EventSubscription on<T>(
     EventHandler<T> handler, {
     int priority = Priority.normal,
     String? identifier,
@@ -218,7 +224,12 @@ class EventBus {
         : buckets.byId.putIfAbsent(identifier, () => <_EventEntry<T>>[]);
 
     final entry = _EventEntry<T>(priority: priority, run: handler);
-    _insertPrioritized(list, entry);
+    list.add(entry);
+    if (identifier == null) {
+      buckets.markGeneralDirty();
+    } else {
+      buckets.markIdDirty(identifier);
+    }
 
     return _EventHandlerSub(
       onCancel: () {
@@ -227,7 +238,7 @@ class EventBus {
           if (identifier == null) {
             if (buckets.byId.isEmpty) _eventHandlers.remove(T);
           } else {
-            buckets.byId.remove(identifier);
+            buckets.removeIdBucket(identifier);
             if (buckets.byId.isEmpty && buckets.general.isEmpty) {
               _eventHandlers.remove(T);
             }
@@ -248,7 +259,7 @@ class EventBus {
   ///   if (e.event.isSpam) e.stop(MessageBlocked());
   /// });
   /// ```
-  StreamSubscription onSync<T>(
+  EventSubscription onSync<T>(
     SyncEventHandler<T> handler, {
     int priority = Priority.normal,
     String? identifier,
@@ -314,22 +325,24 @@ class EventBus {
         requestType: Request,
         responseType: Response,
         identifier: identifier,
-        reason: 'no handlers registered',
+        reason: RequestUnavailableReason.noRegistration,
       );
     }
     final buckets = raw as _RequestBuckets<Request, Response>;
 
+    buckets.ensureGeneralSorted();
+    buckets.ensureIdSorted(identifier);
     final merged = _mergePrioritized(buckets.general, buckets.byId[identifier]);
     if (merged.isEmpty) {
       throw RequestUnavailableException(
         requestType: Request,
         responseType: Response,
         identifier: identifier,
-        reason: 'no handlers registered',
+        reason: RequestUnavailableReason.noMatchingHandler,
       );
     }
 
-    final wrapped = InternalPluginEventResponse<Request>(
+    final wrapped = EventEnvelope<Request>(
       event: request,
       identifier: identifier,
     );
@@ -346,8 +359,7 @@ class EventBus {
       requestType: Request,
       responseType: Response,
       identifier: identifier,
-      reason:
-          'every registered handler returned null but Response is non-nullable',
+      reason: RequestUnavailableReason.allConceded,
     );
   }
 
@@ -373,8 +385,8 @@ class EventBus {
   /// Register a handler for request/response communication.
   ///
   /// When [request] is called with matching `Request`/`Response` types,
-  /// this handler is invoked to produce the envelope. Returns a
-  /// [StreamSubscription] for cancellation.
+  /// this handler is invoked to produce the envelope. Returns an
+  /// [EventSubscription] for cancellation.
   ///
   /// Example:
   /// ```dart
@@ -382,7 +394,7 @@ class EventBus {
   ///   return await performSearch(req.event.query);
   /// }, priority: 10);
   /// ```
-  StreamSubscription onRequest<Request, Response>(
+  EventSubscription onRequest<Request, Response>(
     RequestHandler<Request, Response> handler, {
     int priority = Priority.normal,
     String? identifier,
@@ -406,7 +418,12 @@ class EventBus {
       priority: priority,
       run: handler,
     );
-    _insertPrioritized(list, entry);
+    list.add(entry);
+    if (identifier == null) {
+      buckets.markGeneralDirty();
+    } else {
+      buckets.markIdDirty(identifier);
+    }
 
     return _EventHandlerSub(
       onCancel: () {
@@ -415,7 +432,7 @@ class EventBus {
           if (identifier == null) {
             if (buckets.byId.isEmpty) _requestHandlers.remove(key);
           } else {
-            buckets.byId.remove(identifier);
+            buckets.removeIdBucket(identifier);
             if (buckets.byId.isEmpty && buckets.general.isEmpty) {
               _requestHandlers.remove(key);
             }
@@ -449,22 +466,24 @@ class EventBus {
         requestType: Request,
         responseType: Response,
         identifier: identifier,
-        reason: 'no handlers registered',
+        reason: RequestUnavailableReason.noRegistration,
       );
     }
     final buckets = raw as _RequestBuckets<Request, Response>;
 
+    buckets.ensureGeneralSorted();
+    buckets.ensureIdSorted(identifier);
     final merged = _mergePrioritized(buckets.general, buckets.byId[identifier]);
     if (merged.isEmpty) {
       throw RequestUnavailableException(
         requestType: Request,
         responseType: Response,
         identifier: identifier,
-        reason: 'no handlers registered',
+        reason: RequestUnavailableReason.noMatchingHandler,
       );
     }
 
-    final wrapped = InternalPluginEventResponse<Request>(
+    final wrapped = EventEnvelope<Request>(
       event: request,
       identifier: identifier,
     );
@@ -487,8 +506,7 @@ class EventBus {
       requestType: Request,
       responseType: Response,
       identifier: identifier,
-      reason:
-          'every registered handler returned null but Response is non-nullable',
+      reason: RequestUnavailableReason.allConceded,
     );
   }
 
@@ -519,7 +537,7 @@ class EventBus {
   ///   return findModel(req.event); // must be sync
   /// });
   /// ```
-  StreamSubscription onRequestSync<Request, Response>(
+  EventSubscription onRequestSync<Request, Response>(
     SyncRequestHandler<Request, Response> handler, {
     int priority = Priority.normal,
     String? identifier,
@@ -535,9 +553,8 @@ class EventBus {
 
   /// Emit an internal event that is not exposed to [bind] callbacks.
   ///
-  /// Delegates to [emit] with `internal: true`. Internal events are
-  /// wrapped in [InternalPluginEventResponse] and skip [EventBindingCallback]
-  /// observation. Used for system lifecycle events.
+  /// Delegates to [emit] with `internal: true`. Internal events skip
+  /// [EventBindingCallback] observation. Used for system lifecycle events.
   Future<EventEnvelope<T>> emitInternal<T>({
     required T event,
     String? identifier,
@@ -557,9 +574,7 @@ class EventBus {
   }) async {
     // #enddocregion event-bus-emit
     _checkNotDisposed();
-    final wrapped = internal
-        ? InternalPluginEventResponse(event: event, identifier: identifier)
-        : EventEnvelope<T>(event: event, identifier: identifier);
+    final wrapped = EventEnvelope<T>(event: event, identifier: identifier);
 
     // Forward event to all bound callbacks (skip internal events). Iterate
     // a snapshot so a callback that calls its cancel closure mid-dispatch
@@ -574,6 +589,8 @@ class EventBus {
     if (raw == null) return wrapped;
     final buckets = raw as _EventBuckets<T>;
 
+    buckets.ensureGeneralSorted();
+    buckets.ensureIdSorted(identifier);
     final merged = _mergePrioritized(buckets.general, buckets.byId[identifier]);
 
     // The wrapped object will get passed to each handler and mutated at each step.
@@ -609,9 +626,7 @@ class EventBus {
     bool internal = false,
   }) {
     _checkNotDisposed();
-    final wrapped = internal
-        ? InternalPluginEventResponse(event: event, identifier: identifier)
-        : EventEnvelope<T>(event: event, identifier: identifier);
+    final wrapped = EventEnvelope<T>(event: event, identifier: identifier);
 
     // Forward event to all bound callbacks (skip internal events). Iterate
     // a snapshot so a callback that calls its cancel closure mid-dispatch
@@ -626,6 +641,8 @@ class EventBus {
     if (raw == null) return wrapped;
     final buckets = raw as _EventBuckets<T>;
 
+    buckets.ensureGeneralSorted();
+    buckets.ensureIdSorted(identifier);
     final merged = _mergePrioritized(buckets.general, buckets.byId[identifier]);
 
     // The wrapped object will get passed to each handler and mutated at each step.
@@ -669,17 +686,6 @@ class EventBus {
     return merged;
   }
 
-  /// Insert [entry] into [list] keeping it sorted by descending priority
-  /// (higher priority at the front; dispatch iterates the front-to-back).
-  void _insertPrioritized<E extends _PriorityEntry>(List<E> list, E entry) {
-    // Simple insertion; lists are expected to be small.
-    final index = list.indexWhere((e) => entry.priority > e.priority);
-    if (index == -1) {
-      list.add(entry);
-    } else {
-      list.insert(index, entry);
-    }
-  }
 }
 
 /// Shared interface for priority-sorted handler entries.
@@ -700,10 +706,46 @@ class _EventEntry<T> implements _PriorityEntry {
 }
 
 /// Per-type event buckets. Stored in [EventBus._eventHandlers] at key `T`.
+///
+/// Handlers are appended in O(1); the bucket is marked dirty and sorted
+/// lazily on the next dispatch via [ensureGeneralSorted] /
+/// [ensureIdSorted]. Sorting on append (O(N) shift per insert -> O(N^2)
+/// total for N registrations) is the bottleneck the lazy strategy
+/// removes for the common register-many-then-dispatch pattern.
 class _EventBuckets<T> {
   final List<_EventEntry<T>> general = <_EventEntry<T>>[];
   final Map<String, List<_EventEntry<T>>> byId =
       <String, List<_EventEntry<T>>>{};
+  bool _generalDirty = false;
+  final Set<String> _dirtyIds = <String>{};
+
+  void markGeneralDirty() {
+    _generalDirty = true;
+  }
+
+  void markIdDirty(String id) {
+    _dirtyIds.add(id);
+  }
+
+  /// Remove the identifier's bucket AND its dirty-id entry atomically.
+  /// Keeps `_dirtyIds` from accumulating stale entries when the last
+  /// handler for an identifier is cancelled.
+  void removeIdBucket(String id) {
+    byId.remove(id);
+    _dirtyIds.remove(id);
+  }
+
+  void ensureGeneralSorted() {
+    if (!_generalDirty) return;
+    general.sort((a, b) => b.priority.compareTo(a.priority));
+    _generalDirty = false;
+  }
+
+  void ensureIdSorted(String? id) {
+    if (id == null) return;
+    if (!_dirtyIds.remove(id)) return;
+    byId[id]?.sort((a, b) => b.priority.compareTo(a.priority));
+  }
 }
 
 /// Typed request handler entry.
@@ -716,55 +758,57 @@ class _RequestEntry<Request, Response> implements _PriorityEntry {
 }
 
 /// Per-request-pair buckets. Stored in [EventBus._requestHandlers] at key
-/// `(Request, Response)`.
+/// `(Request, Response)`. Same lazy-sort strategy as [_EventBuckets].
 class _RequestBuckets<Request, Response> {
   final List<_RequestEntry<Request, Response>> general =
       <_RequestEntry<Request, Response>>[];
   final Map<String, List<_RequestEntry<Request, Response>>> byId =
       <String, List<_RequestEntry<Request, Response>>>{};
+  bool _generalDirty = false;
+  final Set<String> _dirtyIds = <String>{};
+
+  void markGeneralDirty() {
+    _generalDirty = true;
+  }
+
+  void markIdDirty(String id) {
+    _dirtyIds.add(id);
+  }
+
+  void removeIdBucket(String id) {
+    byId.remove(id);
+    _dirtyIds.remove(id);
+  }
+
+  void ensureGeneralSorted() {
+    if (!_generalDirty) return;
+    general.sort((a, b) => b.priority.compareTo(a.priority));
+    _generalDirty = false;
+  }
+
+  void ensureIdSorted(String? id) {
+    if (id == null) return;
+    if (!_dirtyIds.remove(id)) return;
+    byId[id]?.sort((a, b) => b.priority.compareTo(a.priority));
+  }
 }
 
 typedef _CancelCallback = void Function();
 
-/// Subscription wrapper for event handlers.
-///
-/// Provides a [StreamSubscription] interface for canceling event handlers.
-/// Only [cancel] is supported: other [StreamSubscription] methods throw
-/// [UnsupportedError] since event bus subscriptions are not backed by a
-/// real [Stream] and don't support backpressure or data callbacks.
-class _EventHandlerSub implements StreamSubscription {
-  /// Function to call when canceling the subscription.
+/// Concrete [EventSubscription] returned by every `on*` method on
+/// [EventBus]. Holds the cancel callback registered when the handler was
+/// inserted into its priority-sorted bucket; calling [cancel] removes the
+/// handler entry and, if the bucket goes empty, removes the bucket too.
+class _EventHandlerSub implements EventSubscription {
   final _CancelCallback _cancel;
+  bool _cancelled = false;
 
   _EventHandlerSub({required _CancelCallback onCancel}) : _cancel = onCancel;
 
   @override
-  Future<void> cancel() async => _cancel();
-
-  @override
-  void onData(void Function(dynamic)? handleData) =>
-      throw UnsupportedError('Event bus subscriptions do not support onData');
-
-  @override
-  void onDone(void Function()? handleDone) =>
-      throw UnsupportedError('Event bus subscriptions do not support onDone');
-
-  @override
-  void onError(Function? handleError) =>
-      throw UnsupportedError('Event bus subscriptions do not support onError');
-
-  @override
-  void pause([Future<void>? resumeSignal]) =>
-      throw UnsupportedError('Event bus subscriptions do not support pause');
-
-  @override
-  void resume() =>
-      throw UnsupportedError('Event bus subscriptions do not support resume');
-
-  @override
-  bool get isPaused => false;
-
-  @override
-  Future<E> asFuture<E>([E? futureValue]) =>
-      throw UnsupportedError('Event bus subscriptions do not support asFuture');
+  Future<void> cancel() async {
+    if (_cancelled) return;
+    _cancelled = true;
+    _cancel();
+  }
 }

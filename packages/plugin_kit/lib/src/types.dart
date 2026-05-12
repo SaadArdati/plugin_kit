@@ -260,10 +260,23 @@ class SessionPluginContext extends PluginContext {
 
 /// Convenience extension for broadcasting events across all active sessions.
 extension SessionBroadcast on List<PluginSession> {
-  /// Emits [event] on every session's bus.
+  /// Emits [event] on every session's bus in parallel.
+  ///
+  /// Each session's cascade is started concurrently rather than waiting
+  /// for the previous session to drain. A slow handler in one session
+  /// no longer delays the next session's dispatch start.
+  ///
+  /// Errors thrown by any session's cascade are collected by
+  /// [Future.wait] with `eagerError: false`: every session still runs to
+  /// completion, and the first error encountered surfaces on the
+  /// returned future once all sessions have settled.
   Future<void> emit<T>(T event, {String? identifier}) async {
-    for (final session in this) {
-      await session.bus.emit<T>(event: event, identifier: identifier);
-    }
+    await Future.wait(
+      [
+        for (final session in this)
+          session.bus.emit<T>(event: event, identifier: identifier),
+      ],
+      eagerError: false,
+    );
   }
 }

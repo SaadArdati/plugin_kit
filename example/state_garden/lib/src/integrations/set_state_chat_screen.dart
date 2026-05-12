@@ -9,7 +9,7 @@ import '../widgets/chat_view.dart';
 
 /// Reference recipe: `StatefulWidget` plus `setState`, no library.
 ///
-/// The widget owns the [StreamSubscription]. Every async continuation that
+/// The widget owns the [EventSubscription]. Every async continuation that
 /// touches state checks `mounted`. The subscription is cancelled in
 /// [State.dispose].
 // #docregion set-state-chat-screen-set-state-chat-screen
@@ -24,7 +24,7 @@ class SetStateChatScreen extends StatefulWidget {
 // #enddocregion set-state-chat-screen-set-state-chat-screen
 
 class _SetStateChatScreenState extends State<SetStateChatScreen> {
-  StreamSubscription<void>? _subscription;
+  EventSubscription? _subscription;
   List<ChatMessage> _messages = const <ChatMessage>[];
 
   @override

@@ -294,15 +294,15 @@ Reading `context` outside the `attach`/`detach` window throws `StateError`. Use 
 The `StatefulPluginServiceHelper` extension adds bus subscription helpers that auto-track. Subscriptions opened through these helpers land in `activeSubscriptions` and get cancelled by the framework when the service detaches.
 
 ```dart
-StreamSubscription on<E>(EventHandler<E> handler, {int priority = 0, String? identifier});
+EventSubscription on<E>(EventHandler<E> handler, {int priority = 0, String? identifier});
 
-StreamSubscription onRequest<Request, Response>(
+EventSubscription onRequest<Request, Response>(
   RequestHandler<Request, Response> handler, {
   int priority = 0,
   String? identifier,
 });
 
-StreamSubscription onRequestSync<Request, Response>(
+EventSubscription onRequestSync<Request, Response>(
   SyncRequestHandler<Request, Response> handler, {
   int priority = 0,
   String? identifier,
@@ -313,7 +313,7 @@ void Function() bind(EventBindingCallback callback);
 Future<EventEnvelope<T>> emit<T>(T event, {String? identifier});
 ```
 
-All five helpers return what callers might need to cancel early: a `StreamSubscription` for `on` / `onRequest` / `onRequestSync`, a cancel callback for `bind`, and the resulting envelope for `emit`. All call sites assume `attach` has run; `emit` throws `StateError` when called outside the window.
+All five helpers return what callers might need to cancel early: a `EventSubscription` for `on` / `onRequest` / `onRequestSync`, a cancel callback for `bind`, and the resulting envelope for `emit`. All call sites assume `attach` has run; `emit` throws `StateError` when called outside the window.
 
 The same helper also exposes `resolve`, `maybeResolve`, and `resolveAfter` so a stateful service can reach into the registry without typing `context.registry` first. To resolve a namespaced slot, build the `ServiceId` via `Namespace.call(...)` and pass it to `resolve(...)` or `maybeResolve(...)`. See [Event Bus & Events](/reference/event-bus-and-events/) for the underlying bus contract.
 

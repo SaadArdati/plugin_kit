@@ -21,7 +21,7 @@ import 'package:collection/collection.dart';
 /// final verbose = config.getBool('verbose') ?? false;
 /// final timeout = config.getInt('timeout') ?? 60;
 /// final name = config.get<String>('name') ?? 'default';
-/// final options = config.list<String>('options') ?? [];
+/// final options = config.list<String>('options');
 /// ```
 ///
 /// The static [hashSettings] produces a stable hash from a settings map.
@@ -80,8 +80,16 @@ class ConfigNode {
     return null;
   }
 
-  /// Returns the value at [key] as a `List<T>`, or null if the value is not
-  /// a list or any element cannot be cast to [T].
+  /// Returns the value at [key] as a `List<T>`, or `null` when the value
+  /// is missing, not a list, or fails the element cast. Nullable so
+  /// callers can fall back to a custom default via `??`:
+  ///
+  /// ```dart
+  /// final tags = config.list<String>('tags') ?? const ['default'];
+  /// ```
+  ///
+  /// Matches the failure mode of [get], [getString], [getInt],
+  /// [getDouble], [getBool], and [map].
   List<T>? list<T>(String key) {
     final v = _node[key];
     if (v is List) {
@@ -94,18 +102,26 @@ class ConfigNode {
     return null;
   }
 
-  /// Returns the value at [key] as a `Map<String, dynamic>`, or an empty map
-  /// when the value is missing, not a map, or fails the cast.
-  Map<String, dynamic> map(String key) {
+  /// Returns the value at [key] as a `Map<String, dynamic>`, or `null`
+  /// when the value is missing, not a map, or fails the cast. Nullable
+  /// so callers can fall back to a custom default via `??`:
+  ///
+  /// ```dart
+  /// final headers = config.map('headers') ?? const {'X-Default': '1'};
+  /// ```
+  ///
+  /// Matches the failure mode of every other typed accessor on this
+  /// class.
+  Map<String, dynamic>? map(String key) {
     final v = _node[key];
     if (v is Map) {
       try {
         return v.cast<String, dynamic>();
       } catch (_) {
-        return const {};
+        return null;
       }
     }
-    return const {};
+    return null;
   }
 
   /// Whether [key] exists with a non-null value.

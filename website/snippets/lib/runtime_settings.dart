@@ -167,7 +167,7 @@ void demonstrateConfigNodeListMap() {
     'headers': {'timeout_ms': 5000},
   });
   final tools = node.list<String>('tools') ?? const [];
-  final headers = node.map('headers');
+  final headers = node.map('headers') ?? const {};
   final timeoutMs = headers['timeout_ms'] as int?;
   print('$tools $timeoutMs');
 }
@@ -204,7 +204,7 @@ void demonstrateNestedMapAccess() {
   const node = ConfigNode({
     'headers': {'timeout_ms': 3000},
   });
-  final headers = node.map('headers');
+  final headers = node.map('headers') ?? const {};
   final timeoutMs = headers['timeout_ms'] as int?;
   print(timeoutMs);
 }

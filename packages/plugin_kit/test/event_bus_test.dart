@@ -72,23 +72,6 @@ void main() {
   });
 
   // ===========================================================================
-  // InternalPluginEventResponse
-  // ===========================================================================
-  group('InternalPluginEventResponse', () {
-    test('is distinguishable from PluginEventResponse by type check', () {
-      final internal = InternalPluginEventResponse<String>(
-        event: 'internal',
-        identifier: null,
-      );
-      final normal = EventEnvelope<String>(event: 'normal', identifier: null);
-
-      // This type distinction is what emit() uses to skip bind callbacks
-      expect(internal, isA<InternalPluginEventResponse<String>>());
-      expect(normal, isNot(isA<InternalPluginEventResponse<String>>()));
-    });
-  });
-
-  // ===========================================================================
   // dispose
   // ===========================================================================
   group('dispose()', () {
@@ -525,7 +508,7 @@ void main() {
         // from the same list emit is iterating over.
         var firstCount = 0;
         var secondCount = 0;
-        late StreamSubscription<void> first;
+        late EventSubscription first;
         first = bus.on<EventA>((event) {
           firstCount++;
           first.cancel();
@@ -552,7 +535,7 @@ void main() {
       'sync handler that cancels another handler during dispatch does not throw',
       () {
         // Same regression as above but via emitSync.
-        late StreamSubscription<void> victim;
+        late EventSubscription victim;
         var aRan = false;
         var bRan = false;
         bus.on<EventA>((event) {
@@ -609,7 +592,7 @@ void main() {
         // Identifier-scoped path goes through _mergePrioritized's other
         // empty-input branch (a.isEmpty + non-empty b). Same regression.
         var count = 0;
-        late StreamSubscription<void> sub;
+        late EventSubscription sub;
         sub = bus.on<EventA>((event) {
           count++;
           sub.cancel();
@@ -625,42 +608,23 @@ void main() {
   });
 
   // ===========================================================================
-  // _EventHandlerSub: StreamSubscription interface
+  // EventSubscription: cancel-only handle returned by every on* method
   // ===========================================================================
-  group('_EventHandlerSub', () {
-    test('isPaused returns false', () {
-      final sub = bus.on<String>((event) {});
-      expect(sub.isPaused, isFalse);
+  group('EventSubscription', () {
+    test('cancel() removes the handler from the bus', () async {
+      var count = 0;
+      final sub = bus.on<String>((event) => count++);
+      await bus.emit<String>(event: 'a');
+      expect(count, 1);
+      await sub.cancel();
+      await bus.emit<String>(event: 'b');
+      expect(count, 1, reason: 'cancelled handler must not fire');
     });
 
-    test('onData throws UnsupportedError', () {
+    test('cancel() is idempotent', () async {
       final sub = bus.on<String>((event) {});
-      expect(() => sub.onData((_) {}), throwsUnsupportedError);
-    });
-
-    test('onDone throws UnsupportedError', () {
-      final sub = bus.on<String>((event) {});
-      expect(() => sub.onDone(() {}), throwsUnsupportedError);
-    });
-
-    test('onError throws UnsupportedError', () {
-      final sub = bus.on<String>((event) {});
-      expect(() => sub.onError((_) {}), throwsUnsupportedError);
-    });
-
-    test('pause throws UnsupportedError', () {
-      final sub = bus.on<String>((event) {});
-      expect(() => sub.pause(), throwsUnsupportedError);
-    });
-
-    test('resume throws UnsupportedError', () {
-      final sub = bus.on<String>((event) {});
-      expect(() => sub.resume(), throwsUnsupportedError);
-    });
-
-    test('asFuture throws UnsupportedError', () {
-      final sub = bus.on<String>((event) {});
-      expect(() => sub.asFuture(), throwsUnsupportedError);
+      await sub.cancel();
+      await sub.cancel(); // must not throw or double-remove
     });
   });
 
@@ -680,7 +644,7 @@ void main() {
     });
 
     test(
-      'wraps event in PluginEventResponse for non-internal events',
+      'wraps event in an EventEnvelope',
       () async {
         EventEnvelope? captured;
         bus.on<String>((e) {
@@ -688,7 +652,6 @@ void main() {
         });
         await bus.emit<String>(event: 'test');
         expect(captured, isA<EventEnvelope<String>>());
-        expect(captured, isNot(isA<InternalPluginEventResponse<String>>()));
       },
     );
   });
@@ -697,15 +660,6 @@ void main() {
   // emitInternal()
   // ===========================================================================
   group('emitInternal()', () {
-    test('wraps event in InternalPluginEventResponse', () async {
-      EventEnvelope? captured;
-      bus.on<String>((e) {
-        captured = e;
-      });
-      await bus.emitInternal<String>(event: 'internal');
-      expect(captured, isA<InternalPluginEventResponse<String>>());
-    });
-
     test('does NOT trigger bind callbacks', () async {
       var bindCalled = false;
       bus.bind((e) => bindCalled = true);

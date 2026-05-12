@@ -28,7 +28,7 @@ void main() {
 
   group('flutter-plugin-event-notifier', () {
     test('PluginEventCubit can be created and closed', () async {
-      final runtime = PluginRuntime.empty()..init();
+      final runtime = PluginRuntime()..init();
       final session = await runtime.createSession();
 
       final cubit = PluginEventCubit<ChatMessageReceived>(session);
@@ -40,7 +40,7 @@ void main() {
 
   group('flutter-chat-controller', () {
     test('ChatController attaches and disposes without error', () async {
-      final runtime = PluginRuntime.empty()..init();
+      final runtime = PluginRuntime()..init();
       final session = await runtime.createSession();
 
       final controller = ChatController(session);

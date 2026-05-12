@@ -194,7 +194,7 @@ void attach(SessionPluginContext context) {
 }
 ```
 
-`EventBus.on` returns a `StreamSubscription` that the bus does not auto-cancel. `PluginHelper` and `StatefulPluginServiceHelper` extensions wrap it: helpers bucket subscriptions per context and the framework cancels them on detach.
+`EventBus.on` returns an `EventSubscription` that the bus does not auto-cancel. `PluginHelper` and `StatefulPluginServiceHelper` extensions wrap it: helpers bucket subscriptions per context and the framework cancels them on detach.
 
 Fix:
 ```dart
@@ -207,24 +207,22 @@ Reach for `context.bus.on(...)` only when the subscription's lifetime should NOT
 ## 7. Coupling to a plugin id for resolution
 
 ```dart
-class BetterDartFormatter extends StatefulPluginService implements Formatter {
-  @override
-  String format(String path, String input) {
-    if (path.endsWith('.dart')) {
-      // Our specialty. Format it ourselves.
-      return input.trim();
-    }
-    // Not a Dart file. Hand off to whichever Formatter was the previous winner.
-    return context.registry
-        .resolveAfter<Formatter>(pluginId: pluginId, serviceId: serviceId)
-        .format(path, input);
+// WRONG: Asking the registry for "the Formatter that plugin X registered."
+class CrossPluginConsumer extends StatefulPluginService {
+  void format(String input) {
+    // No such API exists, and that is the point: coupling to a specific
+    // plugin id makes you brittle to it being disabled, replaced, or
+    // renamed.
+    final formatter =
+        context.registry.resolveByPlugin<Formatter>(PluginId('formatter'));
+    formatter.format(input);
   }
 }
 ```
 
 The registry resolves by `ServiceId` and priority decides the winner. There is no `resolveByPlugin` API. Wanting one means coupling to a plugin that may be disabled, replaced, or renamed.
 
-Fix: resolve by `ServiceId`. Let priority and override do their job. The legitimate case for naming a specific plugin is `resolveAfter(pluginId: self, serviceId: slot)`, which is cursor-based skip-self for chain delegation (patterns.md #6), not "give me their instance."
+Fix: resolve by `ServiceId`. Let priority and override do their job. The legitimate case for naming a specific plugin is `resolveAfter(pluginId: self, serviceId: slot)`: cursor-based skip-self for chain delegation. See patterns.md #6 for the full example.
 
 ## 8. PluginId starting with `__pk_`
 

@@ -1,6 +1,50 @@
 import 'package:collection/collection.dart';
 import 'package:plugin_kit/src/typed_handles.dart';
 
+/// Policy for handling [RuntimeSettings] entries that reference an id
+/// the runtime does not know about. Covers every reference shape that
+/// can drift across app versions:
+///
+/// - a plugin id key in [RuntimeSettings.plugins] for a plugin that is
+///   no longer registered,
+/// - the plugin portion of a service pin in [RuntimeSettings.services]
+///   when the named plugin is no longer registered, and
+/// - the service-id portion of a pin when the named plugin exists but
+///   no longer registers a service under that id.
+///
+/// Cached user settings frequently survive across app upgrades that
+/// rename or remove ids; the policy decides whether to fail loud,
+/// degrade gracefully with a log, or silently drop the unknown entry.
+///
+/// Used by [PluginRuntime.init] (and the matching `init`-style entry
+/// points) to gate every validation pass.
+///
+/// The default is [throwError]: the base package stays strict until a
+/// caller explicitly opts into a softer policy. Production apps that
+/// load cached settings across app upgrades should typically use
+/// [logAndSkip] (or [ignore], if drift is surfaced by another channel).
+enum UnknownReferencePolicy {
+  /// Throw [StateError] on the first unknown reference. The default.
+  /// Surfaces typos and renamed ids loudly in development and CI.
+  /// Not safe for production load paths that read cached user
+  /// settings, since a renamed plugin or service in storage would
+  /// crash app startup; switch to [logAndSkip] for those callsites.
+  throwError,
+
+  /// Log severe and drop the unknown entry. Recommended for
+  /// production load paths that read cached settings written by a
+  /// prior app version. The configuration partial-applies: known
+  /// entries take effect, unknown ones are skipped. A single severe
+  /// log entry per apply call summarises the dropped ids so
+  /// developers still see drift when logging is wired up.
+  logAndSkip,
+
+  /// Silently drop the unknown entry. Use only when another channel
+  /// (UI surfacing of sanitised settings, a structured drift signal)
+  /// already informs the user about the drop.
+  ignore,
+}
+
 /// Configuration for a single service slot within a plugin.
 ///
 /// Controls whether the service is enabled, the per-service configuration
@@ -169,7 +213,7 @@ class PluginConfig {
 ///
 /// [plugins] is keyed by `pluginId`. [services] is keyed by [Pin],
 /// the `(PluginId, ServiceId)` record. The JSON wire form for each key
-/// is `"pluginId:serviceId"` (or `"*:serviceId"` for wildcard) — see
+/// is `"pluginId:serviceId"` (or `"*:serviceId"` for wildcard). See
 /// [Pin.wire] and [Pin.fromWire].
 ///
 /// ```json
@@ -194,7 +238,7 @@ class RuntimeSettings {
 
   /// Service-level configurations keyed by [Pin]. The wire form
   /// of each key (used in JSON serialization) is `"pluginId:serviceId"`
-  /// or `"*:serviceId"` — see [Pin.wire] and
+  /// or `"*:serviceId"`. See [Pin.wire] and
   /// [Pin.fromWire].
   final Map<Pin, ServiceSettings> services;
 
@@ -241,8 +285,8 @@ class RuntimeSettings {
   /// Whether [pluginId] is enabled, per the explicit settings value alone.
   ///
   /// Returns the explicit [PluginConfig.enabled] value if one exists in
-  /// [plugins], otherwise `true`. This is the settings-intent answer
-  /// — it does NOT consult feature flags, the experimental-aware default,
+  /// [plugins], otherwise `true`. This is the settings-intent answer:
+  /// it does NOT consult feature flags, the experimental-aware default,
   /// or dependency-cascade results. For the fully-resolved enablement
   /// decision (locked plugins, experimental fallback,
   /// `defaultEnabledPluginIds`, dependency cascade), use

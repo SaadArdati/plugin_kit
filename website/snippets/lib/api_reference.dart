@@ -411,7 +411,7 @@ Future<void> demonstrateRuntimeSessionPattern() async {
     ),
   );
 
-  print('attached: ${session.attachedPluginIds}');
+  print('enabled: ${session.enabledPluginIds}');
   print('sessions: ${runtime.sessions.length}');
   print('globalRegistry: ${runtime.globalRegistry.runtimeType}');
   print('globalBus: ${runtime.globalBus.runtimeType}');

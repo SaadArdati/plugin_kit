@@ -11,7 +11,7 @@ import '../widgets/chat_view.dart';
 /// Same shape as the [ChangeNotifier]-plus-provider recipe in
 /// `change_notifier_chat.dart`, but the bridge mixes in
 /// [PluginSessionListener] and supplies its bindings declaratively through
-/// the [subscriptions] getter. The mixin owns the [StreamSubscription]
+/// the [subscriptions] getter. The mixin owns the [EventSubscription]
 /// list, [attachSubscriptions] / [detachSubscriptions] are idempotent, and
 /// the host does not store a `_disposed` flag because dispose runs detach
 /// before `notifyListeners` could fire from a late envelope.
@@ -35,14 +35,14 @@ class ChatSessionListenerNotifier extends ChangeNotifier
 
   @override
   List<EventBinding> get subscriptions => [
-    EventBinding.on<ChatMessagesChanged>(_onMessagesChanged),
+    on<ChatMessagesChanged>(_onMessagesChanged),
   ];
 
   List<ChatMessage> _messages = const <ChatMessage>[];
+
   List<ChatMessage> get messages => _messages;
 
-  Future<void> send(String text) =>
-      _session.emit(SendMessageRequested(text)).then((_) {});
+  Future<void> send(String text) => _session.emit(SendMessageRequested(text));
 
   void _onMessagesChanged(ChatMessagesChanged event) {
     _messages = event.messages;
@@ -78,8 +78,7 @@ class _PluginSessionListenerChatBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ChatSessionListenerNotifier bridge = context
-        .watch<ChatSessionListenerNotifier>();
+    final bridge = context.watch<ChatSessionListenerNotifier>();
     return ChatView(
       title: 'plugin_kit (PluginSessionListener mixin)',
       messages: bridge.messages,

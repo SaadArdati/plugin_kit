@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/widgets.dart';
 import 'package:plugin_kit/plugin_kit.dart';
 
@@ -28,8 +26,8 @@ class PluginSessionEvents extends StatefulWidget {
 
 class _PluginSessionEventsState extends State<PluginSessionEvents> {
   final Map<Type, Object?> _last = <Type, Object?>{};
-  final Map<Type, StreamSubscription<void>> _subscriptions =
-      <Type, StreamSubscription<void>>{};
+  final Map<Type, EventSubscription> _subscriptions =
+      <Type, EventSubscription>{};
   final Map<Type, int> _versions = <Type, int>{};
   int _tick = 0;
 

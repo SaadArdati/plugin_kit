@@ -9,7 +9,7 @@ import '../widgets/chat_view.dart';
 /// Recipe: `PluginSessionStateListener` from `flutter_plugin_kit`.
 ///
 /// Same shape as the `setState` recipe, but the mixin owns subscription
-/// bookkeeping: there is no [StreamSubscription] field, no manual
+/// bookkeeping: there is no [EventSubscription] field, no manual
 /// [State.dispose] cancel, and no `_wired` deferral. [listen] is callable
 /// from [State.initState]; the binding is attached against the active
 /// session as soon as one is available, cancelled on dispose, and

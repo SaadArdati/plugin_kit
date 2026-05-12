@@ -38,7 +38,7 @@ class _ConfigPlugin extends GlobalPlugin {
 void main() {
   late PluginRuntime runtime;
 
-  setUp(() => runtime = PluginRuntime.empty());
+  setUp(() => runtime = PluginRuntime());
   tearDown(() async {
     try {
       await runtime.dispose();
@@ -95,12 +95,14 @@ void main() {
     });
 
     test(
-      'plugin-specific override targeting unknown plugin throws StateError',
+      'plugin-specific override targeting unknown plugin throws StateError '
+      'under throwError policy',
       () {
         runtime.addPlugin(_ConfigPlugin(id: 'alpha'));
 
         expect(
           () => runtime.init(
+            unknownReferencePolicy: UnknownReferencePolicy.throwError,
             settings: RuntimeSettings(
               services: {
                 Pin('unknown', ['agent', 'model']): ServiceSettings(
@@ -113,7 +115,7 @@ void main() {
             isA<StateError>().having(
               (e) => e.message,
               'message',
-              contains('disabled/unknown plugin "unknown"'),
+              contains('unknown plugin "unknown"'),
             ),
           ),
         );

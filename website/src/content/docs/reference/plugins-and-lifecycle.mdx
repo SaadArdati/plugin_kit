@@ -147,7 +147,8 @@ A scoped session with its own registry, bus, and plugin attachments. The runtime
 | `bus` | Session-scoped event bus. Disposed when the session is disposed. |
 | `context` | The domain-specific context handed to lifecycle hooks. Type `K` is whatever your runtime parameterizes on. |
 | `settings` | The `RuntimeSettings` snapshot used to create the session. Read-only; settings updates flow through the runtime's reconciliation path. |
-| `isPluginEnabled` | Whether the plugin is currently attached in this session. Tracked separately from registry contents because some plugins only register tools. |
+| `isPluginEnabled` | Whether the plugin is currently active in this session. At session scope the dependency cascade has already resolved by the time the session exists, so the "enabled" set IS the "actually attached" set. Tracked separately from registry contents because some plugins only register tools. |
+| `enabledPluginIds` | The unmodifiable set behind `isPluginEnabled`. Use for "which plugins is this session running?" |
 | `dispose` | Detaches every enabled plugin, disposes the session bus, removes the session from the runtime. Throws `PluginLifecycleException` aggregating any detach failures. |
 | `resolve` / `emit` / `on` | Convenience helpers via `SessionHelper`. Equivalent to going through `registry` or `bus` directly. |
 
@@ -158,7 +159,6 @@ The lifecycle engine. Owns the global scope, creates sessions, runs reconciliati
 ```dart
 class PluginRuntime<G extends GlobalPluginContext, S extends SessionPluginContext> {
   PluginRuntime({List<Plugin>? plugins});
-  PluginRuntime.empty();
 
   late final ServiceRegistry globalRegistry;
   late final EventBus globalBus;
@@ -179,6 +179,8 @@ class PluginRuntime<G extends GlobalPluginContext, S extends SessionPluginContex
     RuntimeSettings? settings,
     Set<PluginId>? defaultEnabledPluginIds,
     GlobalContextFactory<G, S>? globalContextFactory,
+    UnknownReferencePolicy unknownReferencePolicy =
+        UnknownReferencePolicy.throwError,
   });
 
   Future<PluginSession<S>> createSession({
@@ -222,6 +224,8 @@ Order of operations:
 `init` accepts `defaultEnabledPluginIds`. When `null`, plugins are enabled by default except those marked with `FeatureFlag.experimental`, which default off; when non-null, only listed ids are enabled by default. Explicit `RuntimeSettings.plugins` entries always override these defaults.
 
 `globalContextFactory` is required when `G` is a custom subtype of `GlobalPluginContext`. The default factory builds a base `GlobalPluginContext`, which cannot be cast to a tighter type. Same rule for `contextFactory` on `createSession` when `S` is custom.
+
+`unknownReferencePolicy` controls how the runtime responds when `RuntimeSettings` references a plugin or service id this runtime does not know about (typo, renamed id, or cached settings written by a prior app version). Defaults to `UnknownReferencePolicy.throwError`: the base package stays strict so drift is loud during development and CI. Production load paths that read cached settings should pass `UnknownReferencePolicy.logAndSkip` so renamed ids do not crash startup; `UnknownReferencePolicy.ignore` silently drops the unknown entry. The policy is set once on `init` and is reused by every `createSession` / `updateSessionSettings` / `updateGlobalSettings` call on the same runtime. Three validation passes run at each entry point: plugin ids in `RuntimeSettings.plugins`, plugin ids in service pin keys, and (after register-all) service ids in plugin-scoped pins. Wildcard pins are exempt from the service-id pass.
 
 `isPluginEnabled` answers "would this plugin be enabled under these settings?" without applying dependency resolution. Use it for previews and UI tooling.
 

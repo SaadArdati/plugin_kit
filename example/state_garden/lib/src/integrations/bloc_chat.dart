@@ -12,9 +12,7 @@ import '../widgets/chat_view.dart';
 const ListEquality<ChatMessage> _messagesEquality = ListEquality<ChatMessage>();
 
 /// Cubit state with structural equality on the message list and sending
-/// flag. CRITICAL-10 of the architecture rules: exposed state types must
-/// support value equality so observers do not rebuild on identical
-/// snapshots.
+/// flag.
 // #docregion bloc-chat-chat-bloc-state
 class ChatBlocState {
   const ChatBlocState({
@@ -46,18 +44,21 @@ class ChatBlocState {
 // #enddocregion bloc-chat-chat-bloc-state
 
 /// Recipe: flutter_bloc Cubit.
-///
-/// Subscribes in the constructor; guards every emit (including the one in
-/// the bus handler) with [isClosed]; cancels the subscription in [close].
-/// The `if (isClosed) return` after every `await` corresponds to CRITICAL-2.
 // #docregion bloc-chat-chat-cubit
-class ChatCubit extends Cubit<ChatBlocState> {
-  ChatCubit(this._session) : super(const ChatBlocState()) {
-    _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
-  }
-
+class ChatCubit extends Cubit<ChatBlocState> with PluginSessionListener {
   final PluginSession _session;
-  late final StreamSubscription<void> _subscription;
+
+  @override
+  PluginSession<SessionPluginContext> get session => _session;
+
+  @override
+  List<EventBinding> get subscriptions => [
+    on<ChatMessagesChanged>(_onMessagesChanged),
+  ];
+
+  ChatCubit(this._session) : super(const ChatBlocState()) {
+    attachSubscriptions();
+  }
 
   Future<void> send(String text) async {
     if (isClosed) return;
@@ -74,7 +75,7 @@ class ChatCubit extends Cubit<ChatBlocState> {
 
   @override
   Future<void> close() async {
-    await _subscription.cancel();
+    detachSubscriptions();
     return super.close();
   }
 }

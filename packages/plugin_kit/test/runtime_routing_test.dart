@@ -132,7 +132,7 @@ void main() {
   late PluginRuntime runtime;
 
   setUp(() {
-    runtime = PluginRuntime.empty();
+    runtime = PluginRuntime();
   });
 
   tearDown(() async {
@@ -564,7 +564,7 @@ void main() {
       'createSession without contextFactory throws when S is custom type',
       () async {
         final customRuntime =
-            PluginRuntime<GlobalPluginContext, CustomSessionContext>.empty();
+            PluginRuntime<GlobalPluginContext, CustomSessionContext>();
         customRuntime.init();
 
         expect(
@@ -578,7 +578,7 @@ void main() {
 
     test('createSession with contextFactory works for custom type', () async {
       final customRuntime =
-          PluginRuntime<GlobalPluginContext, CustomSessionContext>.empty();
+          PluginRuntime<GlobalPluginContext, CustomSessionContext>();
       customRuntime.init();
 
       final session = await customRuntime.createSession(
@@ -599,14 +599,14 @@ void main() {
 
     test('init without globalContextFactory throws when G is custom type', () {
       final customRuntime =
-          PluginRuntime<CustomGlobalContext, SessionPluginContext>.empty();
+          PluginRuntime<CustomGlobalContext, SessionPluginContext>();
 
       expect(() => customRuntime.init(), throwsStateError);
     });
 
     test('init with globalContextFactory works for custom type', () async {
       final customRuntime =
-          PluginRuntime<CustomGlobalContext, SessionPluginContext>.empty();
+          PluginRuntime<CustomGlobalContext, SessionPluginContext>();
 
       customRuntime.init(
         globalContextFactory: (registry, bus, sessions) => CustomGlobalContext(

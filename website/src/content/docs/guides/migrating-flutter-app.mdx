@@ -230,7 +230,7 @@ Then wrap plugin events in a notifier that Riverpod widgets can watch.
 
 ```dart
 class ChatController extends AsyncNotifier<List<ChatMessage>> {
-  StreamSubscription? _messagesSub;
+  EventSubscription? _messagesSub;
 
   @override
   Future<List<ChatMessage>> build() async {

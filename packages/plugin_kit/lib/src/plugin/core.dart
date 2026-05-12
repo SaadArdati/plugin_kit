@@ -143,8 +143,8 @@ abstract class Plugin {
   /// Identity-keyed: per-session isolation depends on each [PluginContext]
   /// instance being its own bucket. A subclass that overrides `==` /
   /// `hashCode` would otherwise collapse two sessions into one entry here.
-  final Map<PluginContext, List<StreamSubscription>> _subscriptionsByContext =
-      Map<PluginContext, List<StreamSubscription>>.identity();
+  final Map<PluginContext, List<EventSubscription>> _subscriptionsByContext =
+      Map<PluginContext, List<EventSubscription>>.identity();
 
   /// Per-context bindings, populated by [PluginHelper.bind]. Same teardown
   /// and identity-keyed semantics as [_subscriptionsByContext].

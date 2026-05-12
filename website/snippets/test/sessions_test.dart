@@ -15,7 +15,7 @@ void main() {
 
   group('create-session-with-factory', () {
     test('session extras contain session_id', () async {
-      final runtime = PluginRuntime.empty()..init();
+      final runtime = PluginRuntime()..init();
       final session = await runtime.createSession(
         contextFactory: (registry, sessionBus, globalBus) =>
             SessionPluginContext(
@@ -32,7 +32,7 @@ void main() {
 
   group('multi-session-isolation', () {
     test('session buses are isolated', () async {
-      final runtime = PluginRuntime.empty()..init();
+      final runtime = PluginRuntime()..init();
       await demonstrateMultiSessionIsolation(runtime);
       await runtime.dispose();
     });

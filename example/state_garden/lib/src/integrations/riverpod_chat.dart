@@ -48,7 +48,7 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
   Future<List<ChatMessage>> build() async {
     _disposed = false;
     final PluginSession session = ref.watch(sessionProvider);
-    final StreamSubscription<void> sub = session.on<ChatMessagesChanged>(
+    final EventSubscription sub = session.on<ChatMessagesChanged>(
       _onMessagesChanged,
     );
     ref.onDispose(() {

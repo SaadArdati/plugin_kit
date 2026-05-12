@@ -205,7 +205,7 @@ Future<void> demonstrateMutateAndStop(EventBus bus) async {
 }
 ```
 
-`request` and `requestSync` throw `RequestUnavailableException` when no handler is registered or every handler conceded with `null` on a non-nullable response. `maybeRequest` / `maybeRequestSync` convert *only* that exception to `null`; handler-thrown exceptions still propagate. `null` means "request unavailable," not "handler crashed."
+`request` and `requestSync` throw `RequestUnavailableException` carrying a `RequestUnavailableReason` enum: `noRegistration` (no handler for the `(Request, Response)` type pair), `noMatchingHandler` (handlers exist but none match the requested identifier scope), or `allConceded` (every handler returned null on a non-nullable response). `maybeRequest` / `maybeRequestSync` convert *only* that exception to `null`; handler-thrown exceptions still propagate. `null` means "request unavailable," not "handler crashed." Switch on `reason` to distinguish causes.
 
 ## Sessions
 

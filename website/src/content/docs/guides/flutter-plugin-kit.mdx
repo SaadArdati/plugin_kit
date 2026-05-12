@@ -186,7 +186,7 @@ class PluginEventCubit<E> extends Cubit<E?> {
       if (!isClosed) emit(envelope.event);
     });
   }
-  late final StreamSubscription<void> _sub;
+  late final EventSubscription _sub;
 
   @override
   Future<void> close() async {

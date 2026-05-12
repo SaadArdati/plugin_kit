@@ -107,7 +107,7 @@ class PluginEventCubit<E> {
   /// The current event value.
   E? value;
 
-  late final StreamSubscription<void> _sub;
+  late final EventSubscription _sub;
 
   /// Creates a cubit listening to [session] for events of type [E].
   PluginEventCubit(PluginSession session) {

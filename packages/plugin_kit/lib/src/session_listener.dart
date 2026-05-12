@@ -1,7 +1,5 @@
 library;
 
-import 'dart:async';
-
 import 'package:plugin_kit/plugin_kit.dart';
 
 /// Declarative session-event listener mixin for pure-Dart hosts (cubits,
@@ -37,7 +35,7 @@ mixin PluginSessionListener {
   /// the next attach.
   List<EventBinding> get subscriptions;
 
-  final List<StreamSubscription<void>> _eventSubs = [];
+  final List<EventSubscription> _eventSubs = [];
   bool _attached = false;
 
   /// Attach all [subscriptions] to [session]. No-op if already attached.
@@ -58,4 +56,13 @@ mixin PluginSessionListener {
     }
     _eventSubs.clear();
   }
+
+  /// Helper to build a standard [EventBinding] for the given handler and
+  /// parameters. Use this in the [subscriptions] getter to keep it concise.
+  /// For advanced usage, use [EventBinding] directly.
+  EventBinding on<E>(
+    void Function(E event) handler, {
+    int priority = 0,
+    String? identifier,
+  }) => EventBinding.on(handler, priority: priority, identifier: identifier);
 }

@@ -31,7 +31,7 @@ dependencies:
   plugin_kit: ^1.0.0  <!-- pubver:plugin_kit -->
 ```
 
-Requires Dart `>=3.10.0`. For Flutter projects that want the scope widgets and `State` mixin, also add [`flutter_plugin_kit`](https://pub.dev/packages/flutter_plugin_kit). For the customization UI, add [`plugin_kit_dialog`](https://pub.dev/packages/plugin_kit_dialog).
+Requires Dart `>=3.10.0`. For Flutter projects that want the scope widgets and `State` mixin, also add [`flutter_plugin_kit`](packages/flutter_plugin_kit). For the customization UI, add [`plugin_kit_dialog`](packages/plugin_kit_dialog).
 
 ## A small taste
 
@@ -84,6 +84,27 @@ Drop a plugin, lower its priority, or disable it through `RuntimeSettings`, and 
 Plugins, services, registry, event bus, sessions, capabilities, settings reconciliation. The dart-only core covers all of it.
 
 For the per-API breakdown with examples, see [`packages/plugin_kit/README.md`](packages/plugin_kit/README.md) or the full docs site below.
+
+## Logging
+
+plugin_kit uses `package:logging`. Lifecycle warnings, failed attaches, dependency cycles, and other diagnostics flow through named loggers (`plugin_kit.Plugin`, `plugin_kit.PluginRuntime`, `plugin_kit.PluginSession`). Nothing is printed by default; attach a listener to the root logger to see them:
+
+```dart
+import 'package:logging/logging.dart';
+
+void main() {
+  Logger.root.level = Level.INFO; // or Level.ALL during development
+  Logger.root.onRecord.listen((record) {
+    print('${record.level.name}: ${record.loggerName}: ${record.message}');
+    if (record.error != null) print('  ${record.error}');
+    if (record.stackTrace != null) print(record.stackTrace);
+  });
+
+  runApp(MyApp());
+}
+```
+
+Without a listener configured, severe-level messages (failed plugin attach, detected dependency cycles, etc.) go nowhere; you'll see the runtime continue past the failure but won't know why. Wire up a listener at app startup, or route to your existing logging stack.
 
 ## Documentation
 

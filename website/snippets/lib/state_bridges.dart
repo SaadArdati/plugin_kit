@@ -162,7 +162,7 @@ class GetItChatScreen extends StatefulWidget {
 
 class _GetItChatScreenState extends State<GetItChatScreen> {
   late final PluginSession _session;
-  StreamSubscription<void>? _subscription;
+  EventSubscription? _subscription;
   List<ChatMessage> _messages = const <ChatMessage>[];
 
   @override

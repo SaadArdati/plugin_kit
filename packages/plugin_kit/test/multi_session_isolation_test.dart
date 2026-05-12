@@ -231,34 +231,46 @@ class _PartialDetachFailurePlugin extends SessionPlugin {
   }
 }
 
-/// Service that registers a real subscription whose `cancel()` throws,
+/// Service that registers an [EventSubscription] whose `cancel()` throws,
 /// alongside a peer subscription that records whether its own `cancel()`
 /// ran. Used to verify that one bad cancel inside `_unbindContext` does
 /// not strand later cancellations or prevent `_context` from being cleared.
 class _SubCancelThrowingService extends SessionStatefulPluginService {
-  /// Whether the peer subscription's underlying stream was cancelled. The
-  /// stream is wired so that this flips to `true` only when its `cancel()`
-  /// actually runs - so it functions as a regression detector.
+  /// Whether the peer subscription's `cancel()` ran. Flips to `true` only
+  /// when its cancel actually runs, so it functions as a regression
+  /// detector against "one bad cancel stops the rest" bugs.
   bool peerCancelRan = false;
-
-  /// The throwing subscription's stream controller; we read its
-  /// `isClosed`/`hasListener` state from the test as a second-channel
-  /// check that its cancel was at least *attempted* (and threw).
-  late final StreamController<int> throwingController;
 
   @override
   void attach() {
-    throwingController = StreamController<int>();
-    throwingController.onCancel = () {
-      throw StateError('intentional cancel failure');
-    };
-    activeSubscriptions.add(throwingController.stream.listen((_) {}));
+    activeSubscriptions.add(
+      _ThrowingCancelSubscription('intentional cancel failure'),
+    );
+    activeSubscriptions.add(
+      _RecordingCancelSubscription(() => peerCancelRan = true),
+    );
+  }
+}
 
-    final peerController = StreamController<int>();
-    peerController.onCancel = () {
-      peerCancelRan = true;
-    };
-    activeSubscriptions.add(peerController.stream.listen((_) {}));
+/// Test-only [EventSubscription] whose `cancel()` throws a [StateError].
+class _ThrowingCancelSubscription implements EventSubscription {
+  _ThrowingCancelSubscription(this.message);
+  final String message;
+
+  @override
+  Future<void> cancel() async {
+    throw StateError(message);
+  }
+}
+
+/// Test-only [EventSubscription] whose `cancel()` invokes [onCancel].
+class _RecordingCancelSubscription implements EventSubscription {
+  _RecordingCancelSubscription(this.onCancel);
+  final void Function() onCancel;
+
+  @override
+  Future<void> cancel() async {
+    onCancel();
   }
 }
 
@@ -290,26 +302,38 @@ class _ReentrantTrigger {
   const _ReentrantTrigger();
 }
 
-/// Service whose `onCancel` re-enters the helper to register a NEW
+/// Service whose `cancel()` re-enters the helper to register a NEW
 /// subscription mid-detach. Used to prove that `_unbindContext` detects
 /// the re-entry and surfaces it as a step failure rather than letting
 /// the new subscription leak silently against a still-live bus.
 class _ReentrantOnCancelService extends SessionStatefulPluginService {
-  late final StreamController<int> primary;
   bool reentrantSubAttempted = false;
 
   @override
   void attach() {
-    primary = StreamController<int>();
-    primary.onCancel = () {
-      // Misuse: subscribe again from inside the cancel callback. The new
-      // subscription would land in the just-cleared activeSubscriptions
-      // list and never be cancelled in this teardown pass without the
-      // re-entry detection.
-      on<_ReentrantTrigger>((_) {});
-      reentrantSubAttempted = true;
-    };
-    activeSubscriptions.add(primary.stream.listen((_) {}));
+    activeSubscriptions.add(
+      _ReentrantCancelSubscription(() {
+        // Misuse: subscribe again from inside the cancel callback. The
+        // new subscription would land in the just-cleared
+        // activeSubscriptions list and never be cancelled in this
+        // teardown pass without the re-entry detection.
+        on<_ReentrantTrigger>((_) {});
+        reentrantSubAttempted = true;
+      }),
+    );
+  }
+}
+
+/// Test-only [EventSubscription] that invokes [onCancel] from inside its
+/// `cancel()` body. Used to simulate a stream-style onCancel hook that
+/// re-enters helper APIs.
+class _ReentrantCancelSubscription implements EventSubscription {
+  _ReentrantCancelSubscription(this.onCancel);
+  final void Function() onCancel;
+
+  @override
+  Future<void> cancel() async {
+    onCancel();
   }
 }
 
@@ -370,21 +394,11 @@ class _TwoStepFailurePlugin extends SessionPlugin {
 /// its own outer step entry rather than collapsing them under a single
 /// `<serviceId>.unbind` label.
 class _TwoThrowingCancelsService extends SessionStatefulPluginService {
-  late final StreamController<int> firstThrower;
-  late final StreamController<int> secondThrower;
-
   @override
   void attach() {
-    firstThrower = StreamController<int>();
-    firstThrower.onCancel = () {
-      throw StateError('first cancel failure');
-    };
-    activeSubscriptions.add(firstThrower.stream.listen((_) {}));
-    secondThrower = StreamController<int>();
-    secondThrower.onCancel = () {
-      throw StateError('second cancel failure');
-    };
-    activeSubscriptions.add(secondThrower.stream.listen((_) {}));
+    activeSubscriptions
+      ..add(_ThrowingCancelSubscription('first cancel failure'))
+      ..add(_ThrowingCancelSubscription('second cancel failure'));
   }
 }
 

@@ -199,7 +199,7 @@ class PluginEventCubit<E> {
   /// The current event value.
   E? value;
 
-  late final StreamSubscription<void> _sub;
+  late final EventSubscription _sub;
 
   /// Creates a cubit listening to [session] for events of type [E].
   PluginEventCubit(PluginSession session) {
@@ -468,7 +468,7 @@ class PluginEventCubitTyped<E> {
   /// The latest event value.
   E? value;
 
-  late final StreamSubscription<void> _sub;
+  late final EventSubscription _sub;
 
   /// Creates a cubit subscribed to [session] for events of type [E].
   PluginEventCubitTyped(PluginSession session) : super() {
@@ -579,7 +579,7 @@ class SessionEventCubit<E> {
   /// The latest received event, or null before the first event arrives.
   E? value;
 
-  late final StreamSubscription<void> _sub;
+  late final EventSubscription _sub;
 
   /// Creates a [SessionEventCubit] subscribed to [session].
   SessionEventCubit(PluginSession session) {

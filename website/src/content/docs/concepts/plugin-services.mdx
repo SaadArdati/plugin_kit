@@ -130,7 +130,7 @@ That makes stateful services the natural home for anything with long-lived state
 - session-bound caches
 - mutable session state
 
-If you find yourself writing `final _subs = <StreamSubscription>[];` on a `SessionPlugin`, that is usually the signal to promote the state to a stateful service.
+If you find yourself writing `final _subs = <EventSubscription>[];` on a `SessionPlugin`, that is usually the signal to promote the state to a stateful service.
 
 ## Registration rule
 

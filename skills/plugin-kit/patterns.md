@@ -224,20 +224,15 @@ class BetterDartFormatter extends StatefulPluginService implements Formatter {
 
 `resolve` would loop: it returns the winner, which is self.
 
-There is no `maybeResolveAfter`. For genuinely optional fallback, wrap:
+There is no `maybeResolveAfter`. For genuinely optional fallback, wrap the call in a try/catch:
 
 ```dart
-class BetterDartFormatter extends StatefulPluginService implements Formatter {
-  @override
-  String format(String path, String input) {
-    if (path.endsWith('.dart')) {
-      // Our specialty. Format it ourselves.
-      return input.trim();
-    }
-    // Not a Dart file. Hand off to whichever Formatter was the previous winner.
+Formatter? _maybeNext() {
+  try {
     return context.registry
-        .resolveAfter<Formatter>(pluginId: pluginId, serviceId: serviceId)
-        .format(path, input);
+        .resolveAfter<Formatter>(pluginId: pluginId, serviceId: serviceId);
+  } on StateError {
+    return null;
   }
 }
 ```

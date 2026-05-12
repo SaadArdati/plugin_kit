@@ -21,7 +21,7 @@ class SignalsChatBridge {
   }
 
   final PluginSession _session;
-  late final StreamSubscription<void> _subscription;
+  late final EventSubscription _subscription;
   bool _disposed = false;
 
   final Signal<List<ChatMessage>> messages = signal(const <ChatMessage>[]);

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/widgets.dart';
 import 'package:plugin_kit/plugin_kit.dart';
 
@@ -79,7 +77,7 @@ mixin PluginSessionStateListener<W extends StatefulWidget> on State<W> {
   }
 
   final List<EventBinding> _bindings = [];
-  final List<StreamSubscription<void>> _activeSubs = [];
+  final List<EventSubscription> _activeSubs = [];
   PluginSession? _currentSession;
 
   /// Subscribe to events of type [E] on the current session. The

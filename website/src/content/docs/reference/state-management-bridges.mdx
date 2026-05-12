@@ -28,7 +28,7 @@ Two of the recipes below (`StatefulWidget + setState` and `ChangeNotifier + prov
 
 A state holder bridge has the same three duties no matter which library you pick.
 
-1. Subscribe to the relevant fact event on the session bus (`ChatMessagesChanged` in these recipes), store the resulting `StreamSubscription` in a field, and update the holder's state inside the handler.
+1. Subscribe to the relevant fact event on the session bus (`ChatMessagesChanged` in these recipes), store the resulting `EventSubscription` in a field, and update the holder's state inside the handler.
 2. Translate UI intents into bus events with `session.emit(SomeIntent(...))`.
 3. Cancel the subscription in whatever disposal hook the library provides: `Cubit.close`, `ChangeNotifier.dispose`, `ref.onDispose`, `State.dispose`, etc.
 

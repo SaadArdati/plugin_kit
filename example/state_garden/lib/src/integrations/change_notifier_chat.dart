@@ -10,7 +10,7 @@ import '../widgets/chat_view.dart';
 
 /// Recipe: `ChangeNotifier` plus `provider`.
 ///
-/// The bridge stores its [StreamSubscription] in a final field. The handler
+/// The bridge stores its [EventSubscription] in a final field. The handler
 /// guards against a post-dispose fire by checking [_disposed], which the
 /// override of [dispose] flips before cancelling the subscription. This
 /// matters because `EventEnvelope` cascade can be mid-iteration when
@@ -24,7 +24,7 @@ class ChatChangeNotifier extends ChangeNotifier {
   }
 
   final PluginSession _session;
-  late final StreamSubscription<void> _subscription;
+  late final EventSubscription _subscription;
   bool _disposed = false;
 
   List<ChatMessage> _messages = const <ChatMessage>[];

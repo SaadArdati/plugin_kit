@@ -43,7 +43,7 @@ void main() {
   });
 
   test('DialogGlobalContext stores runtime edit state', () {
-    final targetRuntime = PluginRuntime.empty();
+    final targetRuntime = PluginRuntime();
     final controller = PluginKitDialogController(
       runtime: targetRuntime,
       initialSettings: RuntimeSettings.empty(),

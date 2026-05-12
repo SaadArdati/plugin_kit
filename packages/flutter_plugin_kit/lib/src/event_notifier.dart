@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:plugin_kit/plugin_kit.dart';
 
@@ -47,7 +45,7 @@ class PluginEventNotifier<E> extends ChangeNotifier
     );
   }
 
-  late final StreamSubscription<void> _subscription;
+  late final EventSubscription _subscription;
   E? _value;
 
   /// The most recent [E] envelope observed on the session, or `null` if

@@ -18,9 +18,9 @@ extension PluginHelper on Plugin {
   /// The handler receives the [EventEnvelope] wrapping the payload. It may
   /// mutate `e.event` and call [EventEnvelope.stop] to halt the cascade. The
   /// subscription is auto-tracked under [context] and cancelled when that
-  /// context detaches; the returned [StreamSubscription] is for cases that
+  /// context detaches; the returned [EventSubscription] is for cases that
   /// need to cancel the handler explicitly before then.
-  StreamSubscription on<E>(
+  EventSubscription on<E>(
     PluginContext context,
     EventHandler<E> handler, {
     int priority = 0,
@@ -39,7 +39,7 @@ extension PluginHelper on Plugin {
   ///
   /// Auto-tracked under [context]. See [EventBus.onRequest] for details on
   /// request/response communication.
-  StreamSubscription onRequest<Request, Response>(
+  EventSubscription onRequest<Request, Response>(
     PluginContext context,
     RequestHandler<Request, Response> handler, {
     int priority = 0,
@@ -58,7 +58,7 @@ extension PluginHelper on Plugin {
   ///
   /// Like [onRequest] but enforces sync return at compile time. Safe to
   /// invoke via [EventBus.requestSync]. Auto-tracked under [context].
-  StreamSubscription onRequestSync<Request, Response>(
+  EventSubscription onRequestSync<Request, Response>(
     PluginContext context,
     SyncRequestHandler<Request, Response> handler, {
     int priority = 0,
@@ -158,7 +158,7 @@ extension StatefulPluginServiceHelper on StatefulPluginService {
 
   /// Register a request handler for a request/response type pair.
   /// Auto-tracked and cancelled when the framework unbinds the service.
-  StreamSubscription onRequest<Request, Response>(
+  EventSubscription onRequest<Request, Response>(
     RequestHandler<Request, Response> handler, {
     int priority = 0,
     String? identifier,
@@ -174,7 +174,7 @@ extension StatefulPluginServiceHelper on StatefulPluginService {
 
   /// Register a synchronous request handler.
   /// Auto-tracked and cancelled when the framework unbinds the service.
-  StreamSubscription onRequestSync<Request, Response>(
+  EventSubscription onRequestSync<Request, Response>(
     SyncRequestHandler<Request, Response> handler, {
     int priority = 0,
     String? identifier,
@@ -193,9 +193,9 @@ extension StatefulPluginServiceHelper on StatefulPluginService {
   /// The handler receives the [EventEnvelope] wrapping the payload. It may
   /// mutate `e.event` and call [EventEnvelope.stop] to halt the cascade.
   /// Auto-tracked and cancelled when the framework unbinds the service;
-  /// the returned [StreamSubscription] is for cases that need to cancel
+  /// the returned [EventSubscription] is for cases that need to cancel
   /// the handler explicitly before then.
-  StreamSubscription on<E>(
+  EventSubscription on<E>(
     EventHandler<E> handler, {
     int priority = 0,
     String? identifier,
@@ -272,14 +272,14 @@ extension SessionHelper on PluginSession {
   ///
   /// The handler receives the [EventEnvelope] wrapping the payload. It may
   /// mutate `e.event` and call [EventEnvelope.stop] to halt the cascade.
-  StreamSubscription on<T>(
+  EventSubscription on<T>(
     EventHandler<T> handler, {
     int priority = 0,
     String? identifier,
   }) => bus.on<T>(handler, priority: priority, identifier: identifier);
 
   /// Register a request handler on the session's event bus.
-  StreamSubscription onRequest<Request, Response>(
+  EventSubscription onRequest<Request, Response>(
     RequestHandler<Request, Response> handler, {
     int priority = 0,
     String? identifier,
@@ -290,7 +290,7 @@ extension SessionHelper on PluginSession {
   );
 
   /// Registers a synchronous request handler on this session's event bus.
-  StreamSubscription onRequestSync<Request, Response>(
+  EventSubscription onRequestSync<Request, Response>(
     SyncRequestHandler<Request, Response> handler, {
     int priority = 0,
     String? identifier,

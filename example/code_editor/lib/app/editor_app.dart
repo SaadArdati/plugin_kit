@@ -97,6 +97,7 @@ class EditorApp extends StatelessWidget {
 
 class _EditorScreen extends StatefulWidget {
   const _EditorScreen();
+
   @override
   State<_EditorScreen> createState() => _EditorScreenState();
 }
@@ -105,7 +106,7 @@ class _EditorScreenState extends State<_EditorScreen>
     with SingleTickerProviderStateMixin {
   late final PluginRuntime _runtime;
   PluginSession? _session;
-  StreamSubscription? _refreshSub;
+  EventSubscription? _refreshSub;
   bool _runtimeInitialized = false;
 
   late final List<TextDocument> _documents;

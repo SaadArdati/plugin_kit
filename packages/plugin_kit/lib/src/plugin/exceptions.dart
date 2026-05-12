@@ -1,23 +1,51 @@
 import 'package:plugin_kit/src/typed_handles.dart';
 
-/// Exception thrown when a request cannot be fulfilled because no handler is
-/// available or every registered handler conceded by returning null.
+/// Why a `request` / `requestSync` call could not be fulfilled.
 ///
-/// Thrown by [EventBus.request] and [EventBus.requestSync] for the two
-/// availability cases:
-/// - no handler has been registered for the `(Request, Response)` type pair
-///   (possibly scoped to the given identifier), or
-/// - every registered handler returned null but `Response` is non-nullable.
+/// Carried by [RequestUnavailableException.reason]. Callers that need to
+/// distinguish unavailability causes (e.g. log an "unregistered" path
+/// differently from a "everyone conceded" path) switch on this enum
+/// instead of parsing the human-readable message.
+enum RequestUnavailableReason {
+  /// No handler was registered for the `(Request, Response)` type pair
+  /// at all. The request bucket itself was missing.
+  noRegistration,
+
+  /// The type pair has registered handlers, but the priority-merged set
+  /// for the requested identifier is empty. Common shapes: a request
+  /// made under an identifier no handler subscribes to, or an unscoped
+  /// request when only identifier-scoped handlers exist.
+  noMatchingHandler,
+
+  /// At least one handler ran but every invocation returned null while
+  /// the `Response` type is non-nullable. The cascade conceded without
+  /// a winner.
+  allConceded,
+}
+
+/// Exception thrown when a request cannot be fulfilled.
+///
+/// Thrown by [EventBus.request] and [EventBus.requestSync] for the three
+/// availability cases enumerated by [RequestUnavailableReason]:
+/// [RequestUnavailableReason.noRegistration],
+/// [RequestUnavailableReason.noMatchingHandler], and
+/// [RequestUnavailableReason.allConceded].
 ///
 /// [EventBus.maybeRequest] and [EventBus.maybeRequestSync] catch this type
 /// and convert it to a null return. Callers that need to distinguish
-/// unavailability from a successful null response can catch it explicitly:
+/// unavailability from a successful null response can catch it explicitly
+/// and switch on [reason]:
 ///
 /// ```dart
 /// try {
 ///   final result = await bus.request<SearchQuery, SearchResults>(query);
 /// } on RequestUnavailableException catch (e) {
-///   print('No search handler: ${e.requestType} -> ${e.responseType}');
+///   final hint = switch (e.reason) {
+///     RequestUnavailableReason.noRegistration => 'register a handler',
+///     RequestUnavailableReason.noMatchingHandler => 'check identifier scope',
+///     RequestUnavailableReason.allConceded => 'add a fallback handler',
+///   };
+///   log('Search unavailable (${e.reason.name}): $hint');
 /// }
 /// ```
 class RequestUnavailableException implements Exception {
@@ -30,8 +58,8 @@ class RequestUnavailableException implements Exception {
   /// The identifier scoping the request, or null for unscoped requests.
   final String? identifier;
 
-  /// Human-readable description of why the request was unavailable.
-  final String reason;
+  /// Why the request was unavailable. Switch on this for typed dispatch.
+  final RequestUnavailableReason reason;
 
   /// Creates a [RequestUnavailableException] with the given [reason].
   const RequestUnavailableException({
@@ -41,10 +69,21 @@ class RequestUnavailableException implements Exception {
     required this.reason,
   });
 
+  /// Human-readable text derived from [reason].
+  String get _reasonText => switch (reason) {
+        RequestUnavailableReason.noRegistration =>
+          'no handler registered for this type pair',
+        RequestUnavailableReason.noMatchingHandler =>
+          'no handler matched after priority merge',
+        RequestUnavailableReason.allConceded =>
+          'every registered handler conceded with null but Response is non-nullable',
+      };
+
   @override
   String toString() {
     final id = identifier == null ? '' : ' (identifier: $identifier)';
-    return 'RequestUnavailableException: $requestType -> $responseType$id: $reason';
+    return 'RequestUnavailableException: $requestType -> $responseType$id: '
+        '$_reasonText';
   }
 }
 

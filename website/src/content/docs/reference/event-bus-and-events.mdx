@@ -32,20 +32,20 @@ Every handler receives an envelope, not a raw payload. `emit` and `emitInternal`
 - `stop(value)` halts the cascade, sets `event` to `value`, and flips `stopped` to `true`. Subsequent handlers in the priority chain do not run.
 - `stopped` is the boolean the emitter checks on the returned envelope to see whether someone short-circuited the chain.
 
-`InternalPluginEventResponse<T>` is a private subtype the bus wraps internal events in. It is exported from the barrel but you do not construct it; it exists so `bind` callbacks can be filtered out by type.
+The bus distinguishes user-emitted events (visible to `bind` callbacks) from internal-emitted events (skipped by `bind`) via the `internal` parameter on `emit` / `emitSync`, not via the envelope's runtime type. All emit paths construct a plain `EventEnvelope<T>`; nothing else to construct.
 
 ## `on` and `bind`
 
 ### `on<T>` and `onSync<T>`
 
 ```dart
-StreamSubscription on<T>(
+EventSubscription on<T>(
   EventHandler<T> handler, {
   int priority = 0,
   String? identifier,
 });
 
-StreamSubscription onSync<T>(
+EventSubscription onSync<T>(
   SyncEventHandler<T> handler, {
   int priority = 0,
   String? identifier,
@@ -56,7 +56,7 @@ StreamSubscription onSync<T>(
 
 Default priority is `0`. Lower runs first, mirroring the pipeline metaphor. Registry priority is the opposite (higher wins); the rationale is in the concept doc.
 
-The returned `StreamSubscription` is a stub that supports `cancel()` and nothing else. `onData`, `onDone`, `onError`, `pause`, `resume`, and `asFuture` all throw `UnsupportedError`. There is no underlying stream, only a cancellation token shaped like one.
+The returned `EventSubscription` is a typed handle that supports only `cancel()`. It is intentionally NOT a `StreamSubscription` because the bus is not stream-backed and has no backpressure, data callbacks, or `asFuture` semantics. Distinct from `EventBinding`, which is the declarative descriptor consumed by the Flutter listener-lifecycle utilities.
 
 ### `bind`
 
@@ -101,7 +101,7 @@ For non-nullable `Response`, the first handler that runs wins by definition (it 
 ### Async
 
 ```dart
-StreamSubscription onRequest<Request, Response>(
+EventSubscription onRequest<Request, Response>(
   RequestHandler<Request, Response> handler, {
   int priority = 0,
   String? identifier,
@@ -120,12 +120,12 @@ Future<Response?> maybeRequest<Request, Response>(
 
 `RequestHandler<Request, Response>` is `FutureOr<Response> Function(EventEnvelope<Request>)`. The handler reads `envelope.event` to get the request payload.
 
-`request` throws `RequestUnavailableException` (which `implements Exception`) when no handler is registered for the `(Request, Response)` pair, or when every registered handler conceded and `Response` is non-nullable. The error message names the type pair. `maybeRequest` catches `RequestUnavailableException` and returns `null`; any *other* exception thrown by a handler still propagates, which is what most call sites actually want.
+`request` throws `RequestUnavailableException` (which `implements Exception`) carrying a `RequestUnavailableReason` enum: `noRegistration` (no handler for the type pair), `noMatchingHandler` (handlers exist but none match the requested identifier scope), or `allConceded` (every handler returned null on a non-nullable `Response`). `maybeRequest` catches `RequestUnavailableException` and returns `null`; any *other* exception thrown by a handler still propagates, which is what most call sites actually want. Switch on `reason` when you need to distinguish causes.
 
 ### Sync
 
 ```dart
-StreamSubscription onRequestSync<Request, Response>(
+EventSubscription onRequestSync<Request, Response>(
   SyncRequestHandler<Request, Response> handler, {
   int priority = 0,
   String? identifier,
@@ -172,19 +172,19 @@ The bus is reachable directly on every context, but the convenience extensions i
 
 ```dart
 extension PluginHelper on Plugin {
-  StreamSubscription on<E>(
+  EventSubscription on<E>(
     PluginContext context,
     EventHandler<E> handler, {
     int priority = 0,
     String? identifier,
   });
-  StreamSubscription onRequest<Request, Response>(
+  EventSubscription onRequest<Request, Response>(
     PluginContext context,
     RequestHandler<Request, Response> handler, {
     int priority = 0,
     String? identifier,
   });
-  StreamSubscription onRequestSync<Request, Response>(
+  EventSubscription onRequestSync<Request, Response>(
     PluginContext context,
     SyncRequestHandler<Request, Response> handler, {
     int priority = 0,
@@ -201,20 +201,20 @@ extension PluginHelper on Plugin {
 
 Every helper takes the [`PluginContext`](/reference/plugins-and-lifecycle/) as its first argument because the same plugin instance is shared across sessions; there is no safe "current context" to read from a field. Inside `Plugin.attach` / `Plugin.detach` the `context` parameter is right there; pass it along.
 
-Each subscription helper registers on `context.bus` and bookkeeps the returned `StreamSubscription` into a per-context bucket. The framework cancels each context's bucket when that context detaches, so concurrent sessions of the same plugin do not trample each other's teardown.
+Each subscription helper registers on `context.bus` and bookkeeps the returned `EventSubscription` into a per-context bucket. The framework cancels each context's bucket when that context detaches, so concurrent sessions of the same plugin do not trample each other's teardown.
 
 ### `StatefulPluginService` bus methods
 
 `StatefulPluginService` exposes the same shape via the `StatefulPluginServiceHelper` extension. The service holds its own `context` reference (bound by the framework before `attach()` runs), so these helpers do NOT take a `PluginContext` parameter:
 
 ```dart
-StreamSubscription on<E>(EventHandler<E> handler, {int priority = 0, String? identifier});
-StreamSubscription onRequest<Request, Response>(
+EventSubscription on<E>(EventHandler<E> handler, {int priority = 0, String? identifier});
+EventSubscription onRequest<Request, Response>(
   RequestHandler<Request, Response> handler, {
   int priority = 0,
   String? identifier,
 });
-StreamSubscription onRequestSync<Request, Response>(
+EventSubscription onRequestSync<Request, Response>(
   SyncRequestHandler<Request, Response> handler, {
   int priority = 0,
   String? identifier,
@@ -234,17 +234,17 @@ extension SessionHelper on PluginSession {
   Future<EventEnvelope<T>> emit<T>(T event, {String? identifier});
   Future<EventEnvelope<T>> emitInternal<T>(T event, {String? identifier});
 
-  StreamSubscription on<T>(
+  EventSubscription on<T>(
     EventHandler<T> handler, {
     int priority = 0,
     String? identifier,
   });
-  StreamSubscription onRequest<Request, Response>(
+  EventSubscription onRequest<Request, Response>(
     RequestHandler<Request, Response> handler, {
     int priority = 0,
     String? identifier,
   });
-  StreamSubscription onRequestSync<Request, Response>(
+  EventSubscription onRequestSync<Request, Response>(
     SyncRequestHandler<Request, Response> handler, {
     int priority = 0,
     String? identifier,

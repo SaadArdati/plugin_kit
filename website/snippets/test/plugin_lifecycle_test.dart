@@ -59,7 +59,14 @@ void main() {
 
   group('runtime-update-snapshot', () {
     test('demonstrateUpdateModes completes without error', () async {
-      final runtime = PluginRuntime(plugins: [CasualPlugin()])..init();
+      // The snippet toggles `analytics` off, which requires that plugin
+      // to be registered on the runtime (the runtime now rejects
+      // settings entries for unknown plugin ids).
+      final runtime = PluginRuntime(plugins: [
+        CasualPlugin(),
+        CorePlugin(),
+        AnalyticsPlugin(),
+      ])..init();
       await expectLater(demonstrateUpdateModes(runtime), completes);
       await runtime.dispose();
     });

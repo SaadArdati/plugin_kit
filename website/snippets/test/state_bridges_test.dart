@@ -20,7 +20,7 @@ void main() {
 
   group('state-bridge-event-notifier', () {
     test('makeNotifier returns a PluginEventNotifier for a session', () async {
-      final runtime = PluginRuntime.empty()..init();
+      final runtime = PluginRuntime()..init();
       final session = await runtime.createSession();
 
       final notifier = makeNotifier(session);

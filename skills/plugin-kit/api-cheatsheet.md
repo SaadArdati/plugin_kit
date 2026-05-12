@@ -75,7 +75,7 @@ void demonstrateTypedHandlesIndex() {
 }
 ```
 
-`Namespace.call`, `.service`, `.child` and `PluginId.service`, `PluginId.namespace`, `PluginNamespaced.service`, `.child`, `.call` are runtime helpers. `Pin(plugin, segments)` and `Pin.wildcard(segments)` join segments with `'.'` so both are non-const. `Pin.fromWire(String)` is the only const-friendly constructor. Use it for fully-literal const settings, or accept `final` for typical runtime construction.
+`Namespace.call`, `.service`, `.child` and `PluginId.service`, `PluginId.namespace`, `PluginNamespaced.service`, `.child`, `.call` are runtime helpers. `Pin(plugin, segments)` and `Pin.wildcard(segments)` join segments with `'.'` so both are non-const. `Pin.fromWire(String)` is the only const-friendly constructor. Use it for fully-literal const settings, or use `final` for typical runtime construction.
 
 ## Plugin lifecycle (`plugin/core.dart`, `plugin/plugin.dart`, `plugin/runtime.dart`)
 
@@ -117,6 +117,13 @@ Phase order:
 3. Settings reconciliation: newly-disabled plugins detach + unregister; newly-enabled plugins register + attach; staying-enabled plugins get `onPluginSettingsChanged(oldContext, newContext)`. Plugin instances persist; service instances recreate (`register()` re-runs).
 4. `dispose()`: every enabled plugin's `detach(context)` runs.
 
+Failure isolation during attach/detach:
+- Each step (service `attach`/`detach`, plugin `attach`/`detach`, subscription/binding cancel) runs in its own try/catch. A throwing step is logged and recorded; remaining steps still run so peers get torn down cleanly.
+- One step failed: that original exception is rethrown unchanged so callers can pattern-match on its concrete type.
+- Two or more steps failed: a `PluginStepAggregateException` wraps them; iterate `stepFailures` for `(stepName, error, stackTrace)` tuples. Step names are stable strings (`'attach'`, `'detach'`, `'<serviceId>.attach'`, `'subscription.cancel'`, etc.) and survive minification.
+- Re-entry during teardown is rejected. Calling `on(context, ...)` or `bind(context, ...)` from inside a `sub.cancel()` callback during detach surfaces as a `'subscription.leak'` / `'binding.leak'` step failure; the new entries are dropped without being cancelled rather than silently leaking.
+- The runtime catches whichever exception bubbles up and folds it into one entry of `PluginLifecycleException.failures`.
+
 FeatureFlag (`Plugin.featureFlags`):
 - `.locked`: always enabled; cannot be disabled via `RuntimeSettings`.
 - `.experimental`: disabled by default; requires opt-in via `RuntimeSettings` or by inclusion in `defaultEnabledPluginIds`.
@@ -135,16 +142,16 @@ Default-context generics are inferred. `extends SessionPlugin` infers `<SessionP
 `StatefulPluginService<PKC extends PluginContext>` has a wider bound because it serves both global and session scopes. Bare `extends StatefulPluginService` infers `<PluginContext>`. Two typedef aliases give you the common cases without spelling the generic: `extends SessionStatefulPluginService` for session-scoped (`StatefulPluginService<SessionPluginContext>`), `extends GlobalStatefulPluginService` for global-scoped (`StatefulPluginService<GlobalPluginContext>`). Pure syntactic sugar; the explicit form still works.
 
 Plugin helpers (context required, auto-tracked per-context):
-- `on<E>(context, handler, {priority, identifier})` returns `StreamSubscription`
-- `onRequest<R, S>(context, handler, {priority, identifier})` returns `StreamSubscription`
-- `onRequestSync<R, S>(context, handler, {priority, identifier})` returns `StreamSubscription`
+- `on<E>(context, handler, {priority, identifier})` returns `EventSubscription`
+- `onRequest<R, S>(context, handler, {priority, identifier})` returns `EventSubscription`
+- `onRequestSync<R, S>(context, handler, {priority, identifier})` returns `EventSubscription`
 - `bind(context, callback)` returns `void Function()` cancel
 - `emit<T>(context, event, {identifier})` returns `Future<EventEnvelope<T>>`
 
 StatefulPluginService helpers (no context arg, reads `this.context`, auto-tracked):
-- `on<E>(handler, {priority, identifier})` returns `StreamSubscription`
-- `onRequest<R, S>(handler, {priority, identifier})` returns `StreamSubscription`
-- `onRequestSync<R, S>(handler, {priority, identifier})` returns `StreamSubscription`
+- `on<E>(handler, {priority, identifier})` returns `EventSubscription`
+- `onRequest<R, S>(handler, {priority, identifier})` returns `EventSubscription`
+- `onRequestSync<R, S>(handler, {priority, identifier})` returns `EventSubscription`
 - `bind(callback)` returns `void Function()` cancel
 - `emit<T>(event, {identifier})` returns `Future<EventEnvelope<T>>`
 
@@ -263,7 +270,7 @@ Signature contracts:
 
 `pluginId` and `serviceId` on `PluginService` are `late` and stamped on first resolve. Don't read them in the constructor.
 
-`config` returns a `ConfigNode` with `getString`, `getInt`, `getDouble`, `getBool`, `getList`, `map` helpers (`config_node.dart`).
+`config` returns a `ConfigNode` with typed accessors: `getString`, `getInt`, `getDouble`, `getBool`, `list<T>`, `map` (`config_node.dart`). Every accessor returns nullable; chain with `??` for a fallback (`config.list<String>('tags') ?? const ['default']`).
 
 ## Event bus (`event_bus.dart`)
 
@@ -301,8 +308,8 @@ final maybeSync = context.bus.maybeRequestSync<RequestType, ResponseType?>(req);
 Nullable `Response` enables fall-through. Non-nullable forces a winner or throws.
 
 Failure shape:
-- `request` / `requestSync` throw `RequestUnavailableException` (`plugin/exceptions.dart`) when no handler is registered, or when every registered handler conceded with null on a non-nullable `Response`.
-- `maybeRequest` / `maybeRequestSync` convert ONLY that exception to null. Handler-thrown exceptions propagate; `null` means "request unavailable," not "handler crashed." Catch `RequestUnavailableException` to distinguish.
+- `request` / `requestSync` throw `RequestUnavailableException` (`plugin/exceptions.dart`) carrying a `RequestUnavailableReason` enum: `noRegistration` (no handler for the `(Request, Response)` type pair), `noMatchingHandler` (handlers exist but none match the requested identifier scope), or `allConceded` (every handler ran and returned null on a non-nullable `Response`).
+- `maybeRequest` / `maybeRequestSync` convert ONLY that exception to null. Handler-thrown exceptions propagate; `null` means "request unavailable," not "handler crashed." Catch `RequestUnavailableException` and switch on `reason` to distinguish.
 
 Type-agnostic taps:
 ```dart
@@ -310,9 +317,9 @@ bind(context, (envelope) => log(envelope.event));   // Plugin form
 bind((envelope) => log(envelope.event));            // StatefulPluginService form
 ```
 
-`bind` callbacks see user events. `InternalPluginEventResponse` (runtime-internal request/response plumbing) is filtered out.
+`bind` callbacks see user events emitted via `emit(...)`. Events emitted via `emitInternal(...)` (system lifecycle events) are filtered out by the `internal` flag check, not the envelope type. There is no special envelope class; everything uses plain `EventEnvelope`.
 
-`EventBinding<E>` extension type wraps the `StreamSubscription` returned from `on`/`bind` with typed `cancel()`. Most plugin and service code does not touch it directly because `attach`/`detach` orchestration auto-cancels tracked subscriptions; reach for `EventBinding` only when handing a binding off to the Flutter listener-lifecycle utilities (`PluginSessionStateListener`, `PluginSessionListener`) or otherwise managing cancellation outside the lifecycle.
+`EventSubscription` is the cancel-only handle returned by every `on*` method on `EventBus`. Most plugin and service code does not touch it directly because `attach`/`detach` orchestration auto-cancels tracked subscriptions; reach for `EventSubscription` only when handing a subscription off to a longer lifecycle (e.g., a custom controller) or when you need to cancel before detach. The `EventBinding` interface (distinct from `EventSubscription`) is a declarative descriptor consumed by the Flutter listener-lifecycle utilities (`PluginSessionStateListener`, `PluginSessionListener`).
 
 Scope routing (sessions):
 ```dart
@@ -379,7 +386,7 @@ runtime.sessions;                             // List<PluginSession>
 runtime.globalRegistry;
 runtime.globalBus;
 
-session.attachedPluginIds;                    // dep-validated effective set for this session
+session.enabledPluginIds;                     // dep-validated effective set for this session
 session.isPluginEnabled(pluginId);            // bool
 
 await session.dispose();           // detaches all session plugins
@@ -403,6 +410,9 @@ final runtime = PluginRuntime(plugins: [/* ... */]);
 runtime.init(
   settings: const RuntimeSettings.empty(),
   defaultEnabledPluginIds: null,   // null: all on except experimental; non-null: only listed are on
+  // unknownReferencePolicy: defaults to throwError. Pass logAndSkip on production
+  // load paths that read cached settings across app upgrades (renamed/removed ids
+  // would otherwise crash startup). See "Validation" below.
 );
 
 runtime.settings;                  // current RuntimeSettings snapshot
@@ -429,6 +439,19 @@ await runtime.dispose();
 `enabledPlugins` reports settings-intent: locked + explicit settings + `defaultEnabledPluginIds` whitelist (when non-null) + experimental heuristic. Does not account for dependency cascade. `attachedPlugins` reports the post-cascade effective set the runtime actually attached. A plugin enabled in settings but cascade-disabled because its dependency is off appears in `enabledPlugins` but not `attachedPlugins`. Use `enabledPlugins` for settings UI; `attachedPlugins` for "is it actually running."
 
 `updateSettings` runs strictly sequentially (global reconcile first, then each session in order) and updates the stored snapshot only after all reconciles complete. If any reconcile throws, the snapshot stays at the previous value.
+
+Re-entry: `updateSettings`, `updateGlobalSettings`, and `updateSessionSettings` share a single `_reconciling` flag and throw `StateError` if invoked while another pass is in flight. Callers must serialize their settings updates (the standard pattern is a tail-chained `Future` per the troubleshooting docs); the docs already required this, the guard makes it loud instead of letting silent interleaving corrupt state.
+
+Validation: every entry point that accepts `RuntimeSettings` runs three passes. Two run upfront: plugin ids in service pin keys (`RuntimeSettings.services`) and plugin ids in plugin config keys (`RuntimeSettings.plugins`). The third runs after register-all and verifies that plugin-scoped pins target a service id the named plugin actually registered (catches renamed/removed slots, not just renamed plugins). Wildcard pins (`Pin.wildcard(...)`) are exempt from the service-id pass by design.
+
+Response to unknown references is configured via `init(unknownReferencePolicy: ...)` using the `UnknownReferencePolicy` enum:
+- `throwError` (default): throws `StateError` naming the unknowns. Strict for dev/CI.
+- `logAndSkip`: emits one severe log per pass listing the dropped ids; known entries still apply. Use this on production load paths that read cached settings written by a prior app version.
+- `ignore`: silent drop; pair with another channel that surfaces drift.
+
+Failure state consistency: on a thrown lifecycle hook during enable, the runtime rolls back the partial registration (unregisters any services the failing plugin registered) and does NOT add the plugin to `enabledPluginIds` / `_enabledGlobalPluginIds`. On a thrown `session.init`, the session is not added to `runtime.sessions`. After catching `PluginLifecycleException`, state queries (`isPluginEnabled`, `isPluginAttached`, `runtime.sessions`) report the actual post-lifecycle truth, not the pre-mutation intent.
+
+Dependency cycles among enabled plugins are detected via Tarjan's SCC and surfaced as `severe` log entries naming the participants. Detection is informational only - the plugins still attach when their mutual dependencies are satisfied. Investigate cycles; they signal coupling that should usually be merged via a shared service.
 
 ## Flutter integration (`package:flutter_plugin_kit`)
 

@@ -140,7 +140,17 @@ final class LazySingletonWrapper<T extends Object>
   /// The factory function called once on first [provide].
   final Factory<T> factory;
 
-  late final T _instance = factory();
+  /// Explicit init state. Tracks whether [factory] has run so callers can
+  /// distinguish "instance not yet constructed" from "instance constructed
+  /// to null" without forcing construction via `_instance`. Reentry of
+  /// [provide] during initialization is rejected by Dart's `late final`
+  /// cyclic-init detection on `_instance`.
+  bool _initialized = false;
+  late final T _instance = () {
+    final r = factory();
+    _initialized = true;
+    return r;
+  }();
 
   /// Creates a lazy singleton wrapper for [pluginId] using [factory].
   LazySingletonWrapper(
@@ -152,6 +162,11 @@ final class LazySingletonWrapper<T extends Object>
 
   @override
   T provide() => _instance;
+
+  /// The cached instance if [provide] has already been called and the
+  /// factory completed, otherwise `null`. Lets the registry decide whether
+  /// a re-registration would strand a live instance.
+  T? get instanceIfCreated => _initialized ? _instance : null;
 
   @override
   LazySingletonWrapper<T> _clone() {
@@ -336,15 +351,18 @@ class ServiceRegistry {
     overrides: [..._overrides],
   );
 
-  /// Replace the current overrides and re-sort all registration lists.
+  /// Replace the current overrides and re-sort affected registration
+  /// lists.
   ///
   /// Called by the [PluginRuntime] after parsing new [RuntimeSettings].
   /// Plugin-specific priority overrides are applied retroactively: every
   /// existing wrapper has its effective [RegistrationWrapper.priority]
   /// recomputed from the new overrides (falling back to
   /// [RegistrationWrapper.basePriority] when no priority override applies).
-  /// Lists are then re-sorted, so live-winner ordering reflects the new
-  /// settings before this call returns.
+  /// Only lists whose wrappers actually saw an effective-priority change
+  /// are re-sorted - identical-overrides reconciliations skip the sort
+  /// entirely, which keeps the operation cheap on runtimes with many
+  /// registered services.
   ///
   /// Wildcard (`*`) priority overrides are forwarded to whichever plugin
   /// currently wins the slot at the time the override resolves. The
@@ -355,16 +373,28 @@ class ServiceRegistry {
   /// winner-scoped, not layered: only the current winner's wrapper sees a
   /// wildcard priority bump on each settings update.
   void updateSettings({required List<LocalPluginOverride> overrides}) {
+    final wasEmpty = _overrides.isEmpty;
     _overrides = overrides;
-    for (final entry in _registry.entries) {
-      final serviceId = entry.key;
-      final list = entry.value;
+    // Short-circuit: when neither the previous nor the new override list
+    // can affect any wrapper's effective priority, there is no work to
+    // do. This handles the very common "reconcile with no overrides"
+    // path that otherwise iterates every registered wrapper for no
+    // benefit.
+    if (wasEmpty && overrides.isEmpty) return;
+
+    for (final MapEntry(key: serviceId, value: list) in _registry.entries) {
+      bool changed = false;
+
       for (final wrapper in list) {
-        wrapper._setEffectivePriority(
-          _effectivePriorityFor(serviceId, wrapper),
-        );
+        final newPriority = _effectivePriorityFor(serviceId, wrapper);
+        if (wrapper.priority != newPriority) {
+          wrapper._setEffectivePriority(newPriority);
+          changed = true;
+        }
       }
-      list.sort((a, b) => b.priority.compareTo(a.priority));
+      if (changed) {
+        list.sort((a, b) => b.priority.compareTo(a.priority));
+      }
     }
   }
 
@@ -376,11 +406,11 @@ class ServiceRegistry {
   /// Plugin-specific priority overrides win; otherwise falls back to
   /// [RegistrationWrapper.basePriority].
   int _effectivePriorityFor(ServiceId serviceId, RegistrationWrapper wrapper) {
-    for (final o in _overrides) {
-      if (o.serviceId == serviceId &&
-          o.plugin == wrapper.pluginId &&
-          o.priority != null) {
-        return o.priority!;
+    for (final override in _overrides) {
+      if (override.priority case final priority?
+          when override.serviceId == serviceId &&
+              override.plugin == wrapper.pluginId) {
+        return priority;
       }
     }
     return wrapper.basePriority;
@@ -669,11 +699,11 @@ class ServiceRegistry {
       );
     }
 
-    _registry[serviceId] ??= [];
-    final list = _registry[serviceId]!;
-
-    // Remove existing registration from the same plugin to allow replacement
-    list.removeWhere((wrapper) => wrapper.pluginId == pluginId);
+    _rejectIfAttachedStatefulReplacement(
+      list: _registry[serviceId],
+      pluginId: pluginId,
+      serviceId: serviceId,
+    );
 
     final wrapper = FactoryWrapper<T>(
       pluginId,
@@ -683,9 +713,61 @@ class ServiceRegistry {
     );
     wrapper._setEffectivePriority(_effectivePriorityFor(serviceId, wrapper));
 
+    // Only mutate the registry after validation and wrapper construction
+    // succeed, so a thrown guard or factory does not leave an empty bucket
+    // that pollutes listAllServiceIds() and changes resolve()'s error
+    // shape from "not registered" to "all disabled".
+    final list = _registry[serviceId] ??= [];
     list
+      ..removeWhere((wrapper) => wrapper.pluginId == pluginId)
       ..add(wrapper)
       ..sort((a, b) => b.priority.compareTo(a.priority));
+  }
+
+  /// Rejects a `register*` call that would replace an existing
+  /// `StatefulPluginService` whose `attach` has already run for some
+  /// `PluginContext`. The replaced wrapper would be dropped while its old
+  /// instance still owns subscriptions on the bus and still has its
+  /// `_context` bound, and the new instance would never receive an
+  /// `attach()` call from `_runAttach` (the per-plugin attach pass has
+  /// already completed).
+  ///
+  /// Allowed: replacement of a non-stateful service, or a stateful
+  /// instance that was never attached (no bound context).
+  ///
+  /// To swap a live stateful service, disable then re-enable the owning
+  /// plugin via `RuntimeSettings`; the framework's settings reconciliation
+  /// detaches and re-attaches cleanly.
+  void _rejectIfAttachedStatefulReplacement({
+    required List<RegistrationWrapper>? list,
+    required PluginId pluginId,
+    required ServiceId serviceId,
+  }) {
+    if (list == null) return;
+    final existing = list.firstWhereOrNull((w) => w.pluginId == pluginId);
+    if (existing == null) return;
+    final Object? instance;
+    switch (existing) {
+      case SingletonWrapper(:final object):
+        instance = object;
+      case LazySingletonWrapper():
+        instance = existing.instanceIfCreated;
+      case FactoryWrapper():
+        // Factories cannot hold StatefulPluginService instances (rejected
+        // at registerFactory time); nothing to strand.
+        instance = null;
+    }
+    if (instance is StatefulPluginService && instance.hasContext) {
+      throw ArgumentError(
+        'Cannot replace registration "$serviceId" for plugin "$pluginId": '
+        'the existing StatefulPluginService is attached. Replacing it '
+        'would strand the old instance (subscriptions and context stay '
+        'bound) and leave the new instance without an attach() call, '
+        'because _runAttach has already completed for this plugin. '
+        'Disable then re-enable the owning plugin via RuntimeSettings to '
+        'swap a live stateful service.',
+      );
+    }
   }
 
   /// Register an eager singleton service via a [Factory] that constructs
@@ -721,13 +803,16 @@ class ServiceRegistry {
     CapabilitySet capabilities = const {},
   }) {
     // #enddocregion service-registry-register-singleton
-    final instance = create();
-    _registry[serviceId] ??= [];
-    final list = _registry[serviceId]!;
+    _rejectIfAttachedStatefulReplacement(
+      list: _registry[serviceId],
+      pluginId: pluginId,
+      serviceId: serviceId,
+    );
 
-    // Remove existing registration from the same plugin to allow replacement.
-    // Re-registering (e.g. after a model switch) replaces the old instance.
-    list.removeWhere((wrapper) => wrapper.pluginId == pluginId);
+    // Defer instance construction until after the replacement guard so a
+    // rejected re-registration does not run the factory and leak side
+    // effects.
+    final instance = create();
 
     final wrapper = SingletonWrapper<T>(
       pluginId,
@@ -737,7 +822,11 @@ class ServiceRegistry {
     );
     wrapper._setEffectivePriority(_effectivePriorityFor(serviceId, wrapper));
 
+    // Only mutate the registry after validation and wrapper construction
+    // succeed, so a thrown guard or factory does not leave an empty bucket.
+    final list = _registry[serviceId] ??= [];
     list
+      ..removeWhere((wrapper) => wrapper.pluginId == pluginId)
       ..add(wrapper)
       ..sort((a, b) => b.priority.compareTo(a.priority));
   }
@@ -752,11 +841,11 @@ class ServiceRegistry {
     int priority = ServiceRegistry.defaultPriority,
     CapabilitySet capabilities = const {},
   }) {
-    _registry[serviceId] ??= [];
-    final list = _registry[serviceId]!;
-
-    // Remove existing registration from the same plugin to allow replacement
-    list.removeWhere((wrapper) => wrapper.pluginId == pluginId);
+    _rejectIfAttachedStatefulReplacement(
+      list: _registry[serviceId],
+      pluginId: pluginId,
+      serviceId: serviceId,
+    );
 
     final wrapper = LazySingletonWrapper<T>(
       pluginId,
@@ -766,7 +855,11 @@ class ServiceRegistry {
     );
     wrapper._setEffectivePriority(_effectivePriorityFor(serviceId, wrapper));
 
+    // Only mutate the registry after validation and wrapper construction
+    // succeed, so a thrown guard does not leave an empty bucket.
+    final list = _registry[serviceId] ??= [];
     list
+      ..removeWhere((wrapper) => wrapper.pluginId == pluginId)
       ..add(wrapper)
       ..sort((a, b) => b.priority.compareTo(a.priority));
   }
@@ -990,6 +1083,7 @@ class ScopedServiceRegistry {
   /// the owning plugin (cross-plugin queries, etc.).
   // #docregion service-registry-final
   final ServiceRegistry raw;
+
   // #enddocregion service-registry-final
 
   /// The plugin id this scope belongs to. Every registration call below
@@ -1053,6 +1147,7 @@ class ScopedServiceRegistry {
     priority: priority ?? defaultPriority ?? ServiceRegistry.defaultPriority,
     capabilities: capabilities,
   );
+
   // #enddocregion service-registry-register-singleton-2
 
   /// Register a lazy singleton service using a typed [ServiceId] handle.

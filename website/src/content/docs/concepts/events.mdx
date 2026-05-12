@@ -92,7 +92,7 @@ Plugin helpers take `context` as the first positional argument, since plugins ar
 <Code code={extractRegion(pluginLifecycleSnippets, 'session-plugin-attach')} lang="dart" />
 
 Reach for `context.bus.on(...)` only when you genuinely need to manage a subscription's lifetime
-by hand: the bus call returns a `StreamSubscription` you have to cancel yourself, and is not tracked.
+by hand: the bus call returns a `EventSubscription` you have to cancel yourself, and is not tracked.
 
 <Aside type="caution" title="Behavior on the plugin gives up composition">
 A handler attached on the plugin is bound to that plugin's enabled state, full stop. It cannot be

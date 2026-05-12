@@ -23,7 +23,7 @@ class MobxChatBridge {
   }
 
   final PluginSession _session;
-  late final StreamSubscription<void> _subscription;
+  late final EventSubscription _subscription;
   bool _disposed = false;
 
   final Observable<List<ChatMessage>> messages = Observable<List<ChatMessage>>(

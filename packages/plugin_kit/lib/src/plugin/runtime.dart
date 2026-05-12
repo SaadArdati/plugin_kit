@@ -106,9 +106,31 @@ class PluginRuntime<
   /// [RuntimeSettings.plugins] entries always override these defaults.
   Set<PluginId>? _defaultEnabledPluginIds;
 
+  /// How to react when [RuntimeSettings] entries reference an id the
+  /// runtime does not know about (plugin ids in either map, service
+  /// ids in a pin whose plugin exists but does not register that
+  /// slot). Set via [init]; defaults to
+  /// [UnknownReferencePolicy.throwError] so the base package stays
+  /// strict and surfaces drift loudly. Production callers that load
+  /// cached settings across app upgrades should pass
+  /// [UnknownReferencePolicy.logAndSkip] explicitly.
+  UnknownReferencePolicy _unknownReferencePolicy =
+      UnknownReferencePolicy.throwError;
+
   late final _settingsController = StreamController<RuntimeSettings>.broadcast(
     sync: true,
   );
+
+  /// True while a settings-reconciliation pass
+  /// ([updateSettings] / [updateGlobalSettings] / [updateSessionSettings])
+  /// is in flight. Concurrent reconciliations are rejected because they
+  /// would interleave across `await` boundaries and corrupt shared state
+  /// (`_enabledGlobalPluginIds`, registries, the session list).
+  ///
+  /// The docs already require callers to serialize toggles. This flag
+  /// makes the contract loud rather than letting silent interleaving
+  /// produce drift.
+  bool _reconciling = false;
 
   late RuntimeSettings _settings = const RuntimeSettings.empty();
 
@@ -130,10 +152,11 @@ class PluginRuntime<
   /// the latest snapshot.
   Stream<RuntimeSettings> get settingsStream => _settingsController.stream;
 
-  /// Creates an empty runtime with no pre-registered plugins.
-  PluginRuntime.empty();
-
   /// Creates a runtime seeded with optional initial [plugins].
+  ///
+  /// Pass no arguments (or omit [plugins]) for an empty runtime; call
+  /// [addPlugin] / [addPlugins] before [init] to register additional
+  /// plugins.
   PluginRuntime({List<Plugin>? plugins}) {
     _plugins.addAll([...?plugins]);
   }
@@ -180,13 +203,27 @@ class PluginRuntime<
   ///
   /// [globalContextFactory] allows callers to supply a custom [G] constructor.
   /// When null, a default [GlobalPluginContext] is created and cast to [G].
+  ///
+  /// [unknownReferencePolicy] controls how the runtime responds when
+  /// [RuntimeSettings] references plugin or service ids that this
+  /// runtime does not know about (typically a typo, a renamed id, or
+  /// cached user settings written by a prior app version). Defaults to
+  /// [UnknownReferencePolicy.throwError]: the base package stays strict
+  /// so drift is loud during development and CI. Production load paths
+  /// that read cached settings across app upgrades should pass
+  /// [UnknownReferencePolicy.logAndSkip] so a renamed id does not
+  /// crash app startup. See [UnknownReferencePolicy] for all three
+  /// modes.
   PluginRuntime init({
     RuntimeSettings? settings,
     Set<PluginId>? defaultEnabledPluginIds,
     GlobalContextFactory<G, S>? globalContextFactory,
+    UnknownReferencePolicy unknownReferencePolicy =
+        UnknownReferencePolicy.throwError,
   }) {
     _initialized = true;
     _defaultEnabledPluginIds = defaultEnabledPluginIds;
+    _unknownReferencePolicy = unknownReferencePolicy;
     _runtimeLog.info('Initializing runtime');
 
     if (settings != null) {
@@ -196,7 +233,14 @@ class PluginRuntime<
     globalBus = EventBus();
 
     final effectiveSettings = settings ?? RuntimeSettings.empty();
-    _validateServiceSettingPluginIds(services: effectiveSettings.services);
+    _validateServiceSettingPluginIds(
+      entryPoint: 'init',
+      services: effectiveSettings.services,
+    );
+    _validatePluginConfigPluginIds(
+      entryPoint: 'init',
+      plugins: effectiveSettings.plugins,
+    );
 
     // Parse service settings into overrides for the global registry.
     final overrides = <LocalPluginOverride>[];
@@ -228,6 +272,15 @@ class PluginRuntime<
         plugin.register(globalRegistry.scopedFor(plugin.pluginId));
       }
     }
+    // With every global plugin registered, the set of known service ids
+    // for each plugin is now stable. Validate that every plugin-scoped
+    // service pin targets a service the named plugin actually registered.
+    _validateServicePinServiceIds(
+      entryPoint: 'init',
+      registry: globalRegistry,
+      services: effectiveSettings.services,
+      plugins: globalPlugins,
+    );
     // Create global context
     if (globalContextFactory != null) {
       globalContext = globalContextFactory(
@@ -327,7 +380,14 @@ class PluginRuntime<
 
     settings ??= this.settings;
 
-    _validateServiceSettingPluginIds(services: settings.services);
+    _validateServiceSettingPluginIds(
+      entryPoint: 'createSession',
+      services: settings.services,
+    );
+    _validatePluginConfigPluginIds(
+      entryPoint: 'createSession',
+      plugins: settings.plugins,
+    );
 
     final overrides = <LocalPluginOverride>[];
     final pendingWildcards = <ServiceId, ServiceSettings>{};
@@ -353,6 +413,14 @@ class PluginRuntime<
         plugin.register(registry.scopedFor(plugin.pluginId));
       }
     }
+
+    // Validate service pin service ids now that the registry is populated.
+    _validateServicePinServiceIds(
+      entryPoint: 'createSession',
+      registry: registry,
+      services: settings.services,
+      plugins: sessionPlugins,
+    );
 
     // Resolve wildcard winner-scoped overrides now that services are registered
     _resolveAndApplyWildcards(
@@ -391,7 +459,6 @@ class PluginRuntime<
       plugins: List.unmodifiable(sessionPlugins),
       settings: settings,
     );
-    _sessions.add(session);
 
     // Session buses are independent of the global bus. Global plugins that
     // want to broadcast to sessions do so explicitly via the
@@ -402,12 +469,43 @@ class PluginRuntime<
       _sessions.remove(session);
     };
 
-    // Track enabled plugins and attach
+    // Track enabled plugins so `session.init()` knows which plugins to
+    // attach. The session is NOT yet visible via `runtime.sessions` -
+    // we only publish it after init() succeeds. If init throws, the
+    // half-attached session is dropped on the floor (the caller's
+    // reference becomes unreachable after the rethrow).
     for (final pluginId in enabledPluginIds) {
       session.markPluginEnabled(pluginId);
     }
 
-    await session.init();
+    try {
+      await session.init();
+    } catch (e) {
+      // session.init aggregates per-plugin attach failures. Some plugins
+      // may have attached successfully before another threw; all
+      // partial state in this dropped session needs cleanup before we
+      // throw away the session reference. Walk every enabled plugin
+      // and best-effort detach. Cleanup failures are swallowed; the
+      // original PluginLifecycleException is what the caller sees.
+      for (final plugin in sessionPlugins) {
+        if (!session.isPluginEnabled(plugin.pluginId)) continue;
+        try {
+          await plugin._runDetach(session.context);
+        } catch (_) {}
+      }
+      // Dispose the session's bus so its broadcast controller is closed
+      // and any lingering observers stop receiving events from an
+      // orphan session.
+      try {
+        sessionBus.dispose();
+      } catch (_) {}
+      rethrow;
+    }
+
+    // Publish only after successful attach so `runtime.sessions` never
+    // contains a session whose lifecycle failed.
+    _sessions.add(session);
+
     _runtimeLog.info(
       'Session created with ${enabledPluginIds.length} enabled plugins',
     );
@@ -426,6 +524,28 @@ class PluginRuntime<
   /// 4. Update the registry's override list.
   /// 5. Notify remaining enabled plugins via [Plugin.onPluginSettingsChanged].
   Future<void> updateSessionSettings(
+    PluginSession<S> session, {
+    required RuntimeSettings newSettings,
+  }) async {
+    _enterReconcile('updateSessionSettings');
+    try {
+      _validateServiceSettingPluginIds(
+        entryPoint: 'updateSessionSettings',
+        services: newSettings.services,
+      );
+      _validatePluginConfigPluginIds(
+        entryPoint: 'updateSessionSettings',
+        plugins: newSettings.plugins,
+      );
+      await _updateSessionSettingsInternal(session, newSettings: newSettings);
+    } finally {
+      _reconciling = false;
+    }
+  }
+
+  /// Body of [updateSessionSettings] without the re-entry guard. Used by
+  /// [updateSettings] which already holds the guard for the whole pass.
+  Future<void> _updateSessionSettingsInternal(
     PluginSession<S> session, {
     required RuntimeSettings newSettings,
   }) async {
@@ -454,6 +574,16 @@ class PluginRuntime<
       session: session,
     );
     _runtimeLog.info('Session settings updated');
+
+    // Validate service pin service ids after reconciliation: any plugins
+    // newly enabled by this pass have registered, so the registry now
+    // reflects every service id that should be addressable.
+    _validateServicePinServiceIds(
+      entryPoint: 'updateSessionSettings',
+      registry: registry,
+      services: newSettings.services,
+      plugins: sessionPlugins,
+    );
 
     // Resolve wildcard overrides now that registry has current services
     _resolveAndApplyWildcards(
@@ -593,6 +723,43 @@ class PluginRuntime<
     }
   }
 
+  /// Applies the current [_unknownReferencePolicy] to the list of
+  /// detected unknown references for a single validation pass. The
+  /// pass collects every unknown reference into [unknowns] (a list of
+  /// human-readable descriptions) and then this helper either throws,
+  /// logs once with all entries, or no-ops. Batching is intentional:
+  /// one severe log entry per pass is easier to scan than N separate
+  /// messages.
+  void _applyUnknownReferencePolicy({
+    required String kind,
+    required String entryPoint,
+    required List<String> unknowns,
+  }) {
+    if (unknowns.isEmpty) return;
+    switch (_unknownReferencePolicy) {
+      case UnknownReferencePolicy.throwError:
+        throw StateError(
+          'PluginRuntime.$entryPoint received ${unknowns.length} '
+          'RuntimeSettings entries that reference unknown $kind: '
+          '${unknowns.join(', ')}. Either register the missing ids or '
+          'switch the runtime to UnknownReferencePolicy.logAndSkip '
+          '(production-safe default) to drop unknown entries instead '
+          'of crashing.',
+        );
+      case UnknownReferencePolicy.logAndSkip:
+        _runtimeLog.severe(
+          'PluginRuntime.$entryPoint dropped ${unknowns.length} '
+          'RuntimeSettings entries with unknown $kind '
+          '(typo, renamed id, or stale cached settings from a prior '
+          'app version): ${unknowns.join(', ')}.',
+        );
+      case UnknownReferencePolicy.ignore:
+        // Intentional no-op: caller has another channel for surfacing
+        // dropped ids.
+        break;
+    }
+  }
+
   /// Validates that every plugin-scoped service override references a known
   /// plugin id from this runtime's registered plugin set.
   ///
@@ -600,18 +767,81 @@ class PluginRuntime<
   /// wins." Cross-scope keys are still valid as long as the plugin exists;
   /// scope filtering is handled by [_partitionServiceSettings] per pass.
   void _validateServiceSettingPluginIds({
+    required String entryPoint,
     required Map<Pin, ServiceSettings> services,
   }) {
+    if (services.isEmpty) return;
     final knownPluginIds = {for (final plugin in _plugins) plugin.pluginId};
+    final unknowns = <String>[];
     for (final MapEntry(key: scopedKey, value: _) in services.entries) {
       if (scopedKey.isWildcard) continue;
       final pluginId = scopedKey.pluginId;
       if (knownPluginIds.contains(pluginId)) continue;
-      final serviceId = scopedKey.serviceId;
-      throw StateError(
-        'Service override targets disabled/unknown plugin "$pluginId" for "$serviceId".',
-      );
+      unknowns.add('${scopedKey.wire} (unknown plugin "$pluginId")');
     }
+    _applyUnknownReferencePolicy(
+      kind: 'plugin ids in services pin',
+      entryPoint: entryPoint,
+      unknowns: unknowns,
+    );
+  }
+
+  /// Validates that every key in [RuntimeSettings.plugins] references a
+  /// plugin id known to this runtime. Symmetrical to
+  /// [_validateServiceSettingPluginIds] on the services side.
+  void _validatePluginConfigPluginIds({
+    required String entryPoint,
+    required Map<PluginId, PluginConfig> plugins,
+  }) {
+    if (plugins.isEmpty) return;
+    final knownPluginIds = {for (final plugin in _plugins) plugin.pluginId};
+    final unknowns = <String>[];
+    for (final pluginId in plugins.keys) {
+      if (knownPluginIds.contains(pluginId)) continue;
+      unknowns.add(pluginId.value);
+    }
+    _applyUnknownReferencePolicy(
+      kind: 'plugin ids in plugins config',
+      entryPoint: entryPoint,
+      unknowns: unknowns,
+    );
+  }
+
+  /// Validates that every plugin-scoped service pin references a service
+  /// id the named plugin actually registered. Runs AFTER `register-all`
+  /// because the set of registered service ids is not known until then.
+  ///
+  /// Wildcard pins are exempt (they target whoever wins, by design).
+  /// Pins whose plugin id is unknown to this scope are also exempt
+  /// here; those are caught by [_validateServiceSettingPluginIds] in
+  /// the up-front pass.
+  void _validateServicePinServiceIds({
+    required String entryPoint,
+    required ServiceRegistry registry,
+    required Map<Pin, ServiceSettings> services,
+    required Iterable<Plugin> plugins,
+  }) {
+    if (services.isEmpty) return;
+    final scopedPluginIds = {for (final plugin in plugins) plugin.pluginId};
+    final knownByPlugin = <PluginId, Set<ServiceId>>{};
+    Set<ServiceId> knownFor(PluginId pid) =>
+        knownByPlugin.putIfAbsent(pid, () => registry.listAllServiceIds(pid));
+
+    final unknowns = <String>[];
+    for (final MapEntry(key: scopedKey, value: _) in services.entries) {
+      if (scopedKey.isWildcard) continue;
+      final pluginId = scopedKey.pluginId;
+      if (!scopedPluginIds.contains(pluginId)) continue;
+      final serviceId = scopedKey.serviceId;
+      if (knownFor(pluginId).contains(serviceId)) continue;
+      unknowns.add('${scopedKey.wire} (plugin "$pluginId" did not register '
+          '"$serviceId")');
+    }
+    _applyUnknownReferencePolicy(
+      kind: 'service ids in services pin',
+      entryPoint: entryPoint,
+      unknowns: unknowns,
+    );
   }
 
   /// Whether [plugin] is enabled by default in the absence of any
@@ -652,6 +882,97 @@ class PluginRuntime<
     return !plugin.featureFlags.contains(FeatureFlag.experimental);
   }
 
+  /// Detects strongly connected components in the dependency subgraph
+  /// restricted to [enabledPluginIds] (plus [additionalEnabledPluginIds]
+  /// for cross-scope dep resolution) and emits one `severe` log per cycle
+  /// naming the participants.
+  ///
+  /// Detection is informational: cycles where every member is enabled
+  /// satisfy each other's dependencies and the plugins remain attached.
+  /// A cycle is still a structural smell (order ambiguity, fragile
+  /// startup, harder debugging), so silence is the worst outcome. Logging
+  /// preserves backward-compat behavior while surfacing the issue.
+  ///
+  /// Uses Tarjan's algorithm to find SCCs in one pass. Components of size
+  /// >= 2 are cycles; components of size 1 with a self-loop edge are
+  /// self-cycles.
+  void _logDependencyCycles(
+    Set<PluginId> enabledPluginIds,
+    List<Plugin> pluginSubset, {
+    Set<PluginId> additionalEnabledPluginIds = const {},
+  }) {
+    if (enabledPluginIds.isEmpty) return;
+    final byId = <PluginId, Plugin>{
+      for (final p in pluginSubset)
+        if (enabledPluginIds.contains(p.pluginId)) p.pluginId: p,
+    };
+
+    final reachable = <PluginId>{
+      ...enabledPluginIds,
+      ...additionalEnabledPluginIds,
+    };
+
+    int index = 0;
+    final indexMap = <PluginId, int>{};
+    final lowlink = <PluginId, int>{};
+    final onStack = <PluginId>{};
+    final stack = <PluginId>[];
+    final sccs = <List<PluginId>>[];
+
+    void strongConnect(PluginId v) {
+      indexMap[v] = index;
+      lowlink[v] = index;
+      index++;
+      stack.add(v);
+      onStack.add(v);
+
+      final plugin = byId[v];
+      if (plugin != null) {
+        for (final w in plugin.dependencies) {
+          if (!reachable.contains(w)) continue;
+          if (!indexMap.containsKey(w)) {
+            strongConnect(w);
+            final lw = lowlink[w]!;
+            if (lw < lowlink[v]!) lowlink[v] = lw;
+          } else if (onStack.contains(w)) {
+            final iw = indexMap[w]!;
+            if (iw < lowlink[v]!) lowlink[v] = iw;
+          }
+        }
+      }
+
+      if (lowlink[v] == indexMap[v]) {
+        final scc = <PluginId>[];
+        PluginId w;
+        do {
+          w = stack.removeLast();
+          onStack.remove(w);
+          scc.add(w);
+        } while (w != v);
+        sccs.add(scc);
+      }
+    }
+
+    for (final v in enabledPluginIds) {
+      if (!indexMap.containsKey(v)) strongConnect(v);
+    }
+
+    for (final scc in sccs) {
+      final isCycle =
+          scc.length > 1 ||
+          (scc.length == 1 &&
+              (byId[scc.first]?.dependencies.contains(scc.first) ?? false));
+      if (!isCycle) continue;
+      final names = scc.map((p) => p.value).join(' -> ');
+      _runtimeLog.severe(
+        'Dependency cycle detected among enabled plugins: $names. '
+        'Cycles are functional when every member is enabled but indicate '
+        'tight coupling that should usually be one plugin or merged via '
+        'a shared service.',
+      );
+    }
+  }
+
   /// Determines the set of enabled plugin ids based on [RuntimeSettings].
   ///
   /// [pluginSubset] specifies which plugins to evaluate. This allows callers
@@ -682,6 +1003,12 @@ class PluginRuntime<
     }
 
     _validateDependencies(
+      enabledPluginIds,
+      pluginSubset,
+      additionalEnabledPluginIds: additionalEnabledPluginIds,
+    );
+
+    _logDependencyCycles(
       enabledPluginIds,
       pluginSubset,
       additionalEnabledPluginIds: additionalEnabledPluginIds,
@@ -853,7 +1180,6 @@ class PluginRuntime<
           registry.unregister(pluginId: plugin.pluginId, serviceId: serviceId);
         }
       } else if (!wasEnabled && isEnabled) {
-        session.markPluginEnabled(plugin.pluginId);
         _runtimeLog.info(
           'Settings update: enabling plugin "${plugin.pluginId}"',
         );
@@ -884,7 +1210,33 @@ class PluginRuntime<
             st,
           );
           errors.add((plugin.pluginId, e, st));
+          // Cleanup pass: `_runAttach` may have bound StatefulPluginService
+          // contexts and registered subscriptions before throwing. Without
+          // an explicit detach, those services keep `hasContext == true`
+          // and their attach-time subscriptions stay live on the bus,
+          // firing for events on a "rolled back" plugin. Best-effort
+          // detach reverses that; failures during cleanup are swallowed
+          // because the original attach error is what the caller cares
+          // about.
+          try {
+            await plugin._runDetach(session.context);
+          } catch (_) {}
+          // Roll back the partial registration so the registry does not
+          // hold orphan wrappers for a plugin that never attached. State
+          // queries (session.isPluginEnabled, runtime.attachedPluginIds)
+          // must report the plugin as NOT enabled after this failure.
+          final serviceIds = registry.listAllServiceIds(plugin.pluginId);
+          for (final serviceId in serviceIds) {
+            registry.unregister(
+              pluginId: plugin.pluginId,
+              serviceId: serviceId,
+            );
+          }
+          continue;
         }
+        // Both register and attach succeeded: only NOW record the plugin
+        // as enabled in this session.
+        session.markPluginEnabled(plugin.pluginId);
       }
     }
     if (errors.isNotEmpty) {
@@ -950,7 +1302,7 @@ class PluginRuntime<
   Set<PluginId> get attachedPluginIds {
     final ids = <PluginId>{...attachedGlobalPluginIds};
     for (final session in _sessions) {
-      ids.addAll(session.attachedPluginIds);
+      ids.addAll(session.enabledPluginIds);
     }
     return ids;
   }
@@ -966,15 +1318,36 @@ class PluginRuntime<
   /// completes. If any reconcile throws, the stored snapshot stays at the
   /// previous state.
   Future<void> updateSettings(RuntimeSettings newSettings) async {
-    final oldSettings = _settings;
-    await updateGlobalSettings(
-      oldSettings: oldSettings,
-      newSettings: newSettings,
-    );
-    for (final session in _sessions) {
-      await updateSessionSettings(session, newSettings: newSettings);
+    _enterReconcile('updateSettings');
+    try {
+      final oldSettings = _settings;
+      await _updateGlobalSettingsInternal(
+        oldSettings: oldSettings,
+        newSettings: newSettings,
+      );
+      for (final session in _sessions) {
+        await _updateSessionSettingsInternal(session, newSettings: newSettings);
+      }
+      _settingsValue = newSettings;
+    } finally {
+      _reconciling = false;
     }
-    _settingsValue = newSettings;
+  }
+
+  /// Mark a reconciliation pass as in flight, or throw if one already is.
+  /// Paired with `_reconciling = false` in a `finally` so failed reconciles
+  /// do not leave the runtime permanently locked.
+  void _enterReconcile(String entryPoint) {
+    if (_reconciling) {
+      throw StateError(
+        'PluginRuntime.$entryPoint called while a settings reconciliation '
+        'is already in progress. Concurrent reconciliations would '
+        'interleave across await boundaries and corrupt registry / '
+        'session state. Serialize your settings updates (the standard '
+        'pattern is a tail-chained Future per the troubleshooting docs).',
+      );
+    }
+    _reconciling = true;
   }
 
   /// Replace the stored [settings] snapshot and emit it on [settingsStream]
@@ -1003,8 +1376,32 @@ class PluginRuntime<
     required RuntimeSettings oldSettings,
     required RuntimeSettings newSettings,
   }) async {
+    _enterReconcile('updateGlobalSettings');
+    try {
+      await _updateGlobalSettingsInternal(
+        oldSettings: oldSettings,
+        newSettings: newSettings,
+      );
+    } finally {
+      _reconciling = false;
+    }
+  }
+
+  /// Body of [updateGlobalSettings] without the re-entry guard. Used by
+  /// [updateSettings] which already holds the guard for the whole pass.
+  Future<void> _updateGlobalSettingsInternal({
+    required RuntimeSettings oldSettings,
+    required RuntimeSettings newSettings,
+  }) async {
     final oldContext = globalContext.copyWith();
-    _validateServiceSettingPluginIds(services: newSettings.services);
+    _validateServiceSettingPluginIds(
+      entryPoint: 'updateGlobalSettings',
+      services: newSettings.services,
+    );
+    _validatePluginConfigPluginIds(
+      entryPoint: 'updateGlobalSettings',
+      plugins: newSettings.plugins,
+    );
 
     final overrides = <LocalPluginOverride>[];
     final pendingWildcards = <ServiceId, ServiceSettings>{};
@@ -1070,13 +1467,40 @@ class PluginRuntime<
             st,
           );
           errors.add((plugin.pluginId, e, st));
+          // Cleanup pass: see the matching comment in the session enable
+          // path. `_runAttach` may have left service contexts bound and
+          // subscriptions live before throwing; best-effort detach
+          // reverses that. Failures during cleanup are swallowed; the
+          // original attach error already surfaces.
+          try {
+            await plugin._runDetach(globalContext);
+          } catch (_) {}
+          // Roll back the partial registration so attachedGlobalPluginIds
+          // does not advertise a plugin whose attach failed and so the
+          // global registry is not left with orphan wrappers.
+          final serviceIds = globalRegistry.listAllServiceIds(plugin.pluginId);
+          for (final id in serviceIds) {
+            globalRegistry.unregister(pluginId: plugin.pluginId, serviceId: id);
+          }
+          continue;
         }
+        // Both register and attach succeeded: only NOW record the plugin
+        // as attached at the global scope.
         _enabledGlobalPluginIds.add(plugin.pluginId);
         _runtimeLog.info(
           'Global settings update: enabled plugin "${plugin.pluginId}"',
         );
       }
     }
+
+    // Validate service pin service ids now that newly-enabled global
+    // plugins have registered and disabled ones have been unregistered.
+    _validateServicePinServiceIds(
+      entryPoint: 'updateGlobalSettings',
+      registry: globalRegistry,
+      services: newSettings.services,
+      plugins: globalPlugins,
+    );
 
     // Apply updated overrides to global registry. Always call updateSettings,
     // even when both lists are empty, so wrappers whose priority overrides
@@ -1191,8 +1615,17 @@ class PluginSession<K extends SessionPluginContext> {
   bool isPluginEnabled(PluginId pluginId) =>
       _enabledPluginIds.contains(pluginId);
 
-  /// Plugin ids currently attached in this session.
-  Set<PluginId> get attachedPluginIds => Set.unmodifiable(_enabledPluginIds);
+  /// Plugin ids currently enabled in this session. At session scope the
+  /// post-cascade effective set IS the enabled set, so there is no
+  /// separate "attached" view: `_runAttach` has already run by the time
+  /// the session is observable, and any plugin that failed `_runAttach`
+  /// surfaces via [PluginLifecycleException] from [init], not here.
+  ///
+  /// The runtime-level distinction between
+  /// [PluginRuntime.enabledPlugins] (settings-intent) and
+  /// [PluginRuntime.attachedPlugins] (post-cascade) still applies for
+  /// global plugins and for "is this plugin running anywhere?" queries.
+  Set<PluginId> get enabledPluginIds => Set.unmodifiable(_enabledPluginIds);
 
   /// Marks a plugin as enabled in this session.
   void markPluginEnabled(PluginId pluginId) => _enabledPluginIds.add(pluginId);
