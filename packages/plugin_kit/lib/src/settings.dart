@@ -274,11 +274,11 @@ class RuntimeSettings {
   Map<String, dynamic> toJson() => <String, dynamic>{
     'plugins': {
       for (final entry in plugins.entries)
-        entry.key.value: entry.value.toJson(),
+        entry.key: entry.value.toJson(),
     },
     'services': {
       for (final entry in services.entries)
-        entry.key.wire: entry.value.toJson(),
+        entry.key: entry.value.toJson(),
     },
   };
 

@@ -360,11 +360,11 @@ class FormatterPlugin extends SessionPlugin {
 // #enddocregion plugins-dependencies-override
 
 // #docregion plugin-id-value-equality
-/// Demonstrates PluginId value equality and the .value accessor.
+/// Demonstrates PluginId string equality.
 void demonstratePluginId() {
   const id = PluginId('greeter');
 
-  print(id.value); // 'greeter'
+  print(id); // 'greeter'
   print(id == const PluginId('greeter')); // true (delegates to String equality)
 }
 // #enddocregion plugin-id-value-equality

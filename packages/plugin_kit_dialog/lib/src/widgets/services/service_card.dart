@@ -76,7 +76,7 @@ class ServiceCard extends StatelessWidget {
     final singleCap = capabilities.length == 1;
     final firstCap = capabilities.first;
 
-    final title = singleCap ? firstCap.label : pluginId.value;
+    final title = singleCap ? firstCap.label : pluginId;
     final subtitle = singleCap
         ? firstCap.description
         : '${capabilities.length} configurable services';

@@ -147,7 +147,7 @@ class _PriorityBadgeState extends State<PriorityBadge> {
                 bottomLeft: Radius.circular(999),
               ),
             ),
-            child: Text(widget.pluginId.value, style: textStyle),
+            child: Text(widget.pluginId, style: textStyle),
           ),
           _editing
               ? Padding(

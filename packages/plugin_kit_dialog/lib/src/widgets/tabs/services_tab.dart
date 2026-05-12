@@ -109,7 +109,7 @@ class _ServicesTabState extends State<ServicesTab> {
           );
         }
         return NamespaceSectionCard(
-          key: ValueKey('ns:${groupNs.value}'),
+          key: ValueKey('ns:$groupNs'),
           namespace: groupNs,
           visual: group.entries.first.namespaceVisual,
           expanded: _expandedNamespaces.contains(groupNs),
@@ -201,7 +201,7 @@ class _ServiceEntryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scopedKey = entry.pluginId.service(entry.serviceId);
     return ServiceCard(
-      key: ValueKey(scopedKey.wire),
+      key: ValueKey<String>(scopedKey),
       pluginId: entry.pluginId,
       serviceId: entry.serviceId,
       priority: entry.priority,

@@ -183,7 +183,7 @@ abstract class StatefulPluginService<PKC extends PluginContext>
           e,
           st,
         );
-        stepFailures.add(('${serviceId.value}.subscription.cancel', e, st));
+        stepFailures.add(('$serviceId.subscription.cancel', e, st));
       }
     }
     // Re-entry detection: if a stream's onCancel callback re-entered the
@@ -196,7 +196,7 @@ abstract class StatefulPluginService<PKC extends PluginContext>
       final leaked = activeSubscriptions.length;
       activeSubscriptions.clear();
       stepFailures.add((
-        '${serviceId.value}.subscription.leak',
+        '$serviceId.subscription.leak',
         StateError(
           '$leaked subscription(s) were registered on $serviceId during '
           '_unbindContext (re-entrant on(...) inside a sub.cancel callback). '
@@ -218,14 +218,14 @@ abstract class StatefulPluginService<PKC extends PluginContext>
           e,
           st,
         );
-        stepFailures.add(('${serviceId.value}.binding.cancel', e, st));
+        stepFailures.add(('$serviceId.binding.cancel', e, st));
       }
     }
     if (activeBindings.isNotEmpty) {
       final leaked = activeBindings.length;
       activeBindings.clear();
       stepFailures.add((
-        '${serviceId.value}.binding.leak',
+        '$serviceId.binding.leak',
         StateError(
           '$leaked binding(s) were registered on $serviceId during '
           '_unbindContext (re-entrant bind(...) inside a binding-cancel '

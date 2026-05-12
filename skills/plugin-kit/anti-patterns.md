@@ -237,7 +237,7 @@ class ReservedPlugin extends SessionPlugin {
 }
 ```
 
-`__pk_` is the reserved prefix for internal sentinels (`PluginId.wildcard.value == '__pk_wildcard__'`, `PluginId.winnerScoped.value == '__pk_winner__'`). `PluginRuntime.addPlugin` rejects any user-supplied id matching that prefix to prevent silent collisions with wildcard service-override resolution.
+`__pk_` is the reserved prefix for internal sentinels (`PluginId.wildcard == '__pk_wildcard__'`, `PluginId.winnerScoped == '__pk_winner__'`; `PluginId implements String` so the typed identifier compares directly to a String literal). `PluginRuntime.addPlugin` rejects any user-supplied id matching that prefix to prevent silent collisions with wildcard service-override resolution.
 
 Fix: pick any other naming. Plugin ids conventionally read as lowercase_snake_case matching the feature.
 

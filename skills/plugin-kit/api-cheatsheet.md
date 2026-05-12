@@ -42,11 +42,15 @@ void demonstrateTypedHandlesIndex() {
   final modelTopNs = modelId.topNamespace;
   const modelNamespaced = ServiceId.namespaced(agent, 'model');
 
-  // Pin construction via typed chain.
-  final pin1 = chatId.service(modelId);
-  final pin2 = PluginId.wildcard.service(modelId);
+  // Pin construction: bare dotted string (most concise), typed chain, or typed input.
+  final pin1 = chatId.service('agent.model');
+  final pin2 = PluginId.wildcard.service('agent.tools');
   final pin3 = const PluginId('chat').namespace('agent').service('model');
   final pin4 = const PluginId('chat').namespace('agent')('model');
+  final pin4b = chatId.service(modelId);
+
+  // Namespace membership predicate.
+  final inside = agent.has(modelId);
 
   // Pin construction directly.
   final pin5 = Pin('chat', ['agent', 'model']);
@@ -68,14 +72,16 @@ void demonstrateTypedHandlesIndex() {
     '$chatId $agent $modelId $wildcard $winnerScoped '
     '$agentValue $systemPromptNs $modelIdFromNs $modelIdShorthand '
     '$modelValue $modelNs $modelLeaf $modelTopNs $modelNamespaced '
-    '$pin1 $pin2 $pin3 $pin4 $pin5 $pin6 $pin7 '
+    '$pin1 $pin2 $pin3 $pin4 $pin4b $inside $pin5 $pin6 $pin7 '
     '$pluginId $serviceId $isWildcard $wire '
     '$constPin1 $constPin2',
   );
 }
 ```
 
-`Namespace.call`, `.service`, `.child` and `PluginId.service`, `PluginId.namespace`, `PluginNamespaced.service`, `.child`, `.call` are runtime helpers. `Pin(plugin, segments)` and `Pin.wildcard(segments)` join segments with `'.'` so both are non-const. `Pin.fromWire(String)` is the only const-friendly constructor. Use it for fully-literal const settings, or use `final` for typical runtime construction.
+`PluginId`, `Namespace`, `ServiceId`, and `Pin` all declare `implements String`, so a typed identifier flows directly into any `String`-typed parameter, JSON key, log interpolation, or `Map<String, T>` lookup with no `.value` / `.wire` / cast at the call site. The reverse direction (raw `String` into a typed slot) still fails to compile, so registry boundaries keep their type discipline. `PluginId.service` accepts a bare dotted path: `pluginId.service('a.b.c')` produces the same `Pin` as `pluginId.service(const ServiceId('a.b.c'))`. `Namespace.has(ServiceId)` is the typed namespace-containment predicate (matches direct children and nested descendants).
+
+`Namespace.call`, `.service`, `.child` and `PluginId.service`, `PluginId.namespace`, `PluginNamespaced.service`, `.child`, `.call` are runtime helpers. `Pin(plugin, segments)` and `Pin.wildcard(segments)` join segments with `'.'` so both are non-const. `Pin.fromWire(String)` is the only const-friendly Pin constructor. Use it for fully-literal const settings, or use `final` for typical runtime construction.
 
 ## Plugin lifecycle (`plugin/core.dart`, `plugin/plugin.dart`, `plugin/runtime.dart`)
 

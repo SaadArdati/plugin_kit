@@ -13,10 +13,10 @@ final settings = RuntimeSettings(
   services: {
     const PluginId(
       'linter_suite',
-    ).service(const ServiceId('line_length_linter')): const ServiceSettings(
+    ).service('line_length_linter'): const ServiceSettings(
       config: {'max_line_length': 120},
     ),
-    PluginId.wildcard.service(const ServiceId('agent_service')):
+    PluginId.wildcard.service('agent_service'):
         const ServiceSettings(priority: 200, config: {'provider': 'openai'}),
   },
 );

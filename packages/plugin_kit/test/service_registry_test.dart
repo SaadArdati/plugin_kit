@@ -332,25 +332,25 @@ void main() {
 
   group('ServiceId.topNamespace', () {
     test('returns the prefix before the first dot', () {
-      expect(ServiceId('main_agent.service').topNamespace?.value, 'main_agent');
+      expect(ServiceId('main_agent.service').topNamespace, 'main_agent');
     });
 
     test('splits on the first dot only', () {
-      expect(ServiceId('a.b.c').topNamespace?.value, 'a');
+      expect(ServiceId('a.b.c').topNamespace, 'a');
     });
 
     test('returns null for serviceIds without a dot', () {
-      expect(ServiceId('service').topNamespace?.value, isNull);
+      expect(ServiceId('service').topNamespace, isNull);
     });
 
     test('returns null when the serviceId starts with a dot', () {
       // Treat a leading dot as "no namespace" rather than an empty namespace,
       // so callers can `?? 'root'` without producing an empty bucket.
-      expect(ServiceId('.service').topNamespace?.value, isNull);
+      expect(ServiceId('.service').topNamespace, isNull);
     });
 
     test('returns null for an empty serviceId', () {
-      expect(ServiceId('').topNamespace?.value, isNull);
+      expect(ServiceId('').topNamespace, isNull);
     });
   });
 

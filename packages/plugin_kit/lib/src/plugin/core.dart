@@ -244,7 +244,7 @@ abstract class Plugin {
           e,
           st,
         );
-        stepFailures.add(('${service.serviceId.value}.attach', e, st));
+        stepFailures.add(('${service.serviceId}.attach', e, st));
       }
     }
     try {
@@ -294,7 +294,7 @@ abstract class Plugin {
           e,
           st,
         );
-        stepFailures.add(('${service.serviceId.value}.detach', e, st));
+        stepFailures.add(('${service.serviceId}.detach', e, st));
       }
       // _unbindContext catches its own per-iteration cancel failures and
       // returns them as step entries; only fatal errors escape via rethrow.

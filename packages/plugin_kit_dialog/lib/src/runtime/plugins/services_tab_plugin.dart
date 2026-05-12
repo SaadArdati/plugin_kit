@@ -99,13 +99,13 @@ class ServicesTabPlugin extends GlobalPlugin<DialogGlobalContext> {
     entries.sort((a, b) {
       // Group by namespace, then service id, then plugin id (so multiple
       // registrants of the same slot cluster together).
-      final aNs = a.namespace?.value ?? '';
-      final bNs = b.namespace?.value ?? '';
+      final aNs = a.namespace ?? '';
+      final bNs = b.namespace ?? '';
       final nsCompare = aNs.compareTo(bNs);
       if (nsCompare != 0) return nsCompare;
-      final svcCompare = a.serviceId.value.compareTo(b.serviceId.value);
+      final svcCompare = a.serviceId.compareTo(b.serviceId);
       if (svcCompare != 0) return svcCompare;
-      return a.pluginId.value.compareTo(b.pluginId.value);
+      return a.pluginId.compareTo(b.pluginId);
     });
 
     return List.unmodifiable(entries);

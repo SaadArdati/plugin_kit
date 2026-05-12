@@ -92,9 +92,13 @@ doc-versions-check:
 
 # Builds the docs site. Compiles every MDX file, which surfaces broken
 # excerpt references the doc-excerpts-check might miss (a region whose
-# code was deleted, for example).
+# code was deleted, for example). The install / build pair mirrors the
+# `doc-excerpts` job in `.github/workflows/ci.yml`. `--frozen-lockfile`
+# forces installs to match the committed `website/pnpm-lock.yaml`; if it
+# fails, run `pnpm --filter ./website install` to refresh the lockfile
+# and commit the result.
 website-build:
-	cd website && pnpm install --frozen-lockfile
+	pnpm --filter ./website install --frozen-lockfile
 	cd website && pnpm build
 
 # --- Helpers ----------------------------------------------------------------

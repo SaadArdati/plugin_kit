@@ -11,7 +11,7 @@ import '../../theme/plugin_kit_dialog_theme.dart';
 /// description). Tapping the header toggles expansion. When [expanded] is
 /// false, [children] are not painted.
 class NamespaceSectionCard extends StatelessWidget {
-  /// Namespace for the section header. Its [Namespace.value] is used as the
+  /// Namespace for the section header. Its string form is used as the
   /// fallback label if [visual] is null or omits a label.
   final Namespace namespace;
 
@@ -43,7 +43,7 @@ class NamespaceSectionCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final accent = visual?.color ?? colorScheme.primary;
-    final label = visual?.label ?? namespace.value;
+    final label = visual?.label ?? namespace;
 
     return Container(
       clipBehavior: Clip.antiAlias,

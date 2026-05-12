@@ -44,7 +44,7 @@ class _PluginsTabState extends State<PluginsTab> {
     if (_query.isEmpty) return true;
     final q = _query.toLowerCase();
     return chip.label.toLowerCase().contains(q) ||
-        chip.pluginId.value.toLowerCase().contains(q);
+        chip.pluginId.toLowerCase().contains(q);
   }
 
   /// Partitions [chips] so locked entries come first, preserving the

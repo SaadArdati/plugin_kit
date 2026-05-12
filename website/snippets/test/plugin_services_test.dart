@@ -74,7 +74,7 @@ void main() {
     test('serviceSettingsExample has correct service config', () {
       final pin = const PluginId(
         'model_router',
-      ).service(const ServiceId('decider'));
+      ).service('decider');
       final svcSettings = serviceSettingsExample.services[pin];
       expect(svcSettings?.config['default_model'], equals('gpt-4.1-mini'));
     });

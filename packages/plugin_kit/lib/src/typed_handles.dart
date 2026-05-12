@@ -1,14 +1,15 @@
 /// Typed plugin identifier. Wraps the plugin id as a String. Like
 /// [Namespace] and [ServiceId], a zero-cost extension type -- at runtime,
-/// it IS the underlying String. Use [value] when an explicit String is
-/// required (e.g., method args typed `String`, `compareTo`, JSON
-/// serialization keys). Equality and `toString()` delegate to the
+/// it IS the underlying String. Because [PluginId] declares
+/// `implements String`, it flows directly into any `String`-typed
+/// parameter, JSON serialization key, or comparison without needing to
+/// reach for [value]. Equality and `toString()` delegate to the
 /// underlying String, so `==` against a String literal works.
 ///
 /// PluginId values starting with `__pk_` are reserved for internal sentinels
 /// like [PluginId.wildcard] and [PluginId.winnerScoped]. Plugin authors must
 /// not use this prefix; the runtime rejects such ids on registration.
-extension type const PluginId(String value) {
+extension type const PluginId(String value) implements String {
   /// Sentinel plugin id representing "any plugin" in wildcard service
   /// overrides. Serialized as `*` on the wire (see [Pin.wire]);
   /// the runtime translates this to [winnerScoped] when applying overrides.
@@ -44,11 +45,9 @@ extension type const PluginId(String value) {
   /// final any = PluginId.wildcard.service(const ServiceId('agent.tools'));
   /// // any.isWildcard == true
   /// ```
-  Pin service(ServiceId serviceId) {
-    final p = (this as String) == (PluginId.wildcard as String)
-        ? '*'
-        : (this as String);
-    return Pin.fromWire('$p:${(serviceId as String)}');
+  Pin service(String serviceId) {
+    final p = this == PluginId.wildcard ? '*' : this;
+    return Pin.fromWire('$p:$serviceId');
   }
 
   /// Pairs this plugin with the namespace [name], returning a
@@ -88,10 +87,8 @@ class PluginNamespaced {
   /// Returns a [Pin] for the leaf service [id] inside [namespace], owned
   /// by [pluginId]. Wire form: `'<pluginId>:<namespace>.<id>'`.
   Pin service(String id) {
-    final p = (pluginId as String) == (PluginId.wildcard as String)
-        ? '*'
-        : (pluginId as String);
-    return Pin.fromWire('$p:${(namespace as String)}.$id');
+    final p = pluginId == PluginId.wildcard ? '*' : pluginId;
+    return Pin.fromWire('$p:$namespace.$id');
   }
 
   /// Shorthand for [service]: `pluginNs('id')` returns
@@ -132,7 +129,7 @@ class PluginNamespaced {
 /// final scope = fileTree.service('scope');
 /// // ServiceId('agent.system_prompt.file_tree.scope')
 /// ```
-extension type const Namespace(String value) {
+extension type const Namespace(String value) implements String {
   /// Returns a sub-namespace by appending [name] under this one with a `.`
   /// separator. Use to compose nested namespaces:
   ///
@@ -165,6 +162,14 @@ extension type const Namespace(String value) {
   /// context.resolve<Model>(agent('model'));
   /// ```
   ServiceId call(String id) => service(id);
+
+  /// Whether [id] lives anywhere under this namespace. Matches direct
+  /// children and nested descendants alike: `Namespace('agent').has(...)`
+  /// returns true for both `ServiceId('agent.model')` and
+  /// `ServiceId('agent.system_prompt.scope')`, and false for
+  /// `ServiceId('agentic.model')` or `ServiceId('agent')` (the flat id
+  /// that happens to match the namespace name).
+  bool has(ServiceId id) => id.startsWith('$value.');
 }
 
 /// Typed service-slot identifier.
@@ -195,16 +200,11 @@ extension type const Namespace(String value) {
 /// The structure ([namespace] and [id]) can be queried lazily; both getters
 /// parse [value] on demand using the LAST `.` as the separator, which
 /// handles nested namespaces (`'a.b.c.d'` -> namespace `'a.b.c'`, id `'d'`).
-extension type const ServiceId(String value) {
+extension type const ServiceId(String value) implements String {
   /// Builds a [ServiceId] inside [ns] with leaf [id]. The result is the
   /// concatenation `'$ns.$id'`. Equivalent to `ns.service(id)`, but usable
   /// in `const` contexts.
-  // The `(ns as String)` cast is required because Dart's const initializer
-  // evaluation cannot call a getter (`ns.value`) on an extension-type
-  // parameter. The cast is a zero-cost no-op at runtime since Namespace
-  // wraps a String with no representation overhead.
-  const ServiceId.namespaced(Namespace ns, String id)
-    : this('${(ns as String)}.$id');
+  const ServiceId.namespaced(Namespace ns, String id) : this('$ns.$id');
 
   /// The full namespace prefix (everything before the last `.` in [value]),
   /// or `null` when [value] has no `.`. The split uses `lastIndexOf` so
@@ -274,7 +274,7 @@ extension type const ServiceId(String value) {
 ///
 /// Inspect via [pluginId], [serviceId], [isWildcard], [wire]. The first two
 /// parse on demand and throw [FormatException] on a malformed wire string.
-extension type const Pin._(String _value) {
+extension type const Pin._(String _value) implements String {
   /// Pin a service to a plugin. [serviceIdSegments] are joined with `'.'`
   /// to form the service-id portion of the wire format.
   ///

@@ -921,9 +921,9 @@ class ServiceRegistry {
     if (pluginId == null) return _registry.keys.toSet();
 
     return {
-      for (final entry in _registry.entries)
-        for (final wrapper in entry.value)
-          if (wrapper.pluginId == pluginId) entry.key,
+      for (final MapEntry(key: serviceId, value: list) in _registry.entries)
+        for (final wrapper in list)
+          if (wrapper.pluginId == pluginId) serviceId,
     };
   }
 
@@ -937,18 +937,17 @@ class ServiceRegistry {
 
   /// Collect all [Capability] tags from services within a namespace.
   ///
-  /// Scans all service ids whose [ServiceId.value] starts with
-  /// `'${namespace.value}.'` and aggregates their
+  /// Scans all service ids for which [namespace.has] returns true and
+  /// aggregates their
   /// [RegistrationWrapper.capabilities]. Nested namespaces are matched too:
   /// a query for `Namespace('agent')` includes services like
   /// `'agent.system_prompt.scope'`.
   CapabilitySet listCapabilitiesOfNamespace(Namespace namespace) {
     final capabilities = <Capability>{};
-    final prefix = '${namespace.value}.';
-    for (final entry in _registry.entries) {
-      if (!entry.key.value.startsWith(prefix)) continue;
+    for (final MapEntry(key: serviceId, value: list) in _registry.entries) {
+      if (!namespace.has(serviceId)) continue;
 
-      for (final wrapper in entry.value) {
+      for (final wrapper in list) {
         capabilities.addAll(wrapper.capabilities);
       }
     }

@@ -75,9 +75,9 @@ void demonstrateTypedHandles() {
 
   // Pin: pairs a plugin with a service slot.
   final pin = chatId.service(modelId);
-  final wildcardPin = PluginId.wildcard.service(const ServiceId('tools'));
+  final wildcardPin = PluginId.wildcard.service('tools');
 
-  print('$chatId $agent $modelId $directId $pin ${wildcardPin.wire}');
+  print('$chatId $agent $modelId $directId $pin $wildcardPin');
 }
 // #enddocregion api-reference-typed-handles
 

@@ -24,19 +24,19 @@ The registry keys most types as plain strings under the hood. The public API wra
 
 <Code code={extractRegion(apiReferenceSource, 'api-reference-typed-handles')} lang="dart" />
 
-Wraps a plugin identifier. Equality and `toString()` delegate to the wrapped string, so `pluginId == 'core'` works directly. Use `pluginId.value` when an API insists on an explicit `String`.
+Wraps a plugin identifier. The extension type `implements String`, so a `PluginId` flows directly into any `String`-typed parameter, interpolation, or `Map<String, T>` lookup without unwrapping. Equality and `toString()` delegate to the wrapped string.
 
 ### `Namespace`
 
 <Code code={extractRegion(apiReferenceSource, 'api-reference-typed-handles')} lang="dart" />
 
-Wraps a namespace name. The `service(...)` helper builds a namespaced `ServiceId`, and `call(...)` makes the namespace itself callable so `agent('model')` reads as a tiny constructor. `child(...)` produces a sub-namespace by appending a segment, so `Namespace('a').child('b')` is `Namespace('a.b')`.
+Wraps a namespace name. The `service(...)` helper builds a namespaced `ServiceId`, and `call(...)` makes the namespace itself callable so `agent('model')` reads as a tiny constructor. `child(...)` produces a sub-namespace by appending a segment, so `Namespace('a').child('b')` is `Namespace('a.b')`. `has(ServiceId)` is the typed predicate for "does this id live under this namespace at any depth"; it returns true for direct children and nested descendants alike. Like the other handles, `Namespace` `implements String`.
 
 ### `ServiceId`
 
 <Code code={extractRegion(apiReferenceSource, 'api-reference-typed-handles')} lang="dart" />
 
-Wraps the registry key (`namespace.id` or just `id`). `value` is the full underlying string; `==` against another `ServiceId` (or a raw `String`) compares the wrapped values directly.
+Wraps the registry key (`namespace.id` or just `id`). The extension type `implements String`, so a `ServiceId` is usable anywhere a `String` is expected. `==` against another `ServiceId` (or a raw `String`) compares the wrapped values directly.
 
 The three derived getters cover the two ways code typically wants to slice a dotted id:
 
@@ -50,7 +50,7 @@ To produce a namespaced id, build it from a `Namespace`:
 
 <Code code={extractRegion(apiReferenceSource, 'namespace-build-service-id')} lang="dart" />
 
-`ScopedServiceRegistry` reads `serviceId.value` when forwarding to the raw registry, so the dot separator stays an implementation detail at the call site.
+`ScopedServiceRegistry` forwards the `ServiceId` straight through to the raw registry. Because the handle `implements String`, the dot separator stays an implementation detail at the call site.
 
 ## `ServiceRegistry`
 

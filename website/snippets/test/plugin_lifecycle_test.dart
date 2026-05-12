@@ -85,9 +85,9 @@ void main() {
   });
 
   group('plugin-id-value-equality', () {
-    test('PluginId.value returns the wrapped string', () {
+    test('PluginId compares equal to the wrapped string', () {
       const id = PluginId('greeter');
-      expect(id.value, equals('greeter'));
+      expect(id, equals('greeter'));
       expect(id == const PluginId('greeter'), isTrue);
     });
   });

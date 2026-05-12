@@ -57,7 +57,10 @@ jobs:
           version: 9
 
       - name: Install website deps
-        run: pnpm --filter ./website install
+        # --frozen-lockfile enforces that website/pnpm-lock.yaml is honored.
+        # If transitive deps drift, refresh locally with
+        # `pnpm --filter ./website install` and commit the updated lockfile.
+        run: pnpm --filter ./website install --frozen-lockfile
 
       - name: Check .md doc excerpts are in sync
         run: node scripts/update-md-excerpts.mjs --check

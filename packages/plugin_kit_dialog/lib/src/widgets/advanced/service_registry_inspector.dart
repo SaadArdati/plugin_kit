@@ -82,7 +82,7 @@ class _ServiceRegistryInspectorState extends State<ServiceRegistryInspector> {
         final pluginIds = <PluginId>{
           for (final clump in clumps)
             for (final r in clump.registrations) r.pluginId,
-        }.toList()..sort((a, b) => a.value.compareTo(b.value));
+        }.toList()..sort((a, b) => a.compareTo(b));
         final filteredClumps = _applyFilters(clumps);
         final grouped = _groupByNamespace(filteredClumps);
         final registrationCount = clumps.fold<int>(
@@ -135,7 +135,7 @@ class _ServiceRegistryInspectorState extends State<ServiceRegistryInspector> {
                     for (final pluginId in pluginIds) ...[
                       const SizedBox(width: 6),
                       _PluginFilterChip(
-                        label: pluginId.value,
+                        label: pluginId,
                         pluginId: pluginId,
                         selected: _selectedPluginId == pluginId,
                         onTap: () =>
@@ -219,7 +219,7 @@ class _ServiceRegistryInspectorState extends State<ServiceRegistryInspector> {
     final pluginEnabledById = <PluginId, bool>{};
 
     final ids = registry.listAllServiceIds().toList()
-      ..sort((a, b) => a.value.compareTo(b.value));
+      ..sort((a, b) => a.compareTo(b));
     final clumps = <_ServiceClump>[];
     for (final serviceId in ids) {
       final wrappers = registry.getRegistrations(serviceId);
@@ -256,7 +256,7 @@ class _ServiceRegistryInspectorState extends State<ServiceRegistryInspector> {
     final filtered = <_ServiceClump>[];
     for (final clump in clumps) {
       final textMatches =
-          query.isEmpty || clump.serviceId.value.toLowerCase().contains(query);
+          query.isEmpty || clump.serviceId.toLowerCase().contains(query);
       if (!textMatches) continue;
 
       if (_selectedPluginId == null) {
@@ -276,7 +276,7 @@ class _ServiceRegistryInspectorState extends State<ServiceRegistryInspector> {
   ) {
     final grouped = <String, List<_ServiceClump>>{};
     for (final clump in clumps) {
-      final namespace = clump.serviceId.topNamespace?.value ?? 'root';
+      final String namespace = clump.serviceId.topNamespace ?? 'root';
       grouped.putIfAbsent(namespace, () => <_ServiceClump>[]).add(clump);
     }
     final keys = grouped.keys.toList()
@@ -514,7 +514,7 @@ class _ServiceRow extends StatelessWidget {
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      '.${clump.serviceId.value}',
+                      '.${clump.serviceId}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontFamily: 'monospace',
                         height: 1.25,
@@ -687,7 +687,7 @@ class _PriorityChainEntry extends StatelessWidget {
             const SizedBox(width: 6),
             Expanded(
               child: Text(
-                registration.pluginId.value,
+                registration.pluginId,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontFamily: 'monospace',
                   fontWeight: isWinner ? FontWeight.w600 : FontWeight.w400,
@@ -825,7 +825,7 @@ class _PluginPill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            pluginId.value,
+            pluginId,
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,

@@ -170,9 +170,9 @@ class PluginRuntime<
   /// Throws [StateError] if a plugin with the same [Plugin.pluginId]
   /// is already registered.
   void addPlugin(Plugin plugin) {
-    if (_isReservedPluginId(plugin.pluginId.value)) {
+    if (_isReservedPluginId(plugin.pluginId)) {
       throw ArgumentError.value(
-        plugin.pluginId.value,
+        plugin.pluginId,
         'plugin.pluginId',
         'PluginId values starting with "__pk_" are reserved for internal use.',
       );
@@ -777,7 +777,7 @@ class PluginRuntime<
       if (scopedKey.isWildcard) continue;
       final pluginId = scopedKey.pluginId;
       if (knownPluginIds.contains(pluginId)) continue;
-      unknowns.add('${scopedKey.wire} (unknown plugin "$pluginId")');
+      unknowns.add('$scopedKey (unknown plugin "$pluginId")');
     }
     _applyUnknownReferencePolicy(
       kind: 'plugin ids in services pin',
@@ -798,7 +798,7 @@ class PluginRuntime<
     final unknowns = <String>[];
     for (final pluginId in plugins.keys) {
       if (knownPluginIds.contains(pluginId)) continue;
-      unknowns.add(pluginId.value);
+      unknowns.add(pluginId);
     }
     _applyUnknownReferencePolicy(
       kind: 'plugin ids in plugins config',
@@ -834,10 +834,7 @@ class PluginRuntime<
       if (!scopedPluginIds.contains(pluginId)) continue;
       final serviceId = scopedKey.serviceId;
       if (knownFor(pluginId).contains(serviceId)) continue;
-      unknowns.add(
-        '${scopedKey.wire} (plugin "$pluginId" did not register '
-        '"$serviceId")',
-      );
+      unknowns.add('$scopedKey (plugin "$pluginId" did not register "$serviceId")');
     }
     _applyUnknownReferencePolicy(
       kind: 'service ids in services pin',
@@ -965,7 +962,7 @@ class PluginRuntime<
           (scc.length == 1 &&
               (byId[scc.first]?.dependencies.contains(scc.first) ?? false));
       if (!isCycle) continue;
-      final names = scc.map((p) => p.value).join(' -> ');
+      final names = scc.map((p) => p).join(' -> ');
       _runtimeLog.severe(
         'Dependency cycle detected among enabled plugins: $names. '
         'Cycles are functional when every member is enabled but indicate '

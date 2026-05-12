@@ -132,7 +132,7 @@ void main() {
               'message',
               allOf(
                 contains('StatefulPluginService is attached'),
-                contains('plugin "${plugin.pluginId.value}"'),
+                contains('plugin "${plugin.pluginId}"'),
                 contains('"svc"'),
               ),
             ),

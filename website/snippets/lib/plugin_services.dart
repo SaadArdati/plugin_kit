@@ -107,7 +107,7 @@ class ConversationState extends StatefulPluginService {
 // #docregion plugin-service-settings-runtime
 final serviceSettingsExample = RuntimeSettings(
   services: {
-    const PluginId('model_router').service(const ServiceId('decider')):
+    const PluginId('model_router').service('decider'):
         const ServiceSettings(config: {'default_model': 'gpt-4.1-mini'}),
   },
 );

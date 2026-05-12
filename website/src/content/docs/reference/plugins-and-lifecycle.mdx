@@ -17,12 +17,12 @@ This page covers the types you reach for when defining plugins, hosting them, or
 
 ## `PluginId`
 
-A zero-cost extension type wrapping a `String`. `PluginId` is the canonical identifier the runtime uses to register plugins, key service overrides, and resolve dependencies. It compiles to its underlying `String`, so `==` against a `String` literal works, and it can be used as a `Map` key with the same hash semantics as the wrapped value.
+A zero-cost extension type wrapping a `String` that `implements String`. `PluginId` is the canonical identifier the runtime uses to register plugins, key service overrides, and resolve dependencies. It compiles to its underlying `String`, so `==` against a `String` literal works, it flows directly into any `String`-typed parameter or interpolation, and it can be used as a `Map` key with the same hash semantics as the wrapped value.
 
 ```dart
 const id = PluginId('greeter');
 
-id.value;          // 'greeter'
+id;                // 'greeter'
 id == 'greeter';   // true (delegates to String equality)
 ```
 

@@ -10,6 +10,9 @@ pubspec.lock
 /build/
 **/build/
 
+# Node deps (pnpm hoists to workspace root when running from the repo root).
+node_modules/
+
 # Logs
 *.log
 firebase-debug.log

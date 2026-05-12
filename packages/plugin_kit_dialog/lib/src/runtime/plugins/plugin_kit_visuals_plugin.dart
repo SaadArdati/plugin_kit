@@ -41,32 +41,32 @@ class PluginKitVisualsPlugin extends GlobalPlugin {
   static const Namespace pluginVisualNamespace = Namespace('plugin_visual');
 
   /// Namespace for namespace-axis visuals (`PluginKitVisual` keyed by
-  /// `Namespace.value`).
+  /// `Namespace`, which `implements String`).
   static const Namespace namespaceVisualNamespace = Namespace(
     'namespace_visual',
   );
 
   /// Namespace for service-axis visuals (`PluginKitVisual` keyed by
-  /// `ServiceId.value`).
+  /// `ServiceId`, which `implements String`).
   static const Namespace serviceVisualNamespace = Namespace('service_visual');
 
   /// [ServiceId] for the plugin-axis visual keyed by [pluginId]. Use as the
   /// argument to `registry.maybeResolve<PluginKitVisual>(...)` when looking
   /// up the visual override for a specific plugin.
   static ServiceId visualFor(PluginId pluginId) =>
-      pluginVisualNamespace(pluginId.value);
+      pluginVisualNamespace(pluginId);
 
   /// [ServiceId] for the namespace-axis visual keyed by [namespace]. Use as
   /// the argument to `registry.maybeResolve<PluginKitVisual>(...)` when
   /// looking up the visual override for a namespace section header.
   static ServiceId visualOf(Namespace namespace) =>
-      namespaceVisualNamespace(namespace.value);
+      namespaceVisualNamespace(namespace);
 
   /// [ServiceId] for the service-axis visual keyed by [serviceId]. Use as
   /// the argument to `registry.maybeResolve<PluginKitVisual>(...)` when
   /// looking up the visual override for a specific service card.
   static ServiceId visualOfService(ServiceId serviceId) =>
-      serviceVisualNamespace(serviceId.value);
+      serviceVisualNamespace(serviceId);
 
   /// Registration priority used so host overrides beat self-attached
   /// visuals registered at the default registry priority
@@ -170,7 +170,7 @@ class PluginChipsBuilder {
       models.add(
         PluginChipModel(
           pluginId: plugin.pluginId,
-          label: visuals?.label ?? plugin.pluginId.value,
+          label: visuals?.label ?? plugin.pluginId,
           description: visuals?.description,
           icon: visuals?.icon,
           color: visuals?.color,

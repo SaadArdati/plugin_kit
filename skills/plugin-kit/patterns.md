@@ -59,7 +59,7 @@ class _ComplianceRedactor implements Redactor {
 }
 ```
 
-A second plugin can `registerSingleton<Redactor>(redactorId, () => MyStricterRedactor(), priority: Priority.elevated)` and win automatically. Disable just the redactor via `RuntimeSettings.services` keyed `const PluginId('telemetry').service(const ServiceId('telemetry.redactor'))`.
+A second plugin can `registerSingleton<Redactor>(redactorId, () => MyStricterRedactor(), priority: Priority.elevated)` and win automatically. Disable just the redactor via `RuntimeSettings.services` keyed `const PluginId('telemetry').service('telemetry.redactor')`.
 
 The dispatcher subscription is one handler. It does not multiply with competing registrations. The registry decides the winner per resolve.
 
@@ -152,9 +152,9 @@ const ServiceId('agent.model')                            // const-evaluable, st
 final agent('model')                                      // runtime; variable must be final
 ```
 
-Reason: extension type instance methods (`Namespace.call`, `Namespace.service`, `Namespace.child`) are not const-evaluable. `ServiceId.namespaced(Namespace, String)` is const because its constructor uses a String-cast trick.
+Reason: extension type instance methods (`Namespace.call`, `Namespace.service`, `Namespace.child`) are not const-evaluable. `ServiceId.namespaced(Namespace, String)` is const because `Namespace implements String` lets the initializer interpolate the namespace value directly.
 
-For runtime composition (most call sites): `final modelId = agent('model');`.
+For runtime composition (most call sites): `final modelId = agent('model');`. `PluginId.service(String)` accepts dotted paths inline too: `const PluginId('chat').service('agent.model')`.
 
 For const contexts (`static const` fields, const `RuntimeSettings` literals): `ServiceId.namespaced(...)` or raw `ServiceId('agent.model')`.
 

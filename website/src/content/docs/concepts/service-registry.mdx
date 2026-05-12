@@ -104,6 +104,8 @@ The registry itself only knows about `ServiceId`; `Namespace` is a tiny helper f
 
 Namespaces are only useful for semantic grouping. Entirely stylistic. You can also register `const ServiceId('panel.console')` directly as a flat id and nothing breaks.
 
+To ask "is this service id under this namespace?", use the typed predicate `namespace.has(serviceId)`. It matches direct children and nested descendants alike (so `Namespace('panel').has(ServiceId('panel.console'))` and `Namespace('panel').has(ServiceId('panel.editor.terminal'))` are both true).
+
 ## Settings injection
 
 If the resolved instance extends `PluginService`, the registry injects its settings automatically during resolution. The service reads

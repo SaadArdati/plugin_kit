@@ -47,6 +47,41 @@ void main() {
       expect(a('model'), equals(a.service('model')));
       expect(a('model').value, 'agent.model');
     });
+
+    test('has() matches direct children of the namespace', () {
+      const a = Namespace('agent');
+      expect(a.has(const ServiceId('agent.model')), isTrue);
+    });
+
+    test('has() matches nested descendants at any depth', () {
+      const a = Namespace('agent');
+      expect(a.has(const ServiceId('agent.system_prompt.scope')), isTrue);
+    });
+
+    test(
+      'has() rejects a flat service id that happens to share the namespace name',
+      () {
+        const a = Namespace('agent');
+        expect(a.has(const ServiceId('agent')), isFalse);
+      },
+    );
+
+    test('has() rejects a different namespace that shares a prefix string', () {
+      const a = Namespace('agent');
+      expect(a.has(const ServiceId('agentic.model')), isFalse);
+    });
+
+    test('has() rejects unrelated service ids', () {
+      const a = Namespace('agent');
+      expect(a.has(const ServiceId('chat.greeter')), isFalse);
+    });
+
+    test('nested namespace.has only matches its own subtree', () {
+      final agentSub = const Namespace('agent').child('sub');
+      expect(agentSub.has(const ServiceId('agent.sub.foo')), isTrue);
+      expect(agentSub.has(const ServiceId('agent.foo')), isFalse);
+      expect(agentSub.has(const ServiceId('agent.subzero.foo')), isFalse);
+    });
   });
 
   group('ServiceId', () {
@@ -273,5 +308,85 @@ void main() {
       ).namespace('agent').child('system_prompt').service('scope');
       expect(key.wire, 'chat:agent.system_prompt.scope');
     });
+
+    test('service() accepts a bare String dotted path', () {
+      final key = const PluginId('chat').service('agent.model');
+      expect(key.wire, 'chat:agent.model');
+      expect(key, equals(Pin('chat', ['agent', 'model'])));
+    });
+
+    test('service() accepts a deeper bare String dotted path', () {
+      final key = const PluginId('chat').service('agent.system_prompt.scope');
+      expect(key.wire, 'chat:agent.system_prompt.scope');
+    });
+
+    test('service() with a non-namespaced bare String works', () {
+      final key = const PluginId('chat').service('greeter');
+      expect(key.wire, 'chat:greeter');
+    });
+
+    test(
+      'service() with a bare String and with a ServiceId produce equal Pins',
+      () {
+        final viaString = const PluginId('chat').service('agent.model');
+        final viaTyped = const PluginId(
+          'chat',
+        ).service(const ServiceId('agent.model'));
+        expect(viaString, equals(viaTyped));
+      },
+    );
+
+    test('PluginId.wildcard.service accepts a bare String', () {
+      final key = PluginId.wildcard.service('agent.tools');
+      expect(key.isWildcard, isTrue);
+      expect(key.wire, '*:agent.tools');
+    });
+  });
+
+  group('implements String', () {
+    String acceptString(String s) => s;
+
+    test('ServiceId flows into a String parameter without conversion', () {
+      const id = ServiceId('telemetry.redactor');
+      expect(acceptString(id), 'telemetry.redactor');
+    });
+
+    test('PluginId flows into a String parameter without conversion', () {
+      const p = PluginId('chat');
+      expect(acceptString(p), 'chat');
+    });
+
+    test('Namespace flows into a String parameter without conversion', () {
+      const ns = Namespace('agent');
+      expect(acceptString(ns), 'agent');
+    });
+
+    test('Pin flows into a String parameter without conversion', () {
+      final pin = Pin('chat', ['agent', 'model']);
+      expect(acceptString(pin), 'chat:agent.model');
+    });
+
+    test('typed identifier interpolates as its underlying String', () {
+      const id = ServiceId('telemetry.redactor');
+      expect('$id', 'telemetry.redactor');
+    });
+
+    test('typed identifier compares == to the matching String literal', () {
+      const id = ServiceId('telemetry.redactor');
+      expect(id == 'telemetry.redactor', isTrue);
+    });
+
+    test('typed identifier looks up in a Map<String, T>', () {
+      const id = ServiceId('telemetry.redactor');
+      final map = <String, int>{'telemetry.redactor': 7};
+      expect(map[id], 7);
+    });
+
+    // Documentation, not an executable test: the reverse direction must
+    // remain a compile error. Uncommenting either line below should yield
+    // `argument_type_not_assignable` from the analyzer.
+    //
+    // void requireServiceId(ServiceId id) {}
+    // requireServiceId('telemetry.redactor');
   });
 }

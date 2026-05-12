@@ -25,7 +25,7 @@ class _SelfDecorating extends GlobalPlugin {
   @override
   void register(ScopedServiceRegistry registry) {
     registry.registerSingleton<PluginKitVisual>(
-      PluginKitVisualsPlugin.pluginVisualNamespace(pluginId.value),
+      PluginKitVisualsPlugin.pluginVisualNamespace(pluginId),
       () => const PluginKitVisual(
         label: 'Self-Decorating Plugin',
         icon: Icon(Icons.palette),
