@@ -14,8 +14,7 @@
 import 'package:plugin_kit/plugin_kit.dart';
 import 'package:test/test.dart';
 
-class _LifecycleSpyService
-    extends StatefulPluginService<SessionPluginContext> {
+class _LifecycleSpyService extends StatefulPluginService<SessionPluginContext> {
   bool attachCalled = false;
   bool detachCalled = false;
 
@@ -116,8 +115,9 @@ void main() {
         final session = await runtime.createSession();
 
         // Sanity: the first instance was attached during session init.
-        final firstInstance =
-            session.resolve<_LifecycleSpyService>(const ServiceId('svc'));
+        final firstInstance = session.resolve<_LifecycleSpyService>(
+          const ServiceId('svc'),
+        );
         expect(firstInstance.attachCalled, isTrue);
         expect(firstInstance.hasContext, isTrue);
 
@@ -176,8 +176,9 @@ void main() {
           create: () => _LifecycleSpyService(),
         );
 
-        final first =
-            registry.resolve<_LifecycleSpyService>(const ServiceId('svc'));
+        final first = registry.resolve<_LifecycleSpyService>(
+          const ServiceId('svc'),
+        );
         expect(first.hasContext, isFalse);
 
         expect(
@@ -191,45 +192,46 @@ void main() {
       },
     );
 
-    test(
-      'rejected replacement leaves the registry list unchanged',
-      () async {
-        final plugin = _SwappingPlugin();
-        final runtime = PluginRuntime(plugins: [plugin])..init();
-        final session = await runtime.createSession();
+    test('rejected replacement leaves the registry list unchanged', () async {
+      final plugin = _SwappingPlugin();
+      final runtime = PluginRuntime(plugins: [plugin])..init();
+      final session = await runtime.createSession();
 
-        final firstInstance =
-            session.resolve<_LifecycleSpyService>(const ServiceId('svc'));
-        final beforeIds = session.registry.listAllServiceIds();
-        final beforeRegistrations =
-            session.registry.getRegistrations(const ServiceId('svc'))!;
+      final firstInstance = session.resolve<_LifecycleSpyService>(
+        const ServiceId('svc'),
+      );
+      final beforeIds = session.registry.listAllServiceIds();
+      final beforeRegistrations = session.registry.getRegistrations(
+        const ServiceId('svc'),
+      )!;
 
-        expect(() => plugin.swap(session), throwsArgumentError);
+      expect(() => plugin.swap(session), throwsArgumentError);
 
-        // The wrapper list for this service is byte-equivalent to its
-        // pre-reject state: same length, same wrapper identities, and the
-        // resolver still hands back the original instance.
-        expect(session.registry.listAllServiceIds(), beforeIds);
-        final afterRegistrations =
-            session.registry.getRegistrations(const ServiceId('svc'))!;
-        expect(afterRegistrations.length, beforeRegistrations.length);
-        expect(
-          identical(afterRegistrations.first, beforeRegistrations.first),
-          isTrue,
-          reason: 'wrapper identity must survive a rejected replacement',
-        );
-        expect(
-          identical(
-            session.resolve<_LifecycleSpyService>(const ServiceId('svc')),
-            firstInstance,
-          ),
-          isTrue,
-          reason: 'resolved instance identity must survive a rejected replacement',
-        );
+      // The wrapper list for this service is byte-equivalent to its
+      // pre-reject state: same length, same wrapper identities, and the
+      // resolver still hands back the original instance.
+      expect(session.registry.listAllServiceIds(), beforeIds);
+      final afterRegistrations = session.registry.getRegistrations(
+        const ServiceId('svc'),
+      )!;
+      expect(afterRegistrations.length, beforeRegistrations.length);
+      expect(
+        identical(afterRegistrations.first, beforeRegistrations.first),
+        isTrue,
+        reason: 'wrapper identity must survive a rejected replacement',
+      );
+      expect(
+        identical(
+          session.resolve<_LifecycleSpyService>(const ServiceId('svc')),
+          firstInstance,
+        ),
+        isTrue,
+        reason:
+            'resolved instance identity must survive a rejected replacement',
+      );
 
-        await runtime.dispose();
-      },
-    );
+      await runtime.dispose();
+    });
 
     test(
       'does not run the replacement factory when the call is rejected',
@@ -320,8 +322,9 @@ void main() {
         session.resolve<_LifecycleSpyService>(const ServiceId('svc'));
         expect(() => plugin.swap(session), throwsArgumentError);
 
-        final registrations =
-            session.registry.getRegistrations(const ServiceId('svc'));
+        final registrations = session.registry.getRegistrations(
+          const ServiceId('svc'),
+        );
         expect(registrations, isNotNull);
         expect(registrations!.isNotEmpty, isTrue);
 
@@ -346,10 +349,7 @@ void main() {
         expect(firstInstance.attachCalled, isTrue);
         expect(firstInstance.hasContext, isTrue);
 
-        expect(
-          () => plugin.swap(session),
-          throwsA(isA<ArgumentError>()),
-        );
+        expect(() => plugin.swap(session), throwsA(isA<ArgumentError>()));
 
         expect(firstInstance.detachCalled, isFalse);
         expect(firstInstance.hasContext, isTrue);
@@ -358,28 +358,25 @@ void main() {
       },
     );
 
-    test(
-      'allows replacement when the lazy factory has never fired',
-      () {
-        // The lazy-singleton wrapper exists but the factory has not run, so
-        // there is no instance to strand. Replacement is safe.
-        final registry = ServiceRegistry();
-        registry.registerLazySingleton<_LifecycleSpyService>(
+    test('allows replacement when the lazy factory has never fired', () {
+      // The lazy-singleton wrapper exists but the factory has not run, so
+      // there is no instance to strand. Replacement is safe.
+      final registry = ServiceRegistry();
+      registry.registerLazySingleton<_LifecycleSpyService>(
+        pluginId: const PluginId('p'),
+        serviceId: const ServiceId('svc'),
+        factory: () => _LifecycleSpyService(),
+      );
+
+      // Note: no `resolve` call here, so the factory has not run.
+      expect(
+        () => registry.registerLazySingleton<_LifecycleSpyService>(
           pluginId: const PluginId('p'),
           serviceId: const ServiceId('svc'),
           factory: () => _LifecycleSpyService(),
-        );
-
-        // Note: no `resolve` call here, so the factory has not run.
-        expect(
-          () => registry.registerLazySingleton<_LifecycleSpyService>(
-            pluginId: const PluginId('p'),
-            serviceId: const ServiceId('svc'),
-            factory: () => _LifecycleSpyService(),
-          ),
-          returnsNormally,
-        );
-      },
-    );
+        ),
+        returnsNormally,
+      );
+    });
   });
 }

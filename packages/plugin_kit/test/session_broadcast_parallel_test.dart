@@ -49,8 +49,7 @@ void main() {
 
       // Fire the broadcast but do NOT await. Both handlers should kick
       // off concurrently.
-      final broadcast =
-          [session1, session2].emit<_Ping>(const _Ping());
+      final broadcast = [session1, session2].emit<_Ping>(const _Ping());
 
       // Drain microtasks so handlers reach their first `await`.
       await Future<void>.delayed(Duration.zero);
@@ -66,7 +65,8 @@ void main() {
       expect(
         s2Started.isCompleted,
         isTrue,
-        reason: 'session2 handler should have started in parallel with '
+        reason:
+            'session2 handler should have started in parallel with '
             'session1 (this fails with sequential dispatch)',
       );
 
@@ -79,82 +79,75 @@ void main() {
     },
   );
 
-  test(
-    'SessionBroadcast.emit awaits every session before resolving',
-    () async {
-      // Parallel dispatch must still wait for all handlers to settle
-      // before the returned Future completes. A naive Future-and-forget
-      // refactor would break this invariant.
-      final runtime = PluginRuntime(plugins: [_MarkerPlugin()])..init();
-      final session1 = await runtime.createSession();
-      final session2 = await runtime.createSession();
+  test('SessionBroadcast.emit awaits every session before resolving', () async {
+    // Parallel dispatch must still wait for all handlers to settle
+    // before the returned Future completes. A naive Future-and-forget
+    // refactor would break this invariant.
+    final runtime = PluginRuntime(plugins: [_MarkerPlugin()])..init();
+    final session1 = await runtime.createSession();
+    final session2 = await runtime.createSession();
 
-      var s1Finished = false;
-      var s2Finished = false;
-      final s1Gate = Completer<void>();
-      final s2Gate = Completer<void>();
+    var s1Finished = false;
+    var s2Finished = false;
+    final s1Gate = Completer<void>();
+    final s2Gate = Completer<void>();
 
-      session1.bus.on<_Ping>((env) async {
-        await s1Gate.future;
-        s1Finished = true;
-      });
-      session2.bus.on<_Ping>((env) async {
-        await s2Gate.future;
-        s2Finished = true;
-      });
+    session1.bus.on<_Ping>((env) async {
+      await s1Gate.future;
+      s1Finished = true;
+    });
+    session2.bus.on<_Ping>((env) async {
+      await s2Gate.future;
+      s2Finished = true;
+    });
 
-      final broadcast =
-          [session1, session2].emit<_Ping>(const _Ping());
+    final broadcast = [session1, session2].emit<_Ping>(const _Ping());
 
-      // Release after a delay; both should finish before broadcast does.
-      Future<void>.delayed(Duration.zero, () {
-        s1Gate.complete();
-        s2Gate.complete();
-      });
+    // Release after a delay; both should finish before broadcast does.
+    Future<void>.delayed(Duration.zero, () {
+      s1Gate.complete();
+      s2Gate.complete();
+    });
 
-      await broadcast;
-      expect(s1Finished, isTrue);
-      expect(s2Finished, isTrue);
+    await broadcast;
+    expect(s1Finished, isTrue);
+    expect(s2Finished, isTrue);
 
-      await runtime.dispose();
-    },
-  );
+    await runtime.dispose();
+  });
 
-  test(
-    'SessionBroadcast.emit propagates the first error and still waits for '
-    'other sessions to settle',
-    () async {
-      // Mirrors Future.wait's behavior: the first thrown error surfaces
-      // on the broadcast Future, but the other sessions are not
-      // abandoned mid-dispatch. This pins the error-handling shape so a
-      // future refactor doesn't silently drop errors or strand
-      // sessions.
-      final runtime = PluginRuntime(plugins: [_MarkerPlugin()])..init();
-      final session1 = await runtime.createSession();
-      final session2 = await runtime.createSession();
+  test('SessionBroadcast.emit propagates the first error and still waits for '
+      'other sessions to settle', () async {
+    // Mirrors Future.wait's behavior: the first thrown error surfaces
+    // on the broadcast Future, but the other sessions are not
+    // abandoned mid-dispatch. This pins the error-handling shape so a
+    // future refactor doesn't silently drop errors or strand
+    // sessions.
+    final runtime = PluginRuntime(plugins: [_MarkerPlugin()])..init();
+    final session1 = await runtime.createSession();
+    final session2 = await runtime.createSession();
 
-      var s2Finished = false;
-      session1.bus.on<_Ping>((env) async {
-        throw StateError('session1 boom');
-      });
-      session2.bus.on<_Ping>((env) async {
-        await Future<void>.delayed(Duration.zero);
-        s2Finished = true;
-      });
+    var s2Finished = false;
+    session1.bus.on<_Ping>((env) async {
+      throw StateError('session1 boom');
+    });
+    session2.bus.on<_Ping>((env) async {
+      await Future<void>.delayed(Duration.zero);
+      s2Finished = true;
+    });
 
-      await expectLater(
-        () => [session1, session2].emit<_Ping>(const _Ping()),
-        throwsA(isA<StateError>()),
-      );
-      // session2's handler should have run to completion even though
-      // session1's threw. (Future.wait with eagerError: false ensures
-      // this; the default eagerError: true would short-circuit. Pin the
-      // intended shape here.)
-      expect(s2Finished, isTrue);
+    await expectLater(
+      () => [session1, session2].emit<_Ping>(const _Ping()),
+      throwsA(isA<StateError>()),
+    );
+    // session2's handler should have run to completion even though
+    // session1's threw. (Future.wait with eagerError: false ensures
+    // this; the default eagerError: true would short-circuit. Pin the
+    // intended shape here.)
+    expect(s2Finished, isTrue);
 
-      await runtime.dispose();
-    },
-  );
+    await runtime.dispose();
+  });
 }
 
 class _MarkerPlugin extends SessionPlugin {

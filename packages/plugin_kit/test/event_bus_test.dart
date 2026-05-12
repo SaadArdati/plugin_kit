@@ -643,17 +643,14 @@ void main() {
       expect(result.identifier, 'my-id');
     });
 
-    test(
-      'wraps event in an EventEnvelope',
-      () async {
-        EventEnvelope? captured;
-        bus.on<String>((e) {
-          captured = e;
-        });
-        await bus.emit<String>(event: 'test');
-        expect(captured, isA<EventEnvelope<String>>());
-      },
-    );
+    test('wraps event in an EventEnvelope', () async {
+      EventEnvelope? captured;
+      bus.on<String>((e) {
+        captured = e;
+      });
+      await bus.emit<String>(event: 'test');
+      expect(captured, isA<EventEnvelope<String>>());
+    });
   });
 
   // ===========================================================================

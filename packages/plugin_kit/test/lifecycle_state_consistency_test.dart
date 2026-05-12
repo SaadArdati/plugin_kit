@@ -66,9 +66,8 @@ void main() {
     test(
       'session-plugin register throw leaves session.isPluginEnabled false',
       () async {
-        final runtime =
-            PluginRuntime(plugins: [_ThrowsOnSessionRegister()])
-              ..init(defaultEnabledPluginIds: const {});
+        final runtime = PluginRuntime(plugins: [_ThrowsOnSessionRegister()])
+          ..init(defaultEnabledPluginIds: const {});
         final session = await runtime.createSession();
 
         await expectLater(
@@ -76,8 +75,7 @@ void main() {
             session,
             newSettings: const RuntimeSettings(
               plugins: {
-                PluginId('session_register_throw'):
-                    PluginConfig(enabled: true),
+                PluginId('session_register_throw'): PluginConfig(enabled: true),
               },
             ),
           ),
@@ -108,8 +106,7 @@ void main() {
             session,
             newSettings: const RuntimeSettings(
               plugins: {
-                PluginId('session_attach_throw'):
-                    PluginConfig(enabled: true),
+                PluginId('session_attach_throw'): PluginConfig(enabled: true),
               },
             ),
           ),
@@ -140,8 +137,7 @@ void main() {
           () => runtime.updateSettings(
             const RuntimeSettings(
               plugins: {
-                PluginId('global_register_throw'):
-                    PluginConfig(enabled: true),
+                PluginId('global_register_throw'): PluginConfig(enabled: true),
               },
             ),
           ),
@@ -149,11 +145,11 @@ void main() {
         );
 
         expect(
-          runtime.attachedGlobalPluginIds
-              .contains(const PluginId('global_register_throw')),
+          runtime.attachedGlobalPluginIds.contains(
+            const PluginId('global_register_throw'),
+          ),
           isFalse,
-          reason:
-              'register failed; attached set must not contain the plugin',
+          reason: 'register failed; attached set must not contain the plugin',
         );
         expect(
           runtime.isPluginAttached(const PluginId('global_register_throw')),
@@ -174,8 +170,7 @@ void main() {
           () => runtime.updateSettings(
             const RuntimeSettings(
               plugins: {
-                PluginId('global_attach_throw'):
-                    PluginConfig(enabled: true),
+                PluginId('global_attach_throw'): PluginConfig(enabled: true),
               },
             ),
           ),
@@ -183,8 +178,9 @@ void main() {
         );
 
         expect(
-          runtime.attachedGlobalPluginIds
-              .contains(const PluginId('global_attach_throw')),
+          runtime.attachedGlobalPluginIds.contains(
+            const PluginId('global_attach_throw'),
+          ),
           isFalse,
           reason: 'attach failed; attached set must not contain the plugin',
         );

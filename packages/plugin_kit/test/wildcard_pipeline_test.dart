@@ -94,33 +94,30 @@ void main() {
       expect(service.capturedSettings, equals({'source': 'specific'}));
     });
 
-    test(
-      'plugin-specific override targeting unknown plugin throws StateError '
-      'under throwError policy',
-      () {
-        runtime.addPlugin(_ConfigPlugin(id: 'alpha'));
+    test('plugin-specific override targeting unknown plugin throws StateError '
+        'under throwError policy', () {
+      runtime.addPlugin(_ConfigPlugin(id: 'alpha'));
 
-        expect(
-          () => runtime.init(
-            unknownReferencePolicy: UnknownReferencePolicy.throwError,
-            settings: RuntimeSettings(
-              services: {
-                Pin('unknown', ['agent', 'model']): ServiceSettings(
-                  config: {'k': 'v'},
-                ),
-              },
-            ),
+      expect(
+        () => runtime.init(
+          unknownReferencePolicy: UnknownReferencePolicy.throwError,
+          settings: RuntimeSettings(
+            services: {
+              Pin('unknown', ['agent', 'model']): ServiceSettings(
+                config: {'k': 'v'},
+              ),
+            },
           ),
-          throwsA(
-            isA<StateError>().having(
-              (e) => e.message,
-              'message',
-              contains('unknown plugin "unknown"'),
-            ),
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('unknown plugin "unknown"'),
           ),
-        );
-      },
-    );
+        ),
+      );
+    });
 
     test('wildcard for unregistered service is silently dropped', () {
       runtime.addPlugin(_ConfigPlugin(id: 'alpha'));

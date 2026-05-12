@@ -84,8 +84,9 @@ void main() {
             session,
             newSettings: const RuntimeSettings(
               plugins: {
-                PluginId('attach_throws_after_service'):
-                    PluginConfig(enabled: true),
+                PluginId('attach_throws_after_service'): PluginConfig(
+                  enabled: true,
+                ),
               },
             ),
           ),
@@ -119,54 +120,53 @@ void main() {
       },
     );
 
-    test(
-      'createSession: after init() throws, the service\'s attach-time '
-      'subscription on the failed session\'s bus is cancelled',
-      () async {
-        // To cleanly inspect the failed session's bus after the throw,
-        // capture a reference to it during plugin.attach. The test
-        // emits on that bus and asserts the counter stays at zero.
-        final plugin = _CapturingPluginThatThrows();
-        final runtime = PluginRuntime(plugins: [plugin])..init();
+    test('createSession: after init() throws, the service\'s attach-time '
+        'subscription on the failed session\'s bus is cancelled', () async {
+      // To cleanly inspect the failed session's bus after the throw,
+      // capture a reference to it during plugin.attach. The test
+      // emits on that bus and asserts the counter stays at zero.
+      final plugin = _CapturingPluginThatThrows();
+      final runtime = PluginRuntime(plugins: [plugin])..init();
 
-        await expectLater(
-          () => runtime.createSession(),
-          throwsA(isA<PluginLifecycleException>()),
-        );
+      await expectLater(
+        () => runtime.createSession(),
+        throwsA(isA<PluginLifecycleException>()),
+      );
 
-        final capturedBus = plugin.capturedBus;
-        expect(
-          capturedBus,
-          isNotNull,
-          reason: 'plugin.attach should have captured the session bus '
-              'before throwing',
-        );
+      final capturedBus = plugin.capturedBus;
+      expect(
+        capturedBus,
+        isNotNull,
+        reason:
+            'plugin.attach should have captured the session bus '
+            'before throwing',
+      );
 
-        // The orphan session's bus is disposed during cleanup so any
-        // observer still holding a reference cannot drive it further.
-        // Attempting to emit on it throws StateError.
-        expect(
-          capturedBus!.isDisposed,
-          isTrue,
-          reason: 'orphan session bus must be disposed on createSession '
-              'failure',
-        );
+      // The orphan session's bus is disposed during cleanup so any
+      // observer still holding a reference cannot drive it further.
+      // Attempting to emit on it throws StateError.
+      expect(
+        capturedBus!.isDisposed,
+        isTrue,
+        reason:
+            'orphan session bus must be disposed on createSession '
+            'failure',
+      );
 
-        // And the attach-time subscription was cancelled before the bus
-        // was disposed, so the counter stayed at zero throughout
-        // cleanup (no late-firing handler).
-        expect(
-          _markerHandlerCount,
-          0,
-          reason:
-              'failed createSession must cancel attach-time '
-              'subscriptions during cleanup',
-        );
+      // And the attach-time subscription was cancelled before the bus
+      // was disposed, so the counter stayed at zero throughout
+      // cleanup (no late-firing handler).
+      expect(
+        _markerHandlerCount,
+        0,
+        reason:
+            'failed createSession must cancel attach-time '
+            'subscriptions during cleanup',
+      );
 
-        expect(runtime.sessions, isEmpty);
-        await runtime.dispose();
-      },
-    );
+      expect(runtime.sessions, isEmpty);
+      await runtime.dispose();
+    });
   });
 }
 

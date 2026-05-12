@@ -16,52 +16,48 @@ import 'package:plugin_kit/plugin_kit.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test(
-    'updateSettings with unchanged overrides is fast even with many '
-    'registered services',
-    () {
-      // Many services across many plugins, each with several
-      // registrants. Naive: every wrapper visits every override on
-      // every call, and every list is sorted unconditionally.
-      const slotCount = 10000;
-      const registrantsPerSlot = 50;
-      const updateCalls = 1000;
-      const wallClockBudgetMs = 1500;
+  test('updateSettings with unchanged overrides is fast even with many '
+      'registered services', () {
+    // Many services across many plugins, each with several
+    // registrants. Naive: every wrapper visits every override on
+    // every call, and every list is sorted unconditionally.
+    const slotCount = 10000;
+    const registrantsPerSlot = 50;
+    const updateCalls = 1000;
+    const wallClockBudgetMs = 1500;
 
-      final registry = ServiceRegistry();
-      for (var slot = 0; slot < slotCount; slot++) {
-        final serviceId = ServiceId('svc_$slot');
-        for (var plugin = 0; plugin < registrantsPerSlot; plugin++) {
-          registry.registerSingleton<int>(
-            pluginId: PluginId('p_${slot}_$plugin'),
-            serviceId: serviceId,
-            create: () => slot * 10 + plugin,
-            priority: plugin * 10,
-          );
-        }
+    final registry = ServiceRegistry();
+    for (var slot = 0; slot < slotCount; slot++) {
+      final serviceId = ServiceId('svc_$slot');
+      for (var plugin = 0; plugin < registrantsPerSlot; plugin++) {
+        registry.registerSingleton<int>(
+          pluginId: PluginId('p_${slot}_$plugin'),
+          serviceId: serviceId,
+          create: () => slot * 10 + plugin,
+          priority: plugin * 10,
+        );
       }
+    }
 
-      final stopwatch = Stopwatch()..start();
-      for (var i = 0; i < updateCalls; i++) {
-        // Empty overrides means every wrapper's effective priority
-        // resolves to its basePriority, identical to the previous call.
-        // The naive implementation still walks every wrapper and
-        // re-sorts every list.
-        registry.updateSettings(overrides: const []);
-      }
-      stopwatch.stop();
+    final stopwatch = Stopwatch()..start();
+    for (var i = 0; i < updateCalls; i++) {
+      // Empty overrides means every wrapper's effective priority
+      // resolves to its basePriority, identical to the previous call.
+      // The naive implementation still walks every wrapper and
+      // re-sorts every list.
+      registry.updateSettings(overrides: const []);
+    }
+    stopwatch.stop();
 
-      expect(
-        stopwatch.elapsed.inMilliseconds,
-        lessThan(wallClockBudgetMs),
-        reason:
-            'updateSettings with unchanged overrides should be cheap; '
-            '$updateCalls iterations of $slotCount slots took '
-            '${stopwatch.elapsed.inMilliseconds}ms.',
-      );
-    },
-    timeout: const Timeout(Duration(seconds: 60)),
-  );
+    expect(
+      stopwatch.elapsed.inMilliseconds,
+      lessThan(wallClockBudgetMs),
+      reason:
+          'updateSettings with unchanged overrides should be cheap; '
+          '$updateCalls iterations of $slotCount slots took '
+          '${stopwatch.elapsed.inMilliseconds}ms.',
+    );
+  }, timeout: const Timeout(Duration(seconds: 60)));
 
   test(
     'updateSettings with a priority change still re-sorts the affected list',
@@ -107,49 +103,46 @@ void main() {
     },
   );
 
-  test(
-    'updateSettings removing a priority override restamps the wrapper '
-    'back to its base priority',
-    () {
-      // The selective sort must trigger when removing an override too,
-      // not just when adding one. Otherwise an override-then-clear
-      // sequence leaks the override's effective priority into the
-      // wrapper indefinitely.
-      final registry = ServiceRegistry();
-      registry.registerSingleton<int>(
-        pluginId: const PluginId('alpha'),
-        serviceId: const ServiceId('svc'),
-        create: () => 1,
-        priority: 100,
-      );
-      registry.registerSingleton<int>(
-        pluginId: const PluginId('beta'),
-        serviceId: const ServiceId('svc'),
-        create: () => 2,
-        priority: 50,
-      );
+  test('updateSettings removing a priority override restamps the wrapper '
+      'back to its base priority', () {
+    // The selective sort must trigger when removing an override too,
+    // not just when adding one. Otherwise an override-then-clear
+    // sequence leaks the override's effective priority into the
+    // wrapper indefinitely.
+    final registry = ServiceRegistry();
+    registry.registerSingleton<int>(
+      pluginId: const PluginId('alpha'),
+      serviceId: const ServiceId('svc'),
+      create: () => 1,
+      priority: 100,
+    );
+    registry.registerSingleton<int>(
+      pluginId: const PluginId('beta'),
+      serviceId: const ServiceId('svc'),
+      create: () => 2,
+      priority: 50,
+    );
 
-      // Boost beta over alpha.
-      registry.updateSettings(
-        overrides: [
-          const LocalPluginOverride.withPriority(
-            plugin: PluginId('beta'),
-            serviceId: ServiceId('svc'),
-            priority: 200,
-          ),
-        ],
-      );
-      expect(registry.resolve<int>(const ServiceId('svc')), 2);
+    // Boost beta over alpha.
+    registry.updateSettings(
+      overrides: [
+        const LocalPluginOverride.withPriority(
+          plugin: PluginId('beta'),
+          serviceId: ServiceId('svc'),
+          priority: 200,
+        ),
+      ],
+    );
+    expect(registry.resolve<int>(const ServiceId('svc')), 2);
 
-      // Clear all overrides. alpha (base 100) should win again.
-      registry.updateSettings(overrides: const []);
-      expect(
-        registry.resolve<int>(const ServiceId('svc')),
-        1,
-        reason:
-            'clearing the override must restamp beta back to its base 50 '
-            'so alpha wins',
-      );
-    },
-  );
+    // Clear all overrides. alpha (base 100) should win again.
+    registry.updateSettings(overrides: const []);
+    expect(
+      registry.resolve<int>(const ServiceId('svc')),
+      1,
+      reason:
+          'clearing the override must restamp beta back to its base 50 '
+          'so alpha wins',
+    );
+  });
 }

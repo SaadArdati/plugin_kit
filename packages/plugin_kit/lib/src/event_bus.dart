@@ -685,7 +685,6 @@ class EventBus {
     if (j < b.length) merged.addAll(b.sublist(j));
     return merged;
   }
-
 }
 
 /// Shared interface for priority-sorted handler entries.

@@ -174,56 +174,55 @@ void main() {
     },
   );
 
-  test(
-    'toggle race: concurrent updateSettings calls fail fast; serialized '
-    'calls converge to the latest intent',
-    () async {
-      final PluginRuntime runtime = PluginRuntime(
-        plugins: <Plugin>[ChatPlugin(), AltChatPlugin()],
-      )..init();
-      addTearDown(runtime.dispose);
-      final PluginSession session = await runtime.createSession();
+  test('toggle race: concurrent updateSettings calls fail fast; serialized '
+      'calls converge to the latest intent', () async {
+    final PluginRuntime runtime = PluginRuntime(
+      plugins: <Plugin>[ChatPlugin(), AltChatPlugin()],
+    )..init();
+    addTearDown(runtime.dispose);
+    final PluginSession session = await runtime.createSession();
 
-      expect(session.isPluginEnabled(ChatPlugin.id), isTrue);
-      expect(session.isPluginEnabled(AltChatPlugin.id), isTrue);
+    expect(session.isPluginEnabled(ChatPlugin.id), isTrue);
+    expect(session.isPluginEnabled(AltChatPlugin.id), isTrue);
 
-      const settings1 = RuntimeSettings(
-        plugins: <PluginId, PluginConfig>{
-          AltChatPlugin.id: PluginConfig(enabled: true),
-        },
-      );
-      const settings2 = RuntimeSettings(
-        plugins: <PluginId, PluginConfig>{
-          AltChatPlugin.id: PluginConfig(enabled: false),
-        },
-      );
+    const settings1 = RuntimeSettings(
+      plugins: <PluginId, PluginConfig>{
+        AltChatPlugin.id: PluginConfig(enabled: true),
+      },
+    );
+    const settings2 = RuntimeSettings(
+      plugins: <PluginId, PluginConfig>{
+        AltChatPlugin.id: PluginConfig(enabled: false),
+      },
+    );
 
-      // The runtime rejects concurrent reconciliations: firing two
-      // updateSettings calls without serializing surfaces a StateError
-      // on the second one. The first call still succeeds.
-      final Future<void> f1 = runtime.updateSettings(settings1);
-      await expectLater(
-        () => runtime.updateSettings(settings2),
-        throwsStateError,
-      );
-      await f1;
+    // The runtime rejects concurrent reconciliations: firing two
+    // updateSettings calls without serializing surfaces a StateError
+    // on the second one. The first call still succeeds.
+    final Future<void> f1 = runtime.updateSettings(settings1);
+    await expectLater(
+      () => runtime.updateSettings(settings2),
+      throwsStateError,
+    );
+    await f1;
 
-      // After serializing (just chaining the second call after the first
-      // completes), the latest intent wins.
-      await runtime.updateSettings(settings2);
+    // After serializing (just chaining the second call after the first
+    // completes), the latest intent wins.
+    await runtime.updateSettings(settings2);
 
-      expect(
-        runtime.attachedPluginIds.contains(AltChatPlugin.id),
-        isFalse,
-        reason: 'latest serialized intent should disable AltChatPlugin '
-            'at runtime',
-      );
-      expect(
-        runtime.enabledPluginIds.contains(AltChatPlugin.id),
-        isFalse,
-        reason: 'latest serialized intent should disable AltChatPlugin '
-            'in settings',
-      );
-    },
-  );
+    expect(
+      runtime.attachedPluginIds.contains(AltChatPlugin.id),
+      isFalse,
+      reason:
+          'latest serialized intent should disable AltChatPlugin '
+          'at runtime',
+    );
+    expect(
+      runtime.enabledPluginIds.contains(AltChatPlugin.id),
+      isFalse,
+      reason:
+          'latest serialized intent should disable AltChatPlugin '
+          'in settings',
+    );
+  });
 }

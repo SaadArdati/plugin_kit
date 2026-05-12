@@ -71,13 +71,13 @@ class RequestUnavailableException implements Exception {
 
   /// Human-readable text derived from [reason].
   String get _reasonText => switch (reason) {
-        RequestUnavailableReason.noRegistration =>
-          'no handler registered for this type pair',
-        RequestUnavailableReason.noMatchingHandler =>
-          'no handler matched after priority merge',
-        RequestUnavailableReason.allConceded =>
-          'every registered handler conceded with null but Response is non-nullable',
-      };
+    RequestUnavailableReason.noRegistration =>
+      'no handler registered for this type pair',
+    RequestUnavailableReason.noMatchingHandler =>
+      'no handler matched after priority merge',
+    RequestUnavailableReason.allConceded =>
+      'every registered handler conceded with null but Response is non-nullable',
+  };
 
   @override
   String toString() {

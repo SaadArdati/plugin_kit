@@ -85,7 +85,10 @@ void main() {
           ),
         );
 
-        expect(runtime.isPluginAttached(const PluginId('noop_global')), isFalse);
+        expect(
+          runtime.isPluginAttached(const PluginId('noop_global')),
+          isFalse,
+        );
 
         await runtime.dispose();
       },

@@ -834,8 +834,10 @@ class PluginRuntime<
       if (!scopedPluginIds.contains(pluginId)) continue;
       final serviceId = scopedKey.serviceId;
       if (knownFor(pluginId).contains(serviceId)) continue;
-      unknowns.add('${scopedKey.wire} (plugin "$pluginId" did not register '
-          '"$serviceId")');
+      unknowns.add(
+        '${scopedKey.wire} (plugin "$pluginId" did not register '
+        '"$serviceId")',
+      );
     }
     _applyUnknownReferencePolicy(
       kind: 'service ids in services pin',

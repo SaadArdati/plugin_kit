@@ -62,11 +62,9 @@ void main() {
       // The snippet toggles `analytics` off, which requires that plugin
       // to be registered on the runtime (the runtime now rejects
       // settings entries for unknown plugin ids).
-      final runtime = PluginRuntime(plugins: [
-        CasualPlugin(),
-        CorePlugin(),
-        AnalyticsPlugin(),
-      ])..init();
+      final runtime = PluginRuntime(
+        plugins: [CasualPlugin(), CorePlugin(), AnalyticsPlugin()],
+      )..init();
       await expectLater(demonstrateUpdateModes(runtime), completes);
       await runtime.dispose();
     });

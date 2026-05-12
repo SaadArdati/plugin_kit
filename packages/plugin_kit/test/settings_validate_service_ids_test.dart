@@ -44,198 +44,180 @@ class _SessionAlphaPlugin extends SessionPlugin {
 
 void main() {
   group('RuntimeSettings.services pin service-id validation', () {
-    test(
-      'init throws when a pin references a service id the plugin did not '
-      'register, under the default policy',
-      () {
-        final runtime = PluginRuntime(plugins: [_AlphaPlugin()]);
-        expect(
-          () => runtime.init(
-            settings: RuntimeSettings(
-              services: {
-                // Plugin "alpha" only registers ServiceId("agent.model").
-                Pin('alpha', ['agent', 'renamed_in_v2']):
-                    ServiceSettings(config: {'k': 'v'}),
-              },
-            ),
-          ),
-          throwsA(
-            isA<StateError>().having(
-              (e) => e.message,
-              'message',
-              allOf(
-                contains('alpha'),
-                contains('renamed_in_v2'),
+    test('init throws when a pin references a service id the plugin did not '
+        'register, under the default policy', () {
+      final runtime = PluginRuntime(plugins: [_AlphaPlugin()]);
+      expect(
+        () => runtime.init(
+          settings: RuntimeSettings(
+            services: {
+              // Plugin "alpha" only registers ServiceId("agent.model").
+              Pin('alpha', ['agent', 'renamed_in_v2']): ServiceSettings(
+                config: {'k': 'v'},
               ),
-            ),
+            },
           ),
-        );
-      },
-    );
-
-    test(
-      'init under logAndSkip does NOT throw and logs once at severe '
-      'with the unknown service id',
-      () {
-        final logs = <LogRecord>[];
-        final sub = Logger.root.onRecord.listen(logs.add);
-        addTearDown(sub.cancel);
-
-        final runtime = PluginRuntime(plugins: [_AlphaPlugin()]);
-        expect(
-          () => runtime.init(
-            unknownReferencePolicy: UnknownReferencePolicy.logAndSkip,
-            settings: RuntimeSettings(
-              services: {
-                Pin('alpha', ['agent', 'renamed_in_v2']):
-                    ServiceSettings(config: {'k': 'v'}),
-              },
-            ),
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('alpha'), contains('renamed_in_v2')),
           ),
-          returnsNormally,
-        );
+        ),
+      );
+    });
 
-        final severe = logs
-            .where((r) => r.level >= Level.SEVERE)
-            .where((r) => r.message.contains('renamed_in_v2'))
-            .toList();
-        expect(severe, hasLength(1));
-        expect(severe.single.message, contains('init'));
-      },
-    );
+    test('init under logAndSkip does NOT throw and logs once at severe '
+        'with the unknown service id', () {
+      final logs = <LogRecord>[];
+      final sub = Logger.root.onRecord.listen(logs.add);
+      addTearDown(sub.cancel);
 
-    test(
-      'init under ignore does not throw and does not log severe',
-      () {
-        final logs = <LogRecord>[];
-        final sub = Logger.root.onRecord.listen(logs.add);
-        addTearDown(sub.cancel);
-
-        final runtime = PluginRuntime(plugins: [_AlphaPlugin()]);
-        expect(
-          () => runtime.init(
-            unknownReferencePolicy: UnknownReferencePolicy.ignore,
-            settings: RuntimeSettings(
-              services: {
-                Pin('alpha', ['agent', 'renamed_in_v2']):
-                    ServiceSettings(config: {'k': 'v'}),
-              },
-            ),
+      final runtime = PluginRuntime(plugins: [_AlphaPlugin()]);
+      expect(
+        () => runtime.init(
+          unknownReferencePolicy: UnknownReferencePolicy.logAndSkip,
+          settings: RuntimeSettings(
+            services: {
+              Pin('alpha', ['agent', 'renamed_in_v2']): ServiceSettings(
+                config: {'k': 'v'},
+              ),
+            },
           ),
-          returnsNormally,
-        );
+        ),
+        returnsNormally,
+      );
 
-        final severe = logs
-            .where((r) => r.level >= Level.SEVERE)
-            .where((r) => r.message.contains('renamed_in_v2'))
-            .toList();
-        expect(severe, isEmpty);
-      },
-    );
+      final severe = logs
+          .where((r) => r.level >= Level.SEVERE)
+          .where((r) => r.message.contains('renamed_in_v2'))
+          .toList();
+      expect(severe, hasLength(1));
+      expect(severe.single.message, contains('init'));
+    });
 
-    test(
-      'init under throwError accepts a pin that matches a registered '
-      'service id (regression: validator must not over-throw)',
-      () {
-        final runtime = PluginRuntime(plugins: [_AlphaPlugin()]);
-        expect(
-          () => runtime.init(
-            settings: RuntimeSettings(
-              services: {
-                Pin('alpha', ['agent', 'model']):
-                    ServiceSettings(config: {'k': 'v'}),
-              },
-            ),
+    test('init under ignore does not throw and does not log severe', () {
+      final logs = <LogRecord>[];
+      final sub = Logger.root.onRecord.listen(logs.add);
+      addTearDown(sub.cancel);
+
+      final runtime = PluginRuntime(plugins: [_AlphaPlugin()]);
+      expect(
+        () => runtime.init(
+          unknownReferencePolicy: UnknownReferencePolicy.ignore,
+          settings: RuntimeSettings(
+            services: {
+              Pin('alpha', ['agent', 'renamed_in_v2']): ServiceSettings(
+                config: {'k': 'v'},
+              ),
+            },
           ),
-          returnsNormally,
-        );
-      },
-    );
+        ),
+        returnsNormally,
+      );
 
-    test(
-      'createSession throws under default policy when a session pin '
-      'references an unregistered service id on the named plugin',
-      () async {
-        final runtime = PluginRuntime(plugins: [_SessionAlphaPlugin()])
-          ..init();
+      final severe = logs
+          .where((r) => r.level >= Level.SEVERE)
+          .where((r) => r.message.contains('renamed_in_v2'))
+          .toList();
+      expect(severe, isEmpty);
+    });
 
-        await expectLater(
-          () => runtime.createSession(
-            settings: RuntimeSettings(
-              services: {
-                // SessionAlpha registers ServiceId("chat.model") only.
-                Pin('alpha', ['chat', 'removed_in_v3']):
-                    ServiceSettings(config: {'k': 'v'}),
-              },
-            ),
+    test('init under throwError accepts a pin that matches a registered '
+        'service id (regression: validator must not over-throw)', () {
+      final runtime = PluginRuntime(plugins: [_AlphaPlugin()]);
+      expect(
+        () => runtime.init(
+          settings: RuntimeSettings(
+            services: {
+              Pin('alpha', ['agent', 'model']): ServiceSettings(
+                config: {'k': 'v'},
+              ),
+            },
           ),
-          throwsA(
-            isA<StateError>().having(
-              (e) => e.message,
-              'message',
-              allOf(contains('alpha'), contains('removed_in_v3')),
-            ),
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('createSession throws under default policy when a session pin '
+        'references an unregistered service id on the named plugin', () async {
+      final runtime = PluginRuntime(plugins: [_SessionAlphaPlugin()])..init();
+
+      await expectLater(
+        () => runtime.createSession(
+          settings: RuntimeSettings(
+            services: {
+              // SessionAlpha registers ServiceId("chat.model") only.
+              Pin('alpha', ['chat', 'removed_in_v3']): ServiceSettings(
+                config: {'k': 'v'},
+              ),
+            },
           ),
-        );
-
-        await runtime.dispose();
-      },
-    );
-
-    test(
-      'wildcard pins are NOT validated against service-id registration: '
-      'they intentionally target whoever wins, even when no plugin '
-      'registered that id yet',
-      () {
-        final runtime = PluginRuntime(plugins: [_AlphaPlugin()]);
-        // No registered service matches "agent.unreleased", but the
-        // wildcard pin shape is unscoped by design and survives.
-        expect(
-          () => runtime.init(
-            settings: RuntimeSettings(
-              services: {
-                Pin.wildcard(['agent', 'unreleased']):
-                    ServiceSettings(config: {'k': 'v'}),
-              },
-            ),
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('alpha'), contains('removed_in_v3')),
           ),
-          returnsNormally,
-        );
-      },
-    );
+        ),
+      );
 
-    test(
-      'pins whose plugin id is unknown are NOT re-flagged by the '
-      'service-id validator under logAndSkip: the plugin-id pass '
-      'already surfaced them, so we do not duplicate the report',
-      () {
-        final logs = <LogRecord>[];
-        final sub = Logger.root.onRecord.listen(logs.add);
-        addTearDown(sub.cancel);
+      await runtime.dispose();
+    });
 
-        final runtime = PluginRuntime(plugins: [_AlphaPlugin()]);
-        expect(
-          () => runtime.init(
-            unknownReferencePolicy: UnknownReferencePolicy.logAndSkip,
-            settings: RuntimeSettings(
-              services: {
-                Pin('ghost_plug', ['agent', 'model']):
-                    ServiceSettings(config: {'k': 'v'}),
-              },
-            ),
+    test('wildcard pins are NOT validated against service-id registration: '
+        'they intentionally target whoever wins, even when no plugin '
+        'registered that id yet', () {
+      final runtime = PluginRuntime(plugins: [_AlphaPlugin()]);
+      // No registered service matches "agent.unreleased", but the
+      // wildcard pin shape is unscoped by design and survives.
+      expect(
+        () => runtime.init(
+          settings: RuntimeSettings(
+            services: {
+              Pin.wildcard(['agent', 'unreleased']): ServiceSettings(
+                config: {'k': 'v'},
+              ),
+            },
           ),
-          returnsNormally,
-        );
+        ),
+        returnsNormally,
+      );
+    });
 
-        // Exactly one severe message names ghost_plug (the plugin-id
-        // pass). The service-id pass must not log a second time for
-        // the same pin.
-        final severe = logs
-            .where((r) => r.level >= Level.SEVERE)
-            .where((r) => r.message.contains('ghost_plug'))
-            .toList();
-        expect(severe, hasLength(1));
-      },
-    );
+    test('pins whose plugin id is unknown are NOT re-flagged by the '
+        'service-id validator under logAndSkip: the plugin-id pass '
+        'already surfaced them, so we do not duplicate the report', () {
+      final logs = <LogRecord>[];
+      final sub = Logger.root.onRecord.listen(logs.add);
+      addTearDown(sub.cancel);
+
+      final runtime = PluginRuntime(plugins: [_AlphaPlugin()]);
+      expect(
+        () => runtime.init(
+          unknownReferencePolicy: UnknownReferencePolicy.logAndSkip,
+          settings: RuntimeSettings(
+            services: {
+              Pin('ghost_plug', ['agent', 'model']): ServiceSettings(
+                config: {'k': 'v'},
+              ),
+            },
+          ),
+        ),
+        returnsNormally,
+      );
+
+      // Exactly one severe message names ghost_plug (the plugin-id
+      // pass). The service-id pass must not log a second time for
+      // the same pin.
+      final severe = logs
+          .where((r) => r.level >= Level.SEVERE)
+          .where((r) => r.message.contains('ghost_plug'))
+          .toList();
+      expect(severe, hasLength(1));
+    });
   });
 }

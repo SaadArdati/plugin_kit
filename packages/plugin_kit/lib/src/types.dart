@@ -271,12 +271,9 @@ extension SessionBroadcast on List<PluginSession> {
   /// completion, and the first error encountered surfaces on the
   /// returned future once all sessions have settled.
   Future<void> emit<T>(T event, {String? identifier}) async {
-    await Future.wait(
-      [
-        for (final session in this)
-          session.bus.emit<T>(event: event, identifier: identifier),
-      ],
-      eagerError: false,
-    );
+    await Future.wait([
+      for (final session in this)
+        session.bus.emit<T>(event: event, identifier: identifier),
+    ], eagerError: false);
   }
 }
