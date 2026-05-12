@@ -60,8 +60,12 @@ mixin PluginSessionListener {
   /// Helper to build a standard [EventBinding] for the given handler and
   /// parameters. Use this in the [subscriptions] getter to keep it concise.
   /// For advanced usage, use [EventBinding] directly.
+  ///
+  /// The handler receives the full [EventEnvelope] so envelope metadata
+  /// (`sourcePluginId`, `timestamp`, `sequence`) stays reachable. Read
+  /// the payload via `envelope.event`.
   EventBinding on<E>(
-    void Function(E event) handler, {
+    void Function(EventEnvelope<E> envelope) handler, {
     int priority = 0,
     String? identifier,
   }) => EventBinding.on(handler, priority: priority, identifier: identifier);

@@ -42,8 +42,8 @@ import 'session_scope.dart';
 ///   @override
 ///   void initState() {
 ///     super.initState();
-///     listen<ChatMessageReceived>((event) {
-///       setState(() => _last = event.text);
+///     listen<ChatMessageReceived>((envelope) {
+///       setState(() => _last = envelope.event.text);
 ///     });
 ///   }
 /// }
@@ -86,18 +86,22 @@ mixin PluginSessionStateListener<W extends StatefulWidget> on State<W> {
   ///
   /// Callable from any lifecycle callback, including [State.initState].
   ///
+  /// The handler receives the full [EventEnvelope] so envelope metadata
+  /// (`sourcePluginId`, `timestamp`, `sequence`) stays reachable. Read
+  /// the payload via `envelope.event`.
+  ///
   /// [priority] and [identifier] map directly to [EventBus.on]; see
   /// that method for the dispatch model.
   void listen<E>(
-    void Function(E event) handler, {
+    void Function(EventEnvelope<E> envelope) handler, {
     int priority = 0,
     String? identifier,
   }) {
     _addBinding(
       EventBinding.on<E>(
-        (event) {
+        (envelope) {
           if (!mounted) return;
-          handler(event);
+          handler(envelope);
         },
         priority: priority,
         identifier: identifier,
@@ -110,15 +114,19 @@ mixin PluginSessionStateListener<W extends StatefulWidget> on State<W> {
   /// re-attached automatically across session swaps and cancelled in
   /// [dispose].
   ///
+  /// The [when] predicate receives the full [EventEnvelope] so it can
+  /// gate the rebuild on envelope metadata (e.g. `sourcePluginId`) in
+  /// addition to the payload.
+  ///
   /// For unfiltered rebuild-on-event, prefer [BuildContext.watchEvent]
-  /// directly — it uses InheritedWidget-style dependency attachment and
+  /// directly. It uses InheritedWidget-style dependency attachment and
   /// needs no State mixin. Use [rebuildOn] when you need a [when]
   /// predicate to gate the rebuild itself.
-  void rebuildOn<E>([bool Function(E event)? when]) {
+  void rebuildOn<E>([bool Function(EventEnvelope<E> envelope)? when]) {
     _addBinding(
-      EventBinding.on<E>((event) {
+      EventBinding.on<E>((envelope) {
         if (!mounted) return;
-        if (when != null && !when(event)) return;
+        if (when != null && !when(envelope)) return;
         setState(() {});
       }),
     );

@@ -170,6 +170,29 @@ class BetterDartFormatter extends StatefulPluginService implements Formatter {
 }
 // #enddocregion service-registry-resolve-after
 
+/// A formatter that consults the next-priority registrant defensively. The
+/// `_maybeNext` helper wraps [ServiceRegistry.resolveAfter] in a try/catch so
+/// the chain returns `null` rather than throwing when no fallback exists.
+class OptionalFallbackFormatter extends StatefulPluginService
+    implements Formatter {
+  @override
+  String format(String path, String input) {
+    final next = _maybeNext();
+    return next == null ? input : next.format(path, input);
+  }
+
+  // #docregion service-registry-maybe-resolve-after
+  Formatter? _maybeNext() {
+    try {
+      return context.registry
+          .resolveAfter<Formatter>(pluginId: pluginId, serviceId: serviceId);
+    } on StateError {
+      return null;
+    }
+  }
+  // #enddocregion service-registry-maybe-resolve-after
+}
+
 /// Plugin that registers [BetterDartFormatter] as the elevated-priority winner
 /// for the `code_formatter` slot. Used by the matching test to drive the
 /// service through a real runtime so its `context` is bound when `format()`

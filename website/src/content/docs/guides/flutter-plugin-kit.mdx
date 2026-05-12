@@ -119,8 +119,8 @@ The scope reacts correctly when you swap arguments mid-tree: switching from auto
 
 A mixin on `State<W>`. Two methods:
 
-- `listen<E>(void Function(E event) handler)`: register a handler for events of type `E`. Returns nothing; cancellation is automatic on `dispose`.
-- `rebuildOn<E>([bool Function(E event)? when])`: register a setState-trigger handler for events of type `E`, optionally filtered by `when`.
+- `listen<E>(void Function(EventEnvelope<E> envelope) handler)`: register a handler for events of type `E`. Returns nothing; cancellation is automatic on `dispose`. The handler receives the full envelope so `envelope.sourcePluginId` / `envelope.timestamp` stay reachable; read the payload via `envelope.event`.
+- `rebuildOn<E>([bool Function(EventEnvelope<E> envelope)? when])`: register a setState-trigger handler for events of type `E`, optionally filtered by `when`. The predicate receives the envelope too, so filtering can gate on metadata.
 
 Both are callable from `initState` (and any later lifecycle callback). Behind the scenes the mixin records each `listen` / `rebuildOn` call as a descriptor and attaches descriptors against the active session as soon as one becomes available, typically the next `didChangeDependencies` after `initState`. There is no `_wired` flag, no "subscribe in `didChangeDependencies` instead" caveat.
 

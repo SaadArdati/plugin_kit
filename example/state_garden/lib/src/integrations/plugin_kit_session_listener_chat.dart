@@ -44,8 +44,8 @@ class ChatSessionListenerNotifier extends ChangeNotifier
 
   Future<void> send(String text) => _session.emit(SendMessageRequested(text));
 
-  void _onMessagesChanged(ChatMessagesChanged event) {
-    _messages = event.messages;
+  void _onMessagesChanged(EventEnvelope<ChatMessagesChanged> envelope) {
+    _messages = envelope.event.messages;
     notifyListeners();
   }
 

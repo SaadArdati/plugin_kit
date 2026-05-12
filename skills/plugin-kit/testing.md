@@ -11,6 +11,7 @@ PluginContext makeTestContext() {
   return PluginContext.stub(registry: ServiceRegistry.empty(), bus: EventBus());
 }
 ```
+registry & bus fields optional, supply fakes as needed.
 
 `ctx.registry` on a stub is the raw `ServiceRegistry`. Inject a fake using the named-arg registration form:
 

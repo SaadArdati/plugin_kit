@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:plugin_kit/plugin_kit.dart';
 import 'package:provider/provider.dart';
@@ -10,28 +8,34 @@ import '../widgets/chat_view.dart';
 
 /// Recipe: `ChangeNotifier` plus `provider`.
 ///
-/// The bridge stores its [EventSubscription] in a final field. The handler
-/// guards against a post-dispose fire by checking [_disposed], which the
-/// override of [dispose] flips before cancelling the subscription. This
-/// matters because `EventEnvelope` cascade can be mid-iteration when
-/// cancel removes the entry: the snapshot the cascade is iterating still
-/// contains the handler. Without the guard, [notifyListeners] would throw
-/// after dispose.
+/// Mixes in [PluginSessionListener] so subscription lifecycle is declared
+/// once via [subscriptions] and the mixin handles attach/cancel. The
+/// post-dispose guard still matters because the cascade snapshot may
+/// hold the handler when `cancel` runs mid-iteration: `notifyListeners`
+/// must not fire after `dispose`.
 // #docregion change-notifier-chat-chat-change-notifier
-class ChatChangeNotifier extends ChangeNotifier {
+class ChatChangeNotifier extends ChangeNotifier with PluginSessionListener {
   ChatChangeNotifier(this._session) {
-    _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
+    attachSubscriptions();
   }
 
   final PluginSession _session;
-  late final EventSubscription _subscription;
+
+  @override
+  PluginSession get session => _session;
+
+  @override
+  List<EventBinding> get subscriptions => [
+    on<ChatMessagesChanged>(_onMessagesChanged),
+  ];
+
   bool _disposed = false;
 
   List<ChatMessage> _messages = const <ChatMessage>[];
+
   List<ChatMessage> get messages => _messages;
 
-  Future<void> send(String text) =>
-      _session.emit(SendMessageRequested(text)).then((_) {});
+  Future<void> send(String text) => _session.emit(SendMessageRequested(text));
 
   void _onMessagesChanged(EventEnvelope<ChatMessagesChanged> envelope) {
     if (_disposed) return;
@@ -42,7 +46,7 @@ class ChatChangeNotifier extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    unawaited(_subscription.cancel());
+    detachSubscriptions();
     super.dispose();
   }
 }

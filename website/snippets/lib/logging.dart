@@ -1,6 +1,7 @@
 /// Snippets for PluginLifecycleException handling and log discipline.
 library;
 
+import 'package:flutter/widgets.dart';
 import 'package:logging/logging.dart';
 import 'package:plugin_kit/plugin_kit.dart';
 
@@ -15,6 +16,17 @@ class CrashingPlugin extends GlobalPlugin {
   }
 }
 
+/// Stand-in for the host application's root widget. The README's
+/// `runApp(MyApp())` line resolves to this stub when the snippet is
+/// compiled, which is all that matters for validation; readers
+/// substitute their own widget.
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}
+
 // #docregion logging-logger-listen
 /// Wires the root `plugin_kit` logger to print every record.
 void listenToPluginKitLogger() {
@@ -23,6 +35,19 @@ void listenToPluginKitLogger() {
   });
 }
 // #enddocregion logging-logger-listen
+
+// #docregion logging-root-listen-main
+void main() {
+  Logger.root.level = Level.INFO; // or Level.ALL during development
+  Logger.root.onRecord.listen((record) {
+    print('${record.level.name}: ${record.loggerName}: ${record.message}');
+    if (record.error != null) print('  ${record.error}');
+    if (record.stackTrace != null) print(record.stackTrace);
+  });
+
+  runApp(const MyApp());
+}
+// #enddocregion logging-root-listen-main
 
 // #docregion logging-lifecycle-exception
 Future<void> handleLifecycleException() async {

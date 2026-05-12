@@ -24,7 +24,7 @@ class _Recorder with PluginSessionListener {
 
   @override
   List<EventBinding> get subscriptions => [
-    EventBinding.on<_Tick>((e) => ticks.add(e.count)),
+    EventBinding.on<_Tick>((envelope) => ticks.add(envelope.event.count)),
   ];
 }
 
@@ -40,7 +40,7 @@ class _SwappableRecorder with PluginSessionListener {
 
   @override
   List<EventBinding> get subscriptions => [
-    EventBinding.on<_Tick>((e) => ticks.add(e.count)),
+    EventBinding.on<_Tick>((envelope) => ticks.add(envelope.event.count)),
   ];
 
   void switchTo(PluginSession next) {

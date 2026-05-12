@@ -90,9 +90,9 @@ class _SetStateChatScreenState extends State<SetStateChatScreen>
   @override
   void initState() {
     super.initState();
-    listen<ChatMessagesChanged>((event) {
+    listen<ChatMessagesChanged>((envelope) {
       if (!mounted) return;
-      setState(() => _messages = event.messages);
+      setState(() => _messages = envelope.event.messages);
     });
   }
 

@@ -87,11 +87,9 @@ For the per-API breakdown with examples, see [`packages/plugin_kit/README.md`](p
 
 ## Logging
 
-plugin_kit uses `package:logging`. Lifecycle warnings, failed attaches, dependency cycles, and other diagnostics flow through named loggers (`plugin_kit.Plugin`, `plugin_kit.PluginRuntime`, `plugin_kit.PluginSession`). Nothing is printed by default; attach a listener to the root logger to see them:
+plugin_kit uses `package:logging`. Lifecycle warnings, failed attaches, dependency cycles, and other diagnostics flow through named loggers (`plugin_kit.Plugin`, `plugin_kit.PluginRuntime`, `plugin_kit.PluginSession`). Nothing is printed by default; attach a listener to the root logger to see them. Add `package:logging/logging.dart` to your imports, then in your app's `main()`:
 
 ```dart
-import 'package:logging/logging.dart';
-
 void main() {
   Logger.root.level = Level.INFO; // or Level.ALL during development
   Logger.root.onRecord.listen((record) {
@@ -100,7 +98,7 @@ void main() {
     if (record.stackTrace != null) print(record.stackTrace);
   });
 
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 ```
 

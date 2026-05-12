@@ -17,7 +17,7 @@ class _ListenerTestPlugin extends SessionPlugin {
 void main() {
   group('EventBinding.on', () {
     test(
-      'attaches handler to a session and receives unwrapped events',
+      'attaches handler to a session and receives envelopes carrying the event',
       () async {
         final runtime = PluginRuntime(plugins: [_ListenerTestPlugin()])
           ..init(settings: RuntimeSettings.empty());
@@ -26,7 +26,9 @@ void main() {
         addTearDown(session.dispose);
 
         final received = <int>[];
-        final binding = EventBinding.on<_Tick>((e) => received.add(e.count));
+        final binding = EventBinding.on<_Tick>(
+          (envelope) => received.add(envelope.event.count),
+        );
         final sub = binding.attachTo(session);
 
         await session.emit(const _Tick(1));
@@ -90,7 +92,7 @@ void main() {
 
         final received = <int>[];
         final binding = EventBinding.on<_Tick>(
-          (e) => received.add(e.count),
+          (envelope) => received.add(envelope.event.count),
           identifier: 'agent1',
         );
         addTearDown(binding.attachTo(session).cancel);

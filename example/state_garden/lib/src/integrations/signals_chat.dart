@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:plugin_kit/plugin_kit.dart';
 import 'package:signals_flutter/signals_flutter.dart';
@@ -11,17 +9,26 @@ import '../widgets/chat_view.dart';
 /// Recipe: signals_flutter.
 ///
 /// One [Signal] holds the snapshot. The bus handler writes to
-/// `messages.value`; the [Watch] builder rebuilds on read tracking. The
-/// bridge cancels the bus subscription in [dispose]; the `_disposed` guard
-/// blocks any in-flight cascade fire after dispose.
+/// `messages.value`; the [Watch] builder rebuilds on read tracking.
+/// Mixes in [PluginSessionListener] for declarative subscription
+/// lifecycle; the `_disposed` guard still blocks any in-flight cascade
+/// fire after dispose.
 // #docregion signals-chat-signals-chat-bridge
-class SignalsChatBridge {
+class SignalsChatBridge with PluginSessionListener {
   SignalsChatBridge(this._session) {
-    _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
+    attachSubscriptions();
   }
 
   final PluginSession _session;
-  late final EventSubscription _subscription;
+
+  @override
+  PluginSession get session => _session;
+
+  @override
+  List<EventBinding> get subscriptions => [
+    on<ChatMessagesChanged>(_onMessagesChanged),
+  ];
+
   bool _disposed = false;
 
   final Signal<List<ChatMessage>> messages = signal(const <ChatMessage>[]);
@@ -36,7 +43,7 @@ class SignalsChatBridge {
 
   void dispose() {
     _disposed = true;
-    unawaited(_subscription.cancel());
+    detachSubscriptions();
   }
 }
 // #enddocregion signals-chat-signals-chat-bridge

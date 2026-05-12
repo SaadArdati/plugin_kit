@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plugin_kit/plugin_kit.dart';
@@ -24,11 +22,10 @@ final Provider<PluginSession> sessionProvider = Provider<PluginSession>((
 
 /// Recipe: Riverpod AsyncNotifier.
 ///
-/// Subscribes inside [build]; registers `ref.onDispose` after subscribing so
-/// the cancellation closure captures the current subscription. The Notifier
-/// rebuilds when [sessionProvider] changes; both onDispose calls run in the
-/// expected order, cancelling the old subscription before subscribing to
-/// the new bus.
+/// Mixes in [PluginSessionListener] so subscription lifecycle stays
+/// declarative. Each [build] reads the current session, detaches any
+/// stale subscriptions (no-op on the first build), and re-attaches.
+/// `ref.onDispose` then flips a guard flag and cancels for good.
 ///
 /// `_disposed` is reset to `false` at the top of every [build] on purpose:
 /// each rebuild creates a fresh subscription whose [ref.onDispose] callback
@@ -41,19 +38,28 @@ chatNotifierProvider = AsyncNotifierProvider<ChatNotifier, List<ChatMessage>>(
 );
 
 // #docregion riverpod-chat-chat-notifier
-class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
+class ChatNotifier extends AsyncNotifier<List<ChatMessage>>
+    with PluginSessionListener {
   bool _disposed = false;
+  late PluginSession _session;
+
+  @override
+  PluginSession get session => _session;
+
+  @override
+  List<EventBinding> get subscriptions => [
+    on<ChatMessagesChanged>(_onMessagesChanged),
+  ];
 
   @override
   Future<List<ChatMessage>> build() async {
     _disposed = false;
-    final PluginSession session = ref.watch(sessionProvider);
-    final EventSubscription sub = session.on<ChatMessagesChanged>(
-      _onMessagesChanged,
-    );
+    _session = ref.watch(sessionProvider);
+    detachSubscriptions();
+    attachSubscriptions();
     ref.onDispose(() {
       _disposed = true;
-      unawaited(sub.cancel());
+      detachSubscriptions();
     });
     return const <ChatMessage>[];
   }

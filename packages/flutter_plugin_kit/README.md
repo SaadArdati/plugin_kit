@@ -52,8 +52,8 @@ class _ChatScreenState extends State<ChatScreen>
   @override
   void initState() {
     super.initState();
-    listen<ChatMessageReceived>((event) {
-      setState(() => _last = event.text);
+    listen<ChatMessageReceived>((envelope) {
+      setState(() => _last = envelope.event.text);
     });
   }
 

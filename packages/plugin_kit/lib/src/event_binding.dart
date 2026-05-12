@@ -18,12 +18,18 @@ abstract class EventBinding {
   /// when the observer is no longer needed.
   EventSubscription attachTo(PluginSession session);
 
-  /// Builds an [EventBinding] that delivers the unwrapped event payload
-  /// of type [E] to [handler] on each emission of an [E]-typed event.
+  /// Builds an [EventBinding] that delivers the full [EventEnvelope] of
+  /// type [E] to [handler] on each emission of an [E]-typed event.
+  ///
+  /// The handler receives the envelope (not the unwrapped event) so that
+  /// envelope metadata (`sourcePluginId`, `timestamp`, `sequence`) stays
+  /// reachable. Use `envelope.event` for the payload. The shape matches
+  /// [EventBus.on] / [PluginSession.on], so callers can move between the
+  /// declarative and imperative APIs without re-typing handlers.
   ///
   /// [priority] and [identifier] map directly to [EventBus.on].
   static EventBinding on<E>(
-    void Function(E event) handler, {
+    void Function(EventEnvelope<E> envelope) handler, {
     int priority = 0,
     String? identifier,
   }) => _OnBinding<E>(handler, priority: priority, identifier: identifier);
@@ -32,14 +38,14 @@ abstract class EventBinding {
 class _OnBinding<E> implements EventBinding {
   _OnBinding(this.handler, {this.priority = 0, this.identifier});
 
-  final void Function(E event) handler;
+  final void Function(EventEnvelope<E> envelope) handler;
   final int priority;
   final String? identifier;
 
   @override
   EventSubscription attachTo(PluginSession session) {
     return session.on<E>(
-      (envelope) => handler(envelope.event),
+      handler,
       priority: priority,
       identifier: identifier,
     );

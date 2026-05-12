@@ -137,9 +137,9 @@ class _HistoryCardState extends State<HistoryCard>
   @override
   void initState() {
     super.initState();
-    listen<TickEvent>((event) {
+    listen<TickEvent>((envelope) {
       setState(() {
-        _ticks.add(event.count);
+        _ticks.add(envelope.event.count);
         if (_ticks.length > 5) _ticks.removeAt(0);
       });
     });

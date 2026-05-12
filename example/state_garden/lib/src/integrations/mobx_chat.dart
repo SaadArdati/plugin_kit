@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:mobx/mobx.dart';
@@ -13,17 +11,25 @@ import '../widgets/chat_view.dart';
 ///
 /// One [Observable] holds the snapshot, mutated inside [runInAction] so the
 /// reaction system observes the change atomically. The [Observer] widget
-/// re-runs `build` when the observable is read inside it. Cancels the bus
-/// subscription in [dispose]; the `_disposed` guard blocks any in-flight
-/// cascade fire after dispose.
+/// re-runs `build` when the observable is read inside it. Mixes in
+/// [PluginSessionListener] for subscription lifecycle; the `_disposed`
+/// guard still blocks any in-flight cascade fire after dispose.
 // #docregion mobx-chat-mobx-chat-bridge
-class MobxChatBridge {
+class MobxChatBridge with PluginSessionListener {
   MobxChatBridge(this._session) {
-    _subscription = _session.on<ChatMessagesChanged>(_onMessagesChanged);
+    attachSubscriptions();
   }
 
   final PluginSession _session;
-  late final EventSubscription _subscription;
+
+  @override
+  PluginSession get session => _session;
+
+  @override
+  List<EventBinding> get subscriptions => [
+    on<ChatMessagesChanged>(_onMessagesChanged),
+  ];
+
   bool _disposed = false;
 
   final Observable<List<ChatMessage>> messages = Observable<List<ChatMessage>>(
@@ -40,7 +46,7 @@ class MobxChatBridge {
 
   void dispose() {
     _disposed = true;
-    unawaited(_subscription.cancel());
+    detachSubscriptions();
   }
 }
 // #enddocregion mobx-chat-mobx-chat-bridge

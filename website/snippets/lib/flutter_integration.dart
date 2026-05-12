@@ -68,8 +68,8 @@ class _ChatScreenState extends State<ChatScreen>
   @override
   void initState() {
     super.initState();
-    listen<ChatMessageReceived>((event) {
-      setState(() => _last = event.text);
+    listen<ChatMessageReceived>((envelope) {
+      setState(() => _last = envelope.event.text);
     });
   }
 
@@ -183,9 +183,9 @@ class ChatController with PluginSessionListener {
     EventBinding.on<ChatMessageReceived>(_onReceived),
   ];
 
-  void _onReceived(ChatMessageReceived event) {
+  void _onReceived(EventEnvelope<ChatMessageReceived> envelope) {
     // React to the incoming chat message.
-    print('received: ${event.text}');
+    print('received: ${envelope.event.text}');
   }
 
   /// Cancels all active subscriptions.
@@ -371,9 +371,9 @@ class _FullChatScreenState extends State<FullChatScreen>
   @override
   void initState() {
     super.initState();
-    listen<ChatMessageReceived>((event) {
+    listen<ChatMessageReceived>((envelope) {
       if (!mounted) return;
-      setState(() => _last = event.text);
+      setState(() => _last = envelope.event.text);
     });
   }
 

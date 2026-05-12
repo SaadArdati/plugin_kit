@@ -42,8 +42,8 @@ class _FlutterPluginKitChatScreenState extends State<FlutterPluginKitChatScreen>
   @override
   void initState() {
     super.initState();
-    listen<ChatMessagesChanged>((ChatMessagesChanged event) {
-      setState(() => _messages = event.messages);
+    listen<ChatMessagesChanged>((envelope) {
+      setState(() => _messages = envelope.event.messages);
     });
   }
 

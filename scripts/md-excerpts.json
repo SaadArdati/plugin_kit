@@ -3,6 +3,10 @@
     {
       "source": "website/snippets/lib/plugin_lifecycle.dart",
       "region": "session-plugin-basic"
+    },
+    {
+      "source": "website/snippets/lib/logging.dart",
+      "region": "logging-root-listen-main"
     }
   ],
   "packages/plugin_kit/README.md": [
@@ -118,10 +122,7 @@
     },
     null,
     null,
-    {
-      "source": "website/snippets/lib/service_registry.dart",
-      "region": "service-registry-resolve-after"
-    },
+    null,
     {
       "source": "website/snippets/lib/anti_patterns.dart",
       "region": "anti-pattern-reserved-plugin-id"
@@ -163,7 +164,7 @@
     },
     {
       "source": "website/snippets/lib/service_registry.dart",
-      "region": "service-registry-resolve-after"
+      "region": "service-registry-maybe-resolve-after"
     }
   ],
   "skills/plugin-kit/api-cheatsheet.md": [
