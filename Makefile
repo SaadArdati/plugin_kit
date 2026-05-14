@@ -8,7 +8,8 @@
         doc-versions-check website-build clean help \
         test-plugin-kit test-plugin-kit-dialog test-flutter-plugin-kit \
         test-snippets test-state-garden test-code-editor \
-        test-plugin-kit-dialog-demo
+        test-plugin-kit-dialog-demo \
+        doc-audit doc-audit-resume doc-audit-dashboard
 
 # Default target. Run the full CI pipeline AND golden tests.
 all: ci test-goldens
@@ -113,6 +114,30 @@ doc-excerpts-update:
 doc-versions-update:
 	node scripts/sync-md-versions.mjs
 
+# --- Doc-audit autonomous loop ----------------------------------------------
+
+# Run the autonomous doc-audit loop: codex agents audit, validate, fix, and
+# review the documentation against the source code, gated by an external
+# verifier (`make doc-check` + `flutter test website/snippets`). Never commits.
+# Default 15-iteration cap; override with `make doc-audit MAX=30`.
+DOC_AUDIT_MAX ?= 15
+doc-audit:
+	bash scripts/doc-audit-loop/orchestrator.sh --max $(DOC_AUDIT_MAX)
+
+# Resume the most recent doc-audit run from where it left off. Reuses the
+# accumulated stoplist and iteration counter; safe after a crash.
+doc-audit-resume:
+	bash scripts/doc-audit-loop/orchestrator.sh \
+		--resume "$$(cd scripts/doc-audit-loop/runs/latest && pwd -P)" \
+		--max $(DOC_AUDIT_MAX)
+
+# Launch the live monitoring dashboard for the latest doc-audit run. Installs
+# Vite deps on first run, then starts the dev server on http://localhost:4322.
+doc-audit-dashboard:
+	cd scripts/doc-audit-loop/dashboard && \
+		[ -d node_modules ] || npm install && \
+		npm run dev
+
 clean:
 	flutter clean
 	find packages example website -type d -name .dart_tool -prune -exec rm -rf {} +
@@ -129,4 +154,7 @@ help:
 	@echo "  make doc-excerpts-update   Regenerate doc excerpts in place."
 	@echo "  make doc-versions-update   Regenerate install version pins."
 	@echo "  make website-build   Install website deps and build the static site."
+	@echo "  make doc-audit       Run the autonomous doc-audit loop (codex agents)."
+	@echo "  make doc-audit-resume   Resume the most recent doc-audit run."
+	@echo "  make doc-audit-dashboard   Start the live monitoring dashboard at :4322."
 	@echo "  make clean      Remove .dart_tool / build dirs."

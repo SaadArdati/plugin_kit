@@ -30,3 +30,7 @@ firebase-debug.log
 # Flutter golden test failure artifacts (regenerated on failure)
 **/test/failures/
 **/failures/
+
+# doc-audit-loop runs (ephemeral, not tracked) and dashboard build output
+scripts/doc-audit-loop/runs/
+scripts/doc-audit-loop/dashboard/dist/

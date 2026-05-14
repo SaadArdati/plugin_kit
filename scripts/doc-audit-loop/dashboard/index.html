@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>doc-audit-loop dashboard</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="panel topbar">
+        <div>
+          <h1>doc-audit-loop dashboard</h1>
+          <p id="run-meta">Waiting for run data...</p>
+        </div>
+        <div class="topbar-right">
+          <div class="iter-pill">Iteration <span id="current-iter">0</span></div>
+          <div id="status-badge" class="badge gray">UNKNOWN</div>
+        </div>
+      </header>
+
+      <section class="panel iters-panel">
+        <h2>Iterations</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Status</th>
+                <th>Findings</th>
+                <th>Confirmed</th>
+                <th>Dropped</th>
+                <th>Edits</th>
+                <th>Pass</th>
+                <th>Inline</th>
+                <th>Unfixable</th>
+              </tr>
+            </thead>
+            <tbody id="iters-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <aside class="panel details-panel">
+        <div class="details-head">
+          <h2 id="details-title">Iteration details</h2>
+        </div>
+        <div id="details-tabs" class="tabs">
+          <button data-tab="audit" class="tab active">audit.md</button>
+          <button data-tab="validated" class="tab">validated.md</button>
+          <button data-tab="fixReport" class="tab">fix-report.md</button>
+          <button data-tab="review" class="tab">review.md</button>
+        </div>
+        <pre id="details-content" class="mono">Select an iteration to view details.</pre>
+      </aside>
+
+      <section class="panel log-panel">
+        <div class="log-head">
+          <h2>Orchestrator log</h2>
+          <label><input id="pause-log" type="checkbox" /> Pause</label>
+        </div>
+        <pre id="log-content" class="mono"></pre>
+      </section>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
