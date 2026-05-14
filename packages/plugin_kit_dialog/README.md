@@ -317,7 +317,6 @@ void registerWithNumberField(ScopedServiceRegistry registry) {
 
 - **Full guide**: [plugin-kit-docs.saadodi44.workers.dev/guides/plugin-kit-dialog/](https://plugin-kit-docs.saadodi44.workers.dev/guides/plugin-kit-dialog/).
 - **Dialog API reference**: [plugin-kit-docs.saadodi44.workers.dev/reference/dialog-api/](https://plugin-kit-docs.saadodi44.workers.dev/reference/dialog-api/) and [pub.dev dartdoc](https://pub.dev/documentation/plugin_kit_dialog/latest/).
-- **Architecture notes** (advanced): [`docs/superpowers/specs/2026-04-24-plugin-kit-dialog-design.md`](https://github.com/SaadArdati/plugin_kit/blob/main/docs/superpowers/specs/2026-04-24-plugin-kit-dialog-design.md).
 - **Source and issues**: [github.com/SaadArdati/plugin_kit](https://github.com/SaadArdati/plugin_kit).
 
 ## License

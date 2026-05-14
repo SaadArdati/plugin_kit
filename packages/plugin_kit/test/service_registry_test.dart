@@ -1,6 +1,15 @@
 import 'package:plugin_kit/plugin_kit.dart';
 import 'package:test/test.dart';
 
+class _ConfigCaptureService extends PluginService {
+  Map<String, dynamic>? capturedSettings;
+
+  @override
+  void onSettingsInjected() {
+    capturedSettings = settings;
+  }
+}
+
 void main() {
   group('ServiceRegistry disabled-override enforcement', () {
     test('resolve throws when the sole registration is disabled', () {
@@ -96,8 +105,8 @@ void main() {
 
     test('resolveAfter throws when the target is the last in the chain', () {
       // The list ordering is descending priority. alpha (100) is first,
-      // beta (50) second. resolveAfter past beta has no successor — the
-      // method must throw StateError naming the plugin and service id.
+      // beta (50) second. resolveAfter past beta has no successor, so
+      // the method must throw StateError naming the plugin and service id.
       // The forbidden substring guards against a regression in which a
       // disabled-but-present successor was the failure path: the wrong
       // branch's message ("disabled by overrides") would still match
@@ -178,9 +187,9 @@ void main() {
 
     test('resolveAfter throws when no service is registered for the slot', () {
       // No registrations exist for this serviceId at all. The branch's
-      // canonical message starts with "No service registered for" — distinct
-      // from the "after plugin ..." message used by the chain-end and
-      // unknown-target branches above.
+      // canonical message starts with "No service registered for", which
+      // is distinct from the "after plugin ..." message used by the
+      // chain-end and unknown-target branches above.
       final registry = ServiceRegistry();
 
       expect(
@@ -266,35 +275,131 @@ void main() {
       expect(registry.maybeResolve<String>(const ServiceId('svc')), isNull);
     });
 
+    test('wildcard disable AND-merges through a plugin-specific override', () {
+      // Per _overrideForInjection: `enabled` AND-merges across layers.
+      // A wildcard's enabled:false keeps the slot disabled even when a
+      // plugin-specific override exists for the same slot - the
+      // plugin-specific entry's `enabled` defaults to true and cannot
+      // force-enable a wildcard-disabled slot. Use a non-empty
+      // plugin-specific settings map so the merge has both knobs to
+      // exercise.
+      final registry = ServiceRegistry(
+        overrides: [
+          const LocalPluginOverride.disable(
+            plugin: PluginId.winnerScoped,
+            serviceId: ServiceId('svc'),
+          ),
+          const LocalPluginOverride(
+            plugin: PluginId('alpha'),
+            serviceId: ServiceId('svc'),
+            settings: {'k': 'v'},
+            // `enabled` defaults to true.
+          ),
+        ],
+      );
+      registry.registerSingleton<String>(
+        pluginId: const PluginId('alpha'),
+        serviceId: const ServiceId('svc'),
+        create: () => 'alpha impl',
+        priority: 100,
+      );
+
+      expect(
+        () => registry.resolve<String>(const ServiceId('svc')),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('disabled by overrides'),
+          ),
+        ),
+      );
+    });
+
     test(
-      'plugin-specific override beats wildcard override in disable precedence',
+      'duplicate plugin-specific override rows for the same (plugin, '
+      'serviceId) reduce-merge knob by knob instead of shadowing each other',
       () {
-        // Wildcard disables the slot generally; a plugin-specific override
-        // with enabled: true revives the match. Matches the precedence
-        // documented on _overrideForInjection. RuntimeSettings maps
-        // `*:serviceId` keys to an override keyed under
-        // [PluginId.winnerScoped].
+        // _appendServiceOverrides in the runtime emits one canonical row per
+        // (plugin, serviceId), but the registry's overrides list is a public
+        // input. An external caller that hands ServiceRegistry two rows for
+        // the same pair must still see every knob applied, not whichever row
+        // happened to be first.
         final registry = ServiceRegistry(
-          overrides: [
-            const LocalPluginOverride.disable(
-              plugin: PluginId.winnerScoped,
-              serviceId: ServiceId('svc'),
-            ),
-            const LocalPluginOverride(
+          overrides: const [
+            // Row 1: priority-only, settings empty.
+            LocalPluginOverride.withPriority(
               plugin: PluginId('alpha'),
               serviceId: ServiceId('svc'),
-              // `enabled` defaults to true.
+              priority: 200,
+            ),
+            // Row 2: settings-only, priority null.
+            LocalPluginOverride(
+              plugin: PluginId('alpha'),
+              serviceId: ServiceId('svc'),
+              settings: {'temperature': 0.5},
             ),
           ],
         );
-        registry.registerSingleton<String>(
+        registry.registerSingleton<_ConfigCaptureService>(
           pluginId: const PluginId('alpha'),
           serviceId: const ServiceId('svc'),
-          create: () => 'alpha impl',
+          create: () => _ConfigCaptureService(),
+          priority: 50,
+        );
+
+        final service = registry.resolve<_ConfigCaptureService>(
+          const ServiceId('svc'),
+        );
+        expect(
+          service.capturedSettings,
+          equals({'temperature': 0.5}),
+          reason:
+              'settings row must not be shadowed by the priority row when '
+              'both target the same (plugin, serviceId)',
+        );
+      },
+    );
+
+    test(
+      'duplicate disabled row in plugin-specific overrides AND-merges across '
+      'all rows for the pair',
+      () {
+        // If any one of multiple plugin-specific rows for the same pair has
+        // enabled:false, the merged decision must be disabled. Without
+        // reduce-merge, firstOrNull could return the enabled row and bypass
+        // the disable.
+        final registry = ServiceRegistry(
+          overrides: const [
+            LocalPluginOverride(
+              plugin: PluginId('alpha'),
+              serviceId: ServiceId('svc'),
+              settings: {'temperature': 0.5},
+              // enabled defaults to true
+            ),
+            LocalPluginOverride.disable(
+              plugin: PluginId('alpha'),
+              serviceId: ServiceId('svc'),
+            ),
+          ],
+        );
+        registry.registerSingleton<_ConfigCaptureService>(
+          pluginId: const PluginId('alpha'),
+          serviceId: const ServiceId('svc'),
+          create: () => _ConfigCaptureService(),
           priority: 100,
         );
 
-        expect(registry.resolve<String>(const ServiceId('svc')), 'alpha impl');
+        expect(
+          () => registry.resolve<_ConfigCaptureService>(const ServiceId('svc')),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              contains('disabled by overrides'),
+            ),
+          ),
+        );
       },
     );
   });

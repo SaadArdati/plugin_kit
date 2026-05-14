@@ -9,7 +9,8 @@ environment:
   sdk: ">=3.10.0 <4.0.0"
 
 dependencies:
-  plugin_kit: ^1.0.0
+  plugin_kit:
+    path: ../../packages/plugin_kit
 
 dev_dependencies:
   lints: ^6.1.0

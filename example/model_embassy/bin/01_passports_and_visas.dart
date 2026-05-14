@@ -23,11 +23,21 @@ Future<void> main() async {
     modelId: 'claude-sonnet-4-5-20250929',
   );
 
-  final visa = await session.request<AgentBoardingCall, ModelVisa?>(
+  // `maybeRequest` returns null when every visa office concedes
+  // (`onRequest` handlers all returned null). The handler registration is
+  // `<AgentBoardingCall, ModelVisa>`, so on success we get a non-nullable
+  // `ModelVisa` back without an extra cast.
+  final visa = await session.maybeRequest<AgentBoardingCall, ModelVisa>(
     AgentBoardingCall(passport),
   );
 
-  final response = await visa!.client.chat('Hello from the embassy!');
+  if (visa == null) {
+    print('No visa issued for the passport.');
+    await runtime.dispose();
+    return;
+  }
+
+  final response = await visa.client.chat('Hello from the embassy!');
   // #enddocregion passports-and-visas-flow
 
   print('Passport: $passport');

@@ -134,7 +134,9 @@ recipe there is implemented in `example/state_garden/` and run by
 `flutter test`, so the citations are checked code rather than prose.
 
 <Aside type="note" title="Don't bind the runtime's identity to widget rebuilds">
-Resist the urge to stuff `PluginRuntime` into an `InheritedWidget` or a Provider that rebuilds the runtime whenever the tree rebuilds. The runtime outlives the widget tree (hot restart, deep navigation, route stack resets all throw away widgets but not the runtime). Hold it somewhere whose lifetime matches the runtime's: a top-level `final`, a GetIt singleton, a Riverpod provider with one-shot create, or, if the scope's lifetime really does match the runtime's, `flutter_plugin_kit`'s `PluginRuntimeScope`, which constructs the runtime in `initState` and disposes it in `dispose` without rebuilding it.
+Resist the urge to stuff `PluginRuntime` into an `InheritedWidget` or a Provider that rebuilds the runtime whenever the tree rebuilds. The runtime outlives the widget tree (hot restart, deep navigation, route stack resets all throw away widgets but not the runtime).
+
+Hold it somewhere whose lifetime matches the runtime's. The safest options are a top-level `final` or a GetIt singleton: neither depends on the widget tree. A Riverpod `Provider` at the root `ProviderScope` works too, but only when it is a non-`autoDispose` top-level provider, since `autoDispose` reconstructs the value once consumers drop. Inside the widget tree, `flutter_plugin_kit`'s `PluginRuntimeScope` is the right shape when the scope's lifetime really does match the runtime's: it constructs in `initState` and disposes in `dispose` without rebuilding.
 </Aside>
 
 ## Testing Flutter widgets that use Plugin Kit

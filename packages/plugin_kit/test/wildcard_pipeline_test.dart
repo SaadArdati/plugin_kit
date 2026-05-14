@@ -94,6 +94,113 @@ void main() {
       expect(service.capturedSettings, equals({'source': 'specific'}));
     });
 
+    test('single ServiceSettings carrying both priority and config injects '
+        'both into the targeted plugin', () {
+      // Regression: previously _appendServiceOverrides exploded one
+      // ServiceSettings into separate priority and settings rows, and
+      // _overrideForInjection's firstOrNull would return the priority row
+      // (with empty settings), shadowing the config row within the SAME
+      // ServiceSettings. Config was silently dropped.
+      runtime
+        ..addPlugin(_ConfigPlugin(id: 'alpha', priority: 100))
+        ..addPlugin(_ConfigPlugin(id: 'beta', priority: 50));
+
+      runtime.init(
+        settings: RuntimeSettings(
+          services: {
+            Pin('beta', ['agent', 'model']): ServiceSettings(
+              priority: 200,
+              config: {'temperature': 0.5},
+            ),
+          },
+        ),
+      );
+
+      final wrapper = runtime.globalRegistry.resolveRaw<_ConfigCaptureService>(
+        _agentModel,
+      );
+      expect(wrapper.pluginId, 'beta', reason: 'priority bump made beta win');
+      expect(wrapper.priority, 200);
+
+      final service = runtime.globalRegistry.resolve<_ConfigCaptureService>(
+        _agentModel,
+      );
+      expect(
+        service.capturedSettings,
+        equals({'temperature': 0.5}),
+        reason:
+            'config from the same ServiceSettings must survive alongside '
+            'the priority bump',
+      );
+    });
+
+    test('priority-only plugin-specific lets wildcard config flow into the '
+        'now-winning plugin', () {
+      // Per-knob layering: the plugin-specific entry only sets priority,
+      // so the wildcard's config falls through and reaches the new winner.
+      runtime
+        ..addPlugin(_ConfigPlugin(id: 'alpha', priority: 100))
+        ..addPlugin(_ConfigPlugin(id: 'beta', priority: 50));
+
+      runtime.init(
+        settings: RuntimeSettings(
+          services: {
+            Pin.wildcard(['agent', 'model']): ServiceSettings(
+              config: {'temperature': 0.5},
+            ),
+            Pin('beta', ['agent', 'model']): ServiceSettings(priority: 200),
+          },
+        ),
+      );
+
+      final wrapper = runtime.globalRegistry.resolveRaw<_ConfigCaptureService>(
+        _agentModel,
+      );
+      expect(wrapper.pluginId, 'beta');
+      expect(wrapper.priority, 200);
+
+      final service = runtime.globalRegistry.resolve<_ConfigCaptureService>(
+        _agentModel,
+      );
+      expect(
+        service.capturedSettings,
+        equals({'temperature': 0.5}),
+        reason:
+            'wildcard config layers under a priority-only plugin-specific '
+            'override',
+      );
+    });
+
+    test('wildcard disable AND-merges with plugin-specific priority bump', () {
+      // Without AND-merge, a priority-only plugin-specific override would
+      // accidentally shadow the wildcard's enabled:false and silently
+      // re-enable the slot. AND-merge keeps the slot disabled.
+      runtime
+        ..addPlugin(_ConfigPlugin(id: 'alpha', priority: 100))
+        ..addPlugin(_ConfigPlugin(id: 'beta', priority: 50));
+
+      runtime.init(
+        settings: RuntimeSettings(
+          services: {
+            Pin.wildcard(['agent', 'model']): ServiceSettings(enabled: false),
+            Pin('beta', ['agent', 'model']): ServiceSettings(priority: 200),
+          },
+        ),
+      );
+
+      expect(
+        () =>
+            runtime.globalRegistry.resolve<_ConfigCaptureService>(_agentModel),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('disabled by overrides'),
+          ),
+        ),
+      );
+    });
+
     test('plugin-specific override targeting unknown plugin throws StateError '
         'under throwError policy', () {
       runtime.addPlugin(_ConfigPlugin(id: 'alpha'));
@@ -200,7 +307,7 @@ void main() {
       // The wildcard pipeline forwards priority by creating a plugin-scoped
       // override targeting the current winner. updateSettings then restamps
       // any wrapper whose plugin-scoped override carries a non-null
-      // priority — so beta's wrapper picks up the wildcard's 200 without
+      // priority, so beta's wrapper picks up the wildcard's 200 without
       // having to be re-registered.
       runtime
         ..addPlugin(_ConfigPlugin(id: 'alpha', priority: 50))
@@ -317,9 +424,10 @@ void main() {
         // Regression: previously, changing ServiceSettings.priority for an
         // already-registered plugin updated the override list but left the
         // existing wrapper.priority at its registration-time value, so the
-        // sort order — and the live winner — did not change until the plugin
-        // was re-registered (which only happens on session re-create or
-        // detach/attach). updateSettings must restamp wrappers in place.
+        // sort order (and therefore the live winner) did not change until
+        // the plugin was re-registered (which only happens on session
+        // re-create or detach/attach). updateSettings must restamp wrappers
+        // in place.
         runtime
           ..addPlugin(_ConfigPlugin(id: 'alpha', priority: 100))
           ..addPlugin(_ConfigPlugin(id: 'beta', priority: 50));
@@ -335,7 +443,7 @@ void main() {
 
         // Update settings: bump beta's priority above alpha's.
         await runtime.updateGlobalSettings(
-          oldSettings: const RuntimeSettings.empty(),
+          oldSettings: const RuntimeSettings(),
           newSettings: RuntimeSettings(
             services: {
               Pin('beta', ['agent', 'model']): ServiceSettings(priority: 200),
@@ -343,7 +451,7 @@ void main() {
           ),
         );
 
-        // Beta now wins — live, with no re-registration.
+        // Beta now wins, live, with no re-registration.
         winner = runtime.globalRegistry.resolveRaw<_ConfigCaptureService>(
           const ServiceId('agent.model'),
         );
@@ -382,7 +490,7 @@ void main() {
               Pin('beta', ['agent', 'model']): ServiceSettings(priority: 200),
             },
           ),
-          newSettings: const RuntimeSettings.empty(),
+          newSettings: const RuntimeSettings(),
         );
 
         // alpha (priority 100) wins again; beta is back at its base 50.
@@ -430,7 +538,7 @@ void main() {
           .firstWhere((w) => w.pluginId == const PluginId('beta'));
       expect(liveBeta.priority, 999);
 
-      // Snapshot must NOT see the mutation — it owns its own wrappers.
+      // Snapshot must NOT see the mutation; it owns its own wrappers.
       final snapshotBeta = snapshot
           .getRegistrations(const ServiceId('agent.model'))!
           .firstWhere((w) => w.pluginId == const PluginId('beta'));

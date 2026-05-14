@@ -13,10 +13,10 @@ Widget _wrap(Widget child) => MaterialApp(
 
 PluginKitDialogController _ctrl() {
   final runtime = PluginRuntime();
-  runtime.init(settings: RuntimeSettings.empty());
+  runtime.init(settings: RuntimeSettings());
   return PluginKitDialogController(
     runtime: runtime,
-    initialSettings: RuntimeSettings.empty(),
+    initialSettings: RuntimeSettings(),
   );
 }
 

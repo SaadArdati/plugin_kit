@@ -55,7 +55,7 @@ void main() {
       final session = await runtime.createSession();
 
       final client = await session
-          .maybeRequest<WaitForAssistant, AssistantClient?>(
+          .maybeRequest<WaitForAssistant, AssistantClient>(
             const WaitForAssistant(),
           );
       expect(client, isA<AssistantClient>());
@@ -72,9 +72,7 @@ void main() {
 
   group('plugin-service-settings-runtime', () {
     test('serviceSettingsExample has correct service config', () {
-      final pin = const PluginId(
-        'model_router',
-      ).service('decider');
+      final pin = const PluginId('model_router').service('decider');
       final svcSettings = serviceSettingsExample.services[pin];
       expect(svcSettings?.config['default_model'], equals('gpt-4.1-mini'));
     });

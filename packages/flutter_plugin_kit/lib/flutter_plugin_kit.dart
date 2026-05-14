@@ -2,18 +2,18 @@
 ///
 /// Provides:
 ///
-/// - [PluginRuntimeScope] / [PluginSessionScope] — `InheritedWidget`s that
+/// - [PluginRuntimeScope] / [PluginSessionScope]: `InheritedWidget`s that
 ///   carry a `PluginRuntime` / `PluginSession` through the tree.
-/// - [PluginSessionStateListener] — a `State` mixin that subscribes to
+/// - [PluginSessionStateListener]: a `State` mixin that subscribes to
 ///   session bus events using portable [EventBinding] descriptors and
 ///   re-attaches automatically across session swaps.
-/// - [PluginEventNotifier] — a `ChangeNotifier` / `ValueListenable<E?>`
+/// - [PluginEventNotifier]: a `ChangeNotifier` / `ValueListenable<E?>`
 ///   that exposes the most recent event of type `E` on a session, so it
 ///   plugs straight into `provider`'s `ChangeNotifierProvider` or any
 ///   other consumer of the foundation `Listenable` interface.
-/// - `BuildContext.watchEvent<E>()` and `BuildContext.readEvent<E>()` —
+/// - `BuildContext.watchEvent<E>()` and `BuildContext.readEvent<E>()`:
 ///   convenience extensions for callers without an external state library.
-/// - [disposeAndReport] — runs an async dispose and routes any sync OR
+/// - [disposeAndReport]: runs an async dispose and routes any sync OR
 ///   async throw through `FlutterError.reportError` instead of letting it
 ///   escape as an uncaught zone error. The same helper used internally by
 ///   the scopes; exposed for any custom widget whose `State.dispose` fires

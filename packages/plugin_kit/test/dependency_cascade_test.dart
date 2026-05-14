@@ -47,7 +47,7 @@ void main() {
       final runtime = PluginRuntime();
 
       runtime.addPlugins([pluginA, pluginB]);
-      runtime.init(settings: RuntimeSettings.empty());
+      runtime.init(settings: RuntimeSettings());
 
       await runtime.updateSettings(
         RuntimeSettings(plugins: {PluginId('b'): PluginConfig(enabled: false)}),

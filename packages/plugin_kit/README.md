@@ -19,11 +19,15 @@ Three primitives carry the whole library:
 
 Plugins are wiring; services are the meat. The plugin class declares an id, registers services, and stays small. Real behavior, anything stateful or configurable or replaceable, lives in services.
 
-Pure Dart. No Flutter. Depends only on `collection` and `meta`.
+Pure Dart. No Flutter. Depends only on `collection`, `logging`, and `meta`.
+
+## When not to use this
+
+If your app has one HTTP client, one auth service, one analytics service, and a few screens that call them, use the boring thing. Plugin Kit earns its weight when behavior needs to be replaced, layered, disabled, overridden, or vetoed while the app is running, and settings have stopped being data your app reads and started being something that actively reshapes the system. The rest of this README assumes you are past that line.
 
 ## Quick start
 
-Two plugins claim the same `'greeter'` slot at different priorities. The runtime resolves to the winner. The host code never sees the competition.
+Two plugins claim the same `greeter` slot at different priorities. The runtime resolves the higher-priority winner; the host code never sees the competition.
 
 ```dart
 class CasualPlugin extends SessionPlugin {
@@ -65,7 +69,13 @@ Future<void> runGreeterExample() async {
 }
 ```
 
-That move, where features own slots and slots resolve to the current winner, is the vocabulary the rest of the library is built on. Drop a plugin from the list, lower its priority, or disable it via settings, and the call site never changes.
+The formal plugin wins because it asked for higher priority. The casual plugin's greeter is still registered, sitting at the lower priority, ready to win the moment a settings update lowers the formal plugin or disables it. The call site never branches on the choice.
+
+That move, features owning slots and slots resolving to the current winner, is the vocabulary the rest of the library is built on.
+
+## Less breakable runtime
+
+`attach` / `detach` are framework-enforced, so subscriptions opened in `attach` on a `StatefulPluginService` are tracked and cancelled after `detach` returns. Lifecycle failures aggregate into `PluginLifecycleException` with a named phase rather than being dropped. `enabledPlugins` (settings-intent) and `attachedPlugins` (post-dependency-cascade runtime-truth) are distinct queryable sets, so a plugin with a missing dependency does not silently appear to be running. Reconciliation is transactional: per-plugin attach failures roll back to honest state, and `updateSettings` rolls every reconciled session and the global scope back to the previous snapshot on any mid-loop failure so callers never see split-brain.
 
 ## Plugins
 
@@ -109,7 +119,7 @@ Behavior another plugin should override, settings-tune, or disable belongs in a 
 | Lifecycle, events, or session-bound state. | `StatefulPluginService` (or aliases `SessionStatefulPluginService` / `GlobalStatefulPluginService`). | `registerSingleton` / `registerLazySingleton` only; factories rejected. `attach()`, `detach()`, and `onSettingsInjected()` are pure user hooks (no `super`). Auto-tracked event helpers (`on`, `onRequest`, `bind`, `emit`) read `this.context` implicitly. |
 
 ```dart
-class ChatThread extends StatefulPluginService<SessionPluginContext> {
+class ChatThread extends StatefulPluginService {
   /// The accumulated messages for this session.
   final List<Message> messages = [];
 
@@ -205,7 +215,16 @@ Future<void> demonstrateMutateAndStop(EventBus bus) async {
 }
 ```
 
-`request` and `requestSync` throw `RequestUnavailableException` carrying a `RequestUnavailableReason` enum: `noRegistration` (no handler for the `(Request, Response)` type pair), `noMatchingHandler` (handlers exist but none match the requested identifier scope), or `allConceded` (every handler returned null on a non-nullable response). `maybeRequest` / `maybeRequestSync` convert *only* that exception to `null`; handler-thrown exceptions still propagate. `null` means "request unavailable," not "handler crashed." Switch on `reason` to distinguish causes.
+Pick the right method at the call site. `maybeRequest` / `maybeRequestSync` are canonical: they return `null` when the chain produced no answer (no handler wired, no handler matched the identifier, or every handler conceded). `request` / `requestSync` are the assertion variants: use them only when at least one handler is guaranteed to claim; they throw if the chain bottoms out.
+
+The throws are typed. `request` / `requestSync` raise one of two sealed subtypes of `NoRequestAnswerException`:
+
+- `RequestNotWiredException`: no handler is registered for the `(Request, Response)` type pair, or no handler matched the requested identifier (carries a `wasIdentifierMismatch` bool to distinguish). Almost always a wiring bug; fix by registering a handler.
+- `AllConcededException`: every registered handler ran and returned `null` on a non-nullable `Response`. The exception message recommends switching to `maybeRequest`; do that if concession is a valid outcome at your call site.
+
+Handler-thrown exceptions are NOT wrapped. They propagate as-is through both `request` and `maybeRequest`. `maybeRequest` catches only `NoRequestAnswerException` and converts it to `null`. `null` from `maybeRequest` means "no one answered," not "a handler crashed."
+
+**Breaking change (from earlier prototypes):** `RequestUnavailableException` and its `RequestUnavailableReason` enum are replaced by the sealed `NoRequestAnswerException` hierarchy described above. Update `on RequestUnavailableException` clauses to catch the appropriate subtype or the sealed base; replace `reason` enum switches with `is`-checks (or `wasIdentifierMismatch` for the not-wired path).
 
 ## Sessions
 
@@ -271,6 +290,8 @@ SupportsFileFormats? resolveCapability(ServiceRegistry registry) {
 
 ## Companion packages
 
+State management libraries own presentation state. Plugin Kit owns participation. The two Flutter packages below add the widget plumbing for participation to flow through the tree; they do not replace your state library.
+
 | Package | Adds |
 |---|---|
 | [`flutter_plugin_kit`](https://pub.dev/packages/flutter_plugin_kit) | `PluginRuntimeScope` and `PluginSessionScope` `InheritedWidget`s, a `State` mixin that auto-cancels bus subscriptions across session swaps, a `ChangeNotifier` adapter, and `BuildContext.watchEvent<E>()` / `readEvent<E>()` extensions. |
@@ -297,7 +318,7 @@ PluginContext, GlobalPluginContext, SessionPluginContext
 // Services
 PluginService                  // settings injection
 StatefulPluginService<PKC extends PluginContext>
-SessionStatefulPluginService   // alias for StatefulPluginService<SessionPluginContext>
+SessionStatefulPluginService   // alias for StatefulPluginService
 GlobalStatefulPluginService    // alias for StatefulPluginService<GlobalPluginContext>
 
 // Runtime
@@ -309,7 +330,9 @@ LocalPluginOverride            // per-resolve scope override
 
 // Event bus
 EventBus, EventEnvelope, EventBinding
-RequestUnavailableException
+NoRequestAnswerException        // sealed base
+RequestNotWiredException        // subtype: no handler / no identifier match
+AllConcededException            // subtype: every handler returned null
 
 // Settings
 RuntimeSettings, PluginConfig, ServiceSettings

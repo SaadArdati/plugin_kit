@@ -1,89 +1,127 @@
 import 'package:plugin_kit/src/typed_handles.dart';
 
-/// Why a `request` / `requestSync` call could not be fulfilled.
+/// Base class for "the request produced no answer" outcomes.
 ///
-/// Carried by [RequestUnavailableException.reason]. Callers that need to
-/// distinguish unavailability causes (e.g. log an "unregistered" path
-/// differently from a "everyone conceded" path) switch on this enum
-/// instead of parsing the human-readable message.
-enum RequestUnavailableReason {
-  /// No handler was registered for the `(Request, Response)` type pair
-  /// at all. The request bucket itself was missing.
-  noRegistration,
-
-  /// The type pair has registered handlers, but the priority-merged set
-  /// for the requested identifier is empty. Common shapes: a request
-  /// made under an identifier no handler subscribes to, or an unscoped
-  /// request when only identifier-scoped handlers exist.
-  noMatchingHandler,
-
-  /// At least one handler ran but every invocation returned null while
-  /// the `Response` type is non-nullable. The cascade conceded without
-  /// a winner.
-  allConceded,
-}
-
-/// Exception thrown when a request cannot be fulfilled.
+/// Sealed. The two concrete subtypes are [RequestNotWiredException]
+/// (the consumer asked for a `(Request, Response)` type pair, or an
+/// `identifier`-scoped variant of one, for which no handler is
+/// registered) and [AllConcededException] (handlers ran but every one
+/// returned `null` and `Response` is non-nullable).
 ///
-/// Thrown by [EventBus.request] and [EventBus.requestSync] for the three
-/// availability cases enumerated by [RequestUnavailableReason]:
-/// [RequestUnavailableReason.noRegistration],
-/// [RequestUnavailableReason.noMatchingHandler], and
-/// [RequestUnavailableReason.allConceded].
+/// [EventBus.maybeRequest] and [EventBus.maybeRequestSync] catch this
+/// base type and convert it to a `null` return. Handler-thrown
+/// exceptions are NOT subtypes of this class and are NOT caught by
+/// `maybeRequest`; they propagate to the caller unchanged.
 ///
-/// [EventBus.maybeRequest] and [EventBus.maybeRequestSync] catch this type
-/// and convert it to a null return. Callers that need to distinguish
-/// unavailability from a successful null response can catch it explicitly
-/// and switch on [reason]:
+/// Callers that want to distinguish unwired-handler bugs from genuinely
+/// conceded chains can catch the two subtypes separately:
 ///
 /// ```dart
 /// try {
 ///   final result = await bus.request<SearchQuery, SearchResults>(query);
-/// } on RequestUnavailableException catch (e) {
-///   final hint = switch (e.reason) {
-///     RequestUnavailableReason.noRegistration => 'register a handler',
-///     RequestUnavailableReason.noMatchingHandler => 'check identifier scope',
-///     RequestUnavailableReason.allConceded => 'add a fallback handler',
-///   };
-///   log('Search unavailable (${e.reason.name}): $hint');
+/// } on RequestNotWiredException catch (e) {
+///   log.severe('Search misconfigured: $e');
+/// } on AllConcededException catch (e) {
+///   log.info('No provider could answer this search; ${e.suggestion}');
 /// }
 /// ```
-class RequestUnavailableException implements Exception {
-  /// The `Request` type for which no handler was available.
-  final Type requestType;
+sealed class NoRequestAnswerException implements Exception {
+  /// The `Request` type for which no answer was produced.
+  Type get requestType;
 
-  /// The `Response` type for which no handler was available.
-  final Type responseType;
+  /// The `Response` type for which no answer was produced.
+  Type get responseType;
 
   /// The identifier scoping the request, or null for unscoped requests.
+  String? get identifier;
+}
+
+/// Thrown by [EventBus.request] / [EventBus.requestSync] when no handler
+/// is registered for the `(Request, Response)` type pair, or no handler
+/// matched the requested [identifier].
+///
+/// Almost always a wiring bug: the calling code expected a handler to
+/// exist for this type pair (and identifier, if any), but the registry
+/// has none. Fix by registering the handler with
+/// [EventBus.onRequest] / [EventBus.onRequestSync].
+class RequestNotWiredException extends NoRequestAnswerException {
+  @override
+  final Type requestType;
+  @override
+  final Type responseType;
+  @override
   final String? identifier;
 
-  /// Why the request was unavailable. Switch on this for typed dispatch.
-  final RequestUnavailableReason reason;
+  /// True when the type pair has registrations but none matched the
+  /// requested [identifier]. False when no registration exists for the
+  /// type pair at all.
+  final bool wasIdentifierMismatch;
 
-  /// Creates a [RequestUnavailableException] with the given [reason].
-  const RequestUnavailableException({
+  /// Creates a [RequestNotWiredException] for the given type pair.
+  RequestNotWiredException({
     required this.requestType,
     required this.responseType,
     this.identifier,
-    required this.reason,
+    this.wasIdentifierMismatch = false,
   });
-
-  /// Human-readable text derived from [reason].
-  String get _reasonText => switch (reason) {
-    RequestUnavailableReason.noRegistration =>
-      'no handler registered for this type pair',
-    RequestUnavailableReason.noMatchingHandler =>
-      'no handler matched after priority merge',
-    RequestUnavailableReason.allConceded =>
-      'every registered handler conceded with null but Response is non-nullable',
-  };
 
   @override
   String toString() {
     final id = identifier == null ? '' : ' (identifier: $identifier)';
-    return 'RequestUnavailableException: $requestType -> $responseType$id: '
-        '$_reasonText';
+    final detail = wasIdentifierMismatch
+        ? 'handlers exist for this type pair but none matched the identifier'
+        : 'no handler registered for this type pair';
+    return 'RequestNotWiredException: $requestType -> $responseType$id: '
+        '$detail. Register a handler with EventBus.onRequest before calling '
+        'request/maybeRequest.';
+  }
+}
+
+/// Thrown by [EventBus.request] / [EventBus.requestSync] when every
+/// registered handler ran and returned `null` (conceded), and the
+/// `Response` type is non-nullable.
+///
+/// This is not a bug per se: chains designed to allow concession may
+/// legitimately bottom out when no handler can answer a given input.
+/// However, treating "no one could answer" as an exception forces the
+/// consumer to wrap normal flow in `try`/`catch`, which is rarely what
+/// you want. If concession is a valid outcome at your call site, use
+/// [EventBus.maybeRequest] / [EventBus.maybeRequestSync] instead: it
+/// returns `null` for this case and propagates handler-thrown exceptions
+/// unchanged.
+///
+/// Use [EventBus.request] only when you have asserted (by construction,
+/// registration order, or domain invariant) that at least one handler
+/// will claim. If that assertion ever breaks, this exception surfaces
+/// the violation loudly.
+class AllConcededException extends NoRequestAnswerException {
+  @override
+  final Type requestType;
+  @override
+  final Type responseType;
+  @override
+  final String? identifier;
+
+  /// Creates an [AllConcededException] for the given type pair.
+  AllConcededException({
+    required this.requestType,
+    required this.responseType,
+    this.identifier,
+  });
+
+  /// The actionable suggestion this exception's message recommends.
+  /// Exposed as a getter so tests can match on it without comparing
+  /// the full message string.
+  String get suggestion =>
+      'Consider calling maybeRequest<$requestType, $responseType>(...) '
+      'if concession is a valid outcome at this call site.';
+
+  @override
+  String toString() {
+    final id = identifier == null ? '' : ' (identifier: $identifier)';
+    return 'AllConcededException: $requestType -> $responseType$id: '
+        'every registered handler conceded with null but Response is '
+        'non-nullable. $suggestion';
   }
 }
 

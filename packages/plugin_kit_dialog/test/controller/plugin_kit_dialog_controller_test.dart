@@ -7,7 +7,7 @@ void main() {
     final runtime = PluginRuntime(plugins: [_TestGlobalPlugin('core')]);
     final controller = PluginKitDialogController(
       runtime: runtime,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
     expect(controller.isDirty, isFalse);
 
@@ -21,7 +21,7 @@ void main() {
   test('replaceWorking overwrites the working draft', () {
     final controller = PluginKitDialogController(
       runtime: PluginRuntime(plugins: [_TestGlobalPlugin('core')]),
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     const next = RuntimeSettings(
@@ -35,7 +35,7 @@ void main() {
   test('markSaved clears dirty without losing values', () {
     final controller = PluginKitDialogController(
       runtime: PluginRuntime(plugins: [_TestGlobalPlugin('core')]),
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     controller.setPluginEnabled(const PluginId('core'), false);
@@ -63,11 +63,11 @@ void main() {
             },
           ),
         ],
-      )..init(settings: RuntimeSettings.empty());
+      )..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final rows = const PluginChipsBuilder()
-          .build(runtime, RuntimeSettings.empty())
+          .build(runtime, RuntimeSettings())
           .all;
       expect(rows, hasLength(3));
 
@@ -92,7 +92,7 @@ void main() {
   test('stable plugin toggle off then on returns to clean draft', () {
     final controller = PluginKitDialogController(
       runtime: PluginRuntime(plugins: [_TestGlobalPlugin('auto_retry')]),
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     controller.setPluginEnabled(const PluginId('auto_retry'), false);
@@ -118,7 +118,7 @@ void main() {
           ),
         ],
       ),
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     controller.setPluginEnabled(const PluginId('beta_tooling'), true);
@@ -139,7 +139,7 @@ void main() {
     () {
       final controller = PluginKitDialogController(
         runtime: PluginRuntime(plugins: [_TestGlobalPlugin('auto_retry')]),
-        initialSettings: RuntimeSettings.empty(),
+        initialSettings: RuntimeSettings(),
       );
 
       controller.setPluginEnabled(const PluginId('auto_retry'), false);
@@ -155,7 +155,7 @@ void main() {
   test('resetPlugin removes no-op override entries', () {
     final controller = PluginKitDialogController(
       runtime: PluginRuntime(plugins: [_TestGlobalPlugin('auto_retry')]),
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     controller.setPluginEnabled(const PluginId('auto_retry'), false);
@@ -190,7 +190,7 @@ void main() {
     );
 
     final runtime = PluginRuntime(plugins: [_TestGlobalPlugin('foo')]);
-    runtime.init(settings: RuntimeSettings.empty());
+    runtime.init(settings: RuntimeSettings());
     addTearDown(runtime.dispose);
 
     final controller = PluginKitDialogController(
@@ -250,12 +250,12 @@ void main() {
 
   test('setServiceEnabled stores false and removes default true no-op', () {
     final runtime = PluginRuntime(plugins: [_TestGlobalPlugin('foo')]);
-    runtime.init(settings: RuntimeSettings.empty());
+    runtime.init(settings: RuntimeSettings());
     addTearDown(runtime.dispose);
 
     final controller = PluginKitDialogController(
       runtime: runtime,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     controller.setServiceEnabled(Pin('foo', ['agent']), false);
@@ -277,12 +277,12 @@ void main() {
     'setServicePriority stores override and clearing removes no-op entry',
     () {
       final runtime = PluginRuntime(plugins: [_TestGlobalPlugin('foo')]);
-      runtime.init(settings: RuntimeSettings.empty());
+      runtime.init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final controller = PluginKitDialogController(
         runtime: runtime,
-        initialSettings: RuntimeSettings.empty(),
+        initialSettings: RuntimeSettings(),
       );
 
       controller.setServicePriority(Pin('foo', ['agent']), 350);
@@ -305,12 +305,12 @@ void main() {
     tester,
   ) async {
     final runtime = PluginRuntime(plugins: [_ConfigurableDefaultsPlugin()]);
-    runtime.init(settings: RuntimeSettings.empty());
+    runtime.init(settings: RuntimeSettings());
     addTearDown(runtime.dispose);
 
     final controller = PluginKitDialogController(
       runtime: runtime,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     final scopedKey = Pin('defaults_plugin', ['agent', 'model']);
@@ -334,7 +334,7 @@ void main() {
   test('showAllServices defaults to false and notifies on change', () {
     final controller = PluginKitDialogController(
       runtime: PluginRuntime(plugins: [_TestGlobalPlugin('foo')]),
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     expect(controller.showAllServices, isFalse);

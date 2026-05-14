@@ -14,6 +14,8 @@ import riverpodChatSource from '../../../../../example/state_garden/lib/src/inte
 import signalsChatSource from '../../../../../example/state_garden/lib/src/integrations/signals_chat.dart?raw';
 import mobxChatSource from '../../../../../example/state_garden/lib/src/integrations/mobx_chat.dart?raw';
 
+**State management owns presentation state. Plugin Kit owns participation.** A chat screen showing messages is presentation state; a plugin deciding whether it wants to enrich an outgoing prompt is participation. The bridges below let participation flow through whichever widget-rebuild mechanism your state library already provides. Pick the recipe that matches the library you already use; the runtime side is identical.
+
 Plugin Kit is library-agnostic about state management, but the bus, registry, and session lifecycle overlap with what most state libraries do. You can wire it through whatever your app already uses, or lean on the bus directly when an extra layer would only forward events. This page shows the wire-up between a `PluginSession` and seven common state holders, with the same chat protocol used in every example so you can read the differences side by side and pick the cost you actually want to pay.
 
 <Aside type="tip" title="Source of citation">
@@ -62,6 +64,12 @@ Every recipe below uses the same plugin-side protocol so the differences are ent
 
 The plugin's `ChatService` listens for `SendMessageRequested`, appends the user line and an `'echo: ' + text` bot line to its own list, and emits `ChatMessagesChanged` with the full snapshot. See [`chat_service.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/chat/chat_service.dart) for the actual code.
 
+<Aside type="caution" title="Handler signatures are `EventEnvelope<T>`, not `T`">
+Every recipe below calls `session.on<T>(...)` (or a `flutter_plugin_kit` helper that delegates to it). The handler receives an `EventEnvelope<T>`, not the payload directly. The payload lives at `envelope.event`. A handler written as `(event) { messages = event.messages; }` does not compile because `EventEnvelope` has no `.messages` getter. Always destructure: `(envelope) { messages = envelope.event.messages; }`.
+
+The same shape applies to `EventBinding.on<T>` and `PluginSessionStateListener.listen<T>` / `rebuildOn<T>` from `flutter_plugin_kit`.
+</Aside>
+
 ## Recipe: StatefulWidget + setState
 
 The reference shape with no library at all. The widget owns the subscription. `mounted` guards every continuation.
@@ -85,10 +93,6 @@ A `ChangeNotifier` subclass holds a `List<ChatMessage>` and calls `notifyListene
 <Code code={extractRegion(changeNotifierChatSource, 'change-notifier-chat-chat-change-notifier')} lang="dart" />
 
 Wrap with `ChangeNotifierProvider` and read in widgets through `context.watch<ChatChangeNotifier>()` as usual. Source: [`change_notifier_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/change_notifier_chat.dart).
-
-<Aside type="caution" title="The handler signature is `EventEnvelope<T>`, not `T`">
-`session.on<T>` calls back with `EventEnvelope<T>`, not the payload directly. The payload is at `envelope.event`. A handler written as `(event) { messages = event.messages; }` does not compile because `EventEnvelope` has no `.messages` getter. Always destructure: `(envelope) { messages = envelope.event.messages; }`.
-</Aside>
 
 ### With flutter_plugin_kit
 
@@ -187,7 +191,7 @@ These show up rarely but bite hard.
 
 - **Settings reconciliation does not dispose the session.** `updateSessionSettings` mutates the registry in place and runs detach/attach for plugins whose enablement changed. The session bus, registry, and context object are the same instances afterward. Existing subscriptions on the session bus survive.
 - **Disabling a plugin removes its event handlers.** A consumer's `session.emit(SomeIntent())` reaches no handler if the plugin that owned the `on<SomeIntent>` was just disabled. No error: the cascade simply has no handlers to run.
-- **Toggling plugins back-to-back without serialization is racy.** Two concurrent `updateSessionSettings` calls read and mutate `session._enabledPluginIds` between awaits and can converge on incoherent state (a plugin that should be off ends up re-attached). Tail-chain toggle handlers via `_pending = _pending.then(...)`.
+- **Concurrent settings updates throw, so toggle handlers need to be serialized.** Starting a second `updateSettings` / `updateGlobalSettings` / `updateSessionSettings` while one is already in flight raises a `StateError` from `_enterReconcile` rather than corrupting registry state. Tail-chain your toggle handlers (`_pending = _pending.then(...)`) so a rapid double-tap on a settings toggle queues instead of throwing.
 - **Hot-swap by priority works through resolve, not through events.** Disabling a higher-priority registrant for a slot makes the lower-priority one win on the next `session.resolve<T>(...)`. If your code holds the resolved instance in a field, it does not see the swap. Resolve at point of use.
 
 ## Related reading

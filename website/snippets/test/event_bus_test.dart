@@ -132,7 +132,7 @@ void main() {
     test('requestOpenPort returns null when no handler registered', () async {
       final ctx = PluginContext.stub();
       // No onRequest handler registered; maybeRequest returns null.
-      final result = await ctx.bus.maybeRequest<FindOpenPort, int?>(
+      final result = await ctx.bus.maybeRequest<FindOpenPort, int>(
         const FindOpenPort(),
       );
       expect(result, isNull);

@@ -33,12 +33,12 @@ void main() {
     'ServiceCard with two capabilities starts collapsed and expands on tap',
     (tester) async {
       final runtime = PluginRuntime();
-      runtime.init(settings: RuntimeSettings.empty());
+      runtime.init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final controller = PluginKitDialogController(
         runtime: runtime,
-        initialSettings: RuntimeSettings.empty(),
+        initialSettings: RuntimeSettings(),
       );
 
       var expanded = false;
@@ -91,12 +91,12 @@ void main() {
     'ServiceCard switch toggles service enabled override and clears on default',
     (tester) async {
       final runtime = PluginRuntime();
-      runtime.init(settings: RuntimeSettings.empty());
+      runtime.init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final controller = PluginKitDialogController(
         runtime: runtime,
-        initialSettings: RuntimeSettings.empty(),
+        initialSettings: RuntimeSettings(),
       );
 
       await tester.pumpWidget(
@@ -142,19 +142,19 @@ void main() {
     (tester) async {
       final targetRuntime = PluginRuntime()
         ..addPlugin(_ConfigurableTargetPlugin());
-      targetRuntime.init(settings: RuntimeSettings.empty());
+      targetRuntime.init(settings: RuntimeSettings());
       addTearDown(targetRuntime.dispose);
 
       final controller = PluginKitDialogController(
         runtime: targetRuntime,
-        initialSettings: RuntimeSettings.empty(),
+        initialSettings: RuntimeSettings(),
       );
 
       final dialogRuntime =
           PluginRuntime<DialogGlobalContext, SessionPluginContext>(
             plugins: [FieldRenderersPlugin(), ServicesTabPlugin()],
           )..init(
-            settings: RuntimeSettings.empty(),
+            settings: RuntimeSettings(),
             globalContextFactory: (registry, bus, sessions) =>
                 DialogGlobalContext(
                   registry: registry,
@@ -197,8 +197,8 @@ void main() {
     tester,
   ) async {
     final controller = PluginKitDialogController(
-      runtime: PluginRuntime()..init(settings: RuntimeSettings.empty()),
-      initialSettings: RuntimeSettings.empty(),
+      runtime: PluginRuntime()..init(settings: RuntimeSettings()),
+      initialSettings: RuntimeSettings(),
     );
     addTearDown(controller.dispose);
 

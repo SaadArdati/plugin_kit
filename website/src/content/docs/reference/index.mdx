@@ -14,7 +14,7 @@ If you want the model behind the API, the [concepts](/concepts/plugins/) explain
 <CardGrid>
   <LinkCard
     title="Plugins & Lifecycle"
-    description="`PluginId`, `Plugin`, `GlobalPlugin`, `SessionPlugin`, `FeatureFlag`, the context types, `PluginSession`, `PluginRuntime`, `PluginRuntime`, `PluginLifecycleException`."
+    description="`PluginId`, `Plugin`, `GlobalPlugin`, `SessionPlugin`, `FeatureFlag`, the context types, `PluginSession`, `PluginRuntime`, `PluginLifecycleException`."
     href="/reference/plugins-and-lifecycle/"
   />
   <LinkCard
@@ -38,16 +38,18 @@ If you want the model behind the API, the [concepts](/concepts/plugins/) explain
     href="/reference/dialog-api/"
   />
   <LinkCard
+    title="State Management Bridges"
+    description="Wire-up recipes for Bloc, Riverpod, ChangeNotifier, signals_flutter, MobX, GetIt, and plain setState, plus the `flutter_plugin_kit` shortcuts."
+    href="/reference/state-management-bridges/"
+  />
+  <LinkCard
+    title="Naming Conventions"
+    description="Plugin ids, service ids, namespaces, event types, capabilities, settings keys, and variable names: the style guide the docs and demo follow."
+    href="/reference/naming-conventions/"
+  />
+  <LinkCard
     title="Architecture"
     description="Contributor-facing design rationale: type hierarchy, lifecycle phases, priority resolution, event dispatch, cross-scope routing, key decisions."
     href="/reference/architecture/"
   />
 </CardGrid>
-
-## How this differs from auto-generated dartdoc
-
-Each Plugin Kit package will publish auto-generated dartdoc once it ships on pub.dev. That reference is comprehensive: every public symbol, every parameter, every link in the source. It is also organized the way the source is, which is rarely the way you think about the library.
-
-The pages here are curated. They cover the public surface but group related types together, show the canonical usage shape inline, and skip private helpers. When a method has three signatures and two of them are rarely the right call, this reference says so. Auto-generated docs cannot do that.
-
-The two will coexist. When dartdoc lands, each curated page will link to the relevant pub.dev section.

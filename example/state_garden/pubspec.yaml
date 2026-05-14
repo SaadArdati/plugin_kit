@@ -12,8 +12,10 @@ dependencies:
   flutter:
     sdk: flutter
   collection: ^1.19.1
-  plugin_kit: ^1.0.0
-  flutter_plugin_kit: ^0.1.0
+  plugin_kit:
+    path: ../../packages/plugin_kit
+  flutter_plugin_kit:
+    path: ../../packages/flutter_plugin_kit
 
   flutter_bloc: ^9.0.0
   flutter_riverpod: ^2.6.0

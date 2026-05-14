@@ -1,13 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_kit/plugin_kit.dart';
-
 // Note: PluginKitDialogDraft is package-private, exposed via the controller
 // barrel in Task 8. For Task 7 we test it directly via a relative import.
 import 'package:plugin_kit_dialog/src/controller/plugin_kit_dialog_draft.dart';
 
 void main() {
   test('initial draft is not dirty', () {
-    final draft = PluginKitDialogDraft.initial(RuntimeSettings.empty());
+    final draft = PluginKitDialogDraft.initial(RuntimeSettings());
     expect(draft.isDirty, isFalse);
     expect(draft.active, draft.working);
     expect(draft.dirtyPluginIds, isEmpty);
@@ -16,7 +15,7 @@ void main() {
 
   test('withPluginEnabled flips dirty', () {
     final draft = PluginKitDialogDraft.initial(
-      RuntimeSettings.empty(),
+      RuntimeSettings(),
     ).withPluginEnabled(const PluginId('foo'), true);
 
     expect(draft.isDirty, isTrue);
@@ -27,7 +26,7 @@ void main() {
 
   test('resetAll restores to active', () {
     final draft = PluginKitDialogDraft.initial(
-      RuntimeSettings.empty(),
+      RuntimeSettings(),
     ).withPluginEnabled(const PluginId('foo'), true).resetAll();
 
     expect(draft.isDirty, isFalse);
@@ -36,7 +35,7 @@ void main() {
 
   test('markSaved makes working the new active', () {
     final draft = PluginKitDialogDraft.initial(
-      RuntimeSettings.empty(),
+      RuntimeSettings(),
     ).withPluginEnabled(const PluginId('foo'), true).markSaved();
 
     expect(draft.isDirty, isFalse);
@@ -46,7 +45,7 @@ void main() {
 
   test('withServiceField writes dotted key and marks service dirty', () {
     final draft = PluginKitDialogDraft.initial(
-      RuntimeSettings.empty(),
+      RuntimeSettings(),
     ).withServiceField(Pin('foo', ['agent']), 'model.name', 'gpt-4.1');
 
     expect(draft.isDirty, isTrue);
@@ -60,7 +59,7 @@ void main() {
   });
 
   test('resetField clears path and prunes empty parents', () {
-    final draft = PluginKitDialogDraft.initial(RuntimeSettings.empty())
+    final draft = PluginKitDialogDraft.initial(RuntimeSettings())
         .withServiceField(Pin('foo', ['agent']), 'model.name', 'gpt-4.1')
         .withServiceField(Pin('foo', ['agent']), 'model.provider', 'openai')
         .resetField(Pin('foo', ['agent']), 'model.name')
@@ -114,7 +113,7 @@ void main() {
   });
 
   test('applyNoOpDeletion deletes no-op service override', () {
-    final draft = PluginKitDialogDraft.initial(RuntimeSettings.empty())
+    final draft = PluginKitDialogDraft.initial(RuntimeSettings())
         .withServiceField(Pin('foo', ['agent']), 'model', 'gpt-4.1')
         .applyNoOpDeletion(
           scopedKey: Pin('foo', ['agent']),
@@ -125,7 +124,7 @@ void main() {
   });
 
   test('applyNoOpDeletion keeps override when unknown keys are present', () {
-    final draft = PluginKitDialogDraft.initial(RuntimeSettings.empty())
+    final draft = PluginKitDialogDraft.initial(RuntimeSettings())
         .withServiceField(Pin('foo', ['agent']), 'custom.unknown', 1)
         .applyNoOpDeletion(
           scopedKey: Pin('foo', ['agent']),
@@ -136,7 +135,7 @@ void main() {
   });
 
   test('applyNoOpDeletion keeps override when a known field differs', () {
-    final draft = PluginKitDialogDraft.initial(RuntimeSettings.empty())
+    final draft = PluginKitDialogDraft.initial(RuntimeSettings())
         .withServiceField(Pin('foo', ['agent']), 'model', 'claude')
         .applyNoOpDeletion(
           scopedKey: Pin('foo', ['agent']),

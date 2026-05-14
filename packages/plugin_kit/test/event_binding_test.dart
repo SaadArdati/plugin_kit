@@ -20,7 +20,7 @@ void main() {
       'attaches handler to a session and receives envelopes carrying the event',
       () async {
         final runtime = PluginRuntime(plugins: [_ListenerTestPlugin()])
-          ..init(settings: RuntimeSettings.empty());
+          ..init(settings: RuntimeSettings());
         addTearDown(runtime.dispose);
         final session = await runtime.createSession();
         addTearDown(session.dispose);
@@ -50,7 +50,7 @@ void main() {
         // forgets to forward it would land at the default, breaking any
         // ordering the caller relied on.
         final runtime = PluginRuntime(plugins: [_ListenerTestPlugin()])
-          ..init(settings: RuntimeSettings.empty());
+          ..init(settings: RuntimeSettings());
         addTearDown(runtime.dispose);
         final session = await runtime.createSession();
         addTearDown(session.dispose);
@@ -85,7 +85,7 @@ void main() {
         // general subscription and would receive every emission of E,
         // including those targeted at other identifiers.
         final runtime = PluginRuntime(plugins: [_ListenerTestPlugin()])
-          ..init(settings: RuntimeSettings.empty());
+          ..init(settings: RuntimeSettings());
         addTearDown(runtime.dispose);
         final session = await runtime.createSession();
         addTearDown(session.dispose);

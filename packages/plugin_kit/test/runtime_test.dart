@@ -35,7 +35,25 @@ class _CustomGlobalContext extends GlobalPluginContext {
     required super.bus,
     required super.sessions,
     required this.label,
+    super.extras,
   });
+
+  @override
+  _CustomGlobalContext copyWith({
+    ServiceRegistry? registry,
+    Map<String, Object>? extras,
+    EventBus? bus,
+    List<PluginSession<SessionPluginContext>>? sessions,
+    String? label,
+  }) {
+    return _CustomGlobalContext(
+      registry: registry ?? this.registry.copy(),
+      bus: bus ?? this.bus,
+      extras: extras ?? this.extras,
+      sessions: sessions ?? this.sessions,
+      label: label ?? this.label,
+    );
+  }
 }
 
 class TestSessionPlugin extends SessionPlugin {

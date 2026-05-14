@@ -46,7 +46,7 @@ void main() {
     final targetRuntime = PluginRuntime();
     final controller = PluginKitDialogController(
       runtime: targetRuntime,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     FutureOr<void> onSave(RuntimeSettings settings) {}

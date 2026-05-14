@@ -4,38 +4,38 @@
 
 # Plugin Kit
 
-A Dart plugin runtime for apps that have grown into platforms: replaceable services, controlled plugin lifecycles, isolated sessions, and typed events between parts of your app that have never been formally introduced.
+A Dart plugin runtime for apps that have grown into platforms. Features get real lifecycles. Services get replaceable, prioritized implementations. Sessions stay sealed. Behavior gets to be replaced, layered, disabled, overridden, or vetoed while the app is running.
 
-It has no opinion about what your app does. It does not know about Flutter, servers, agents, editors, or any particular settings backend. You build those on top. The runtime stays the same.
+It does not know about Flutter, servers, agents, editors, or any particular settings backend. You build those on top. The runtime stays the same.
 
-Plugins are wiring; services are the meat. The plugin class declares an id, registers services, and stays small. Real behavior, anything stateful or configurable or replaceable, lives in services.
+> A DI container answers *"give me an instance of X."*
+> A plugin runtime answers a different question: *"given this set of capabilities, this user's settings, and this session's scope, compose a coherent system and let me change my mind at any time."*
+
+The difference is composition. DI wires up a fixed graph at startup. A plugin runtime wires up a dynamic graph that responds to settings changes, plugin enable/disable, priority overrides, and session boundaries while the application is running.
 
 ![Plugin Kit Dialog showing the Plugins tab with toggleable enable/disable controls for each registered plugin](https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/example/plugin_kit_dialog_demo/test/goldens/plugins_tab_dark.png)
 
-*The `plugin_kit_dialog` companion package mounted on a real runtime. Toggling a tile runs the full lifecycle; the registry inspector and per-service config follow on the other tabs.*
+*The `plugin_kit_dialog` companion package mounted on a real runtime. Toggling a tile runs the full lifecycle.*
+
+## Most apps don't need this
+
+If your app has one HTTP client, one auth service, one analytics service, and a few screens that call them, use the boring thing. Instantiate the client. Register the service. Ship the app.
+
+Plugin Kit starts making sense at the exact moment the word "just" starts lying to you. *"Just add a setting to disable this provider." "Just let enterprise customers override this behavior." "Just experiment quickly with this implementation." "Just make sure the original runs if this way fails."* When behavior needs to be replaced, layered, disabled, overridden, or vetoed while the app is running, and settings have stopped being data your app reads and started being something that actively reshapes the system, you have outgrown a DI container. That is the seam this library is for.
 
 ## Packages in this repo
 
-| Package | Adds |
-|---|---|
-| [`plugin_kit`](packages/plugin_kit) | Pure-Dart runtime: plugins, services, registry, event bus, settings, capabilities. The piece you build on. |
-| [`flutter_plugin_kit`](packages/flutter_plugin_kit) | Flutter ergonomics: `InheritedWidget` scopes that carry the runtime/session through the tree, a `State` mixin that auto-cancels bus subscriptions across session swaps, a `ChangeNotifier` adapter, and `BuildContext.watchEvent` / `readEvent` extensions. Optional. |
-| [`plugin_kit_dialog`](packages/plugin_kit_dialog) | Drop-in three-tab Flutter UI on top of any `PluginRuntime` for toggling plugins, editing configurable services, and browsing the registry. Optional. |
+| Package | Adds | Add when |
+|---|---|---|
+| [`plugin_kit`](packages/plugin_kit) | Pure-Dart runtime: plugins, services, registry, event bus, settings, capabilities. | Always. The thing you build on. |
+| [`flutter_plugin_kit`](packages/flutter_plugin_kit) | `InheritedWidget` scopes that carry the runtime/session, a `State` mixin that auto-cancels bus subscriptions across session swaps, a `ChangeNotifier` adapter, `BuildContext.watchEvent`/`readEvent` extensions. | Your shell is Flutter and you want the widget plumbing done. |
+| [`plugin_kit_dialog`](packages/plugin_kit_dialog) | Drop-in three-tab Flutter UI: toggle plugins, edit configurable services, browse the registry. | Your users (or your QA) need to flip plugins at runtime without you writing a settings screen per plugin. |
 
-`plugin_kit` stands alone. The two Flutter packages are opt-in.
+The Dart-only core stays Dart-only on purpose: a backend Dart package can declare its `UiConfigurableCapability` once and any Flutter app that ships `plugin_kit_dialog` will render a real settings UI for it, without the backend taking a Flutter dependency.
 
-## Install
+## A taste
 
-```yaml
-dependencies:
-  plugin_kit: ^1.0.0  <!-- pubver:plugin_kit -->
-```
-
-Requires Dart `>=3.10.0`. For Flutter projects that want the scope widgets and `State` mixin, also add [`flutter_plugin_kit`](packages/flutter_plugin_kit). For the customization UI, add [`plugin_kit_dialog`](packages/plugin_kit_dialog).
-
-## A small taste
-
-Two plugins claim the same `'greeter'` slot at different priorities. The runtime resolves to the winner. The host code never sees the competition.
+Two plugins claim the same `greeter` slot at different priorities. The runtime resolves the higher-priority winner; the host code never sees the competition.
 
 ```dart
 class CasualPlugin extends SessionPlugin {
@@ -77,13 +77,29 @@ Future<void> runGreeterExample() async {
 }
 ```
 
-Drop a plugin, lower its priority, or disable it through `RuntimeSettings`, and the call site never changes. That move, where features own slots and slots resolve to the current winner, is the vocabulary the rest of the library is built on.
+At the call site:
 
-## What's in plugin_kit
+```dart
+final greeter = session.resolve<Greeter>(const ServiceId('greeter'));
+print(greeter.greet(name));
+```
 
-Plugins, services, registry, event bus, sessions, capabilities, settings reconciliation. The dart-only core covers all of it.
+No conditional, no flag, no branch. Drop the formal plugin, lower its priority, or disable it through `RuntimeSettings`, and the call site never changes. That move, where features own slots and slots resolve to the current winner, is the vocabulary the rest of the library is built on.
 
-For the per-API breakdown with examples, see [`packages/plugin_kit/README.md`](packages/plugin_kit/README.md) or the full docs site below.
+## What this actually buys you: less breakable code
+
+Plugin Kit makes a class of bugs structurally impossible rather than situationally avoidable.
+
+- `attach` and `detach` are framework-enforced. Subscriptions opened during `attach` on a `StatefulPluginService` are tracked and cancelled after `detach` returns. "I forgot to cancel that subscription" stops being a bug class.
+- Lifecycle failures aggregate. `PluginLifecycleException` carries the named phase (`attachGlobal`, `attachSession`, `updateSessionSettings`) and every plugin's error. One plugin throwing at startup does not abort the others; it surfaces as part of a labelled aggregate.
+- `enabledPlugins` (settings-intent) and `attachedPlugins` (post-dependency-cascade runtime-truth) are distinct, queryable sets. A plugin whose dependency went missing does not silently advertise itself as running.
+- Reconciliation is transactional. Per-plugin attach failures roll back to honest state (failed plugin out of the enabled set, services unregistered), and `updateSettings` rolls every reconciled session and the global scope back to the previous snapshot on any mid-loop failure. The stored `RuntimeSettings` snapshot stays at the previous value, so the caller never sees split-brain.
+
+You stop writing the teardown code, and the runtime stops trusting you to write it correctly.
+
+## State management vs Plugin Kit
+
+State management owns presentation state. Plugin Kit owns participation. A chat screen showing messages is presentation state. A plugin deciding whether it wants to enrich an outgoing prompt is participation. Plugin Kit sits beside Provider, Riverpod, Bloc, or GetIt: they keep doing widget-facing work; Plugin Kit owns the runtime protocol underneath.
 
 ## Logging
 

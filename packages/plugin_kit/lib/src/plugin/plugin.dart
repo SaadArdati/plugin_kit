@@ -17,6 +17,7 @@ import 'package:meta/meta.dart';
 
 import '../config_node.dart';
 import '../event_bus.dart';
+import '../priority.dart';
 import '../service_registry.dart';
 import '../settings.dart';
 import '../typed_handles.dart';

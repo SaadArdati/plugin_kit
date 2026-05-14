@@ -85,8 +85,7 @@ class _StubPlugin extends SessionPlugin {
   PluginId get pluginId => const PluginId('stub_plugin');
 }
 
-class _StubStatefulService
-    extends StatefulPluginService<SessionPluginContext> {}
+class _StubStatefulService extends StatefulPluginService {}
 
 class _HostingPlugin extends SessionPlugin {
   _HostingPlugin(this._service);

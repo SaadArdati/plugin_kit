@@ -14,7 +14,7 @@
 import 'package:plugin_kit/plugin_kit.dart';
 import 'package:test/test.dart';
 
-class _LifecycleSpyService extends StatefulPluginService<SessionPluginContext> {
+class _LifecycleSpyService extends StatefulPluginService {
   bool attachCalled = false;
   bool detachCalled = false;
 

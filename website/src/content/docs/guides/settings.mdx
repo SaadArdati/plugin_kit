@@ -49,8 +49,7 @@ Plugin enablement follows a fixed precedence.
 
 1. `FeatureFlag.locked` wins immediately.
 2. Explicit `PluginConfig.enabled` is respected next.
-3. If the runtime was initialized with a `defaultEnabledPluginIds` set, unspecified plugins fall back to that.
-4. Otherwise the experimental heuristic kicks in: stable plugins on by default, experimental plugins off by default.
+3. Otherwise the experimental heuristic kicks in: stable plugins on by default, experimental plugins off by default.
 
 </Steps>
 
@@ -116,10 +115,20 @@ You can target a slot by role instead of by plugin id. That matters when:
 - the host UI configures a slot generically
 - you want one setting to follow the winner
 
-<Aside type="note" title="Wildcard handling is not a simple layered merge">
-Do not picture it as "plugin-specific settings always sit on top of wildcard settings." What the runtime actually does is find the current winner, materialize the wildcard override onto that winner, and also keep a meta fallback entry for winner-scoped behavior like `resolveAfter(...)`.
+<Aside type="note" title="Wildcards target the slot, not the plugin">
+A `*:serviceId` entry applies to whichever registration currently wins that slot. If the winner changes (because another plugin's priority got bumped, or a service was disabled), the wildcard's config follows the new winner.
 
-If you mix plugin-specific and wildcard overrides on the same slot, validate the behavior you actually want. The safe mental model is: `*:serviceId` means "apply this to whoever wins right now."
+When both a wildcard and a plugin-specific entry target the same slot, the runtime merges them knob by knob:
+
+- `enabled`: AND-merge. If either layer disables the slot, it stays disabled. A plugin-specific entry cannot force-enable a slot the wildcard disabled.
+- `priority`: plugin-specific wins if set; otherwise the wildcard's priority applies to the current winner.
+- `config`: plugin-specific config wins if non-empty; otherwise the wildcard's config fills in.
+
+A concrete example: two plugins both register `model_router`. The wildcard supplies `temperature: 0.5`. A plugin-specific entry on `beta` only bumps priority. The result is that `beta` is now the winning registration, and it resolves with `temperature: 0.5` from the wildcard, because `beta`'s plugin-specific row has no `config` of its own for the merge to prefer.
+
+<Code code={extractRegion(runtimeSettingsSource, 'runtime-settings-wildcard-follows-winner')} lang="dart" />
+
+If you want to fully replace the wildcard's config for one plugin, put a `config` map on the plugin-specific entry too; that is the case where plugin-specific beats wildcard.
 </Aside>
 
 ![Plugin Kit Dialog Advanced tab showing the service registry inspector with namespaces, competing registrations, priority order, and the current winner picked out for each slot](/images/dialog/advanced_tab_dark.png)

@@ -165,7 +165,7 @@ Future<void> main() async {
 
   print('=== Completions for query.sql ===');
   final completionResponse = await session
-      .request<CompletionRequest, CompletionResponse?>(
+      .maybeRequest<CompletionRequest, CompletionResponse>(
         CompletionRequest(document: _sqlDoc, line: 0, column: 0),
       );
 

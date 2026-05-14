@@ -49,7 +49,7 @@ abstract class VisaOffice extends StatefulPluginService {
 
   @override
   void attach() {
-    onRequest<AgentBoardingCall, ModelVisa?>((req) async {
+    onRequest<AgentBoardingCall, ModelVisa>((req) async {
       final passport = req.event.passport;
 
       if (!supportedFamilies.contains(passport.modelFamily)) return null;

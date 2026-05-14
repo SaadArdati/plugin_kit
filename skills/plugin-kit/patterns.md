@@ -102,7 +102,7 @@ Contract: each session has its own service instance. State never leaks across se
 Mechanism: `register()` runs once per session for `SessionPlugin` (once per runtime for `GlobalPlugin`). `registerSingleton<T>(id, Factory<T> create)` runs `create()` once at registration. An inline factory `() => T()` evaluates `T()` fresh per `register()` call, so each session gets its own instance.
 
 ```dart
-class ChatThread extends StatefulPluginService<SessionPluginContext> {
+class ChatThread extends StatefulPluginService {
   /// The accumulated messages for this session.
   final List<Message> messages = [];
 
@@ -214,7 +214,7 @@ class BetterDartFormatter extends StatefulPluginService implements Formatter {
       // Our specialty. Format it ourselves.
       return input.trim();
     }
-    // Not a Dart file. Hand off to whichever Formatter was the previous winner.
+    // Hand off to whichever Formatter would be next in line for this slot.
     return context.registry
         .resolveAfter<Formatter>(pluginId: pluginId, serviceId: serviceId)
         .format(path, input);
@@ -229,12 +229,15 @@ There is no `maybeResolveAfter`. For genuinely optional fallback, wrap the call 
 ```dart
 Formatter? _maybeNext() {
   try {
-    return context.registry
-        .resolveAfter<Formatter>(pluginId: pluginId, serviceId: serviceId);
+    return context.registry.resolveAfter<Formatter>(
+      pluginId: pluginId,
+      serviceId: serviceId,
+    );
   } on StateError {
     return null;
   }
 }
+
 ```
 
 Disabled wrappers in the chain are skipped (per `LocalPluginOverride`). `StateError` only fires when no enabled fallback exists.

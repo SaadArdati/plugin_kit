@@ -1,6 +1,6 @@
 ---
 title: Getting Started
-description: Add Plugin Kit, write two plugins for the same slot, and watch the runtime pick the winner.
+description: Add Plugin Kit, write a chat plugin and an experimental variant for the same slot, and watch the runtime pick the winner.
 ---
 
 import { CardGrid, LinkCard, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -11,7 +11,7 @@ import pluginLifecycleDart from '../../../../website/snippets/lib/plugin_lifecyc
 
 <PubVersion />
 
-You will write two plugins, register the same service from each, and watch the runtime pick the winner.
+You will write a chat plugin shipping a default system prompt, an experimental plugin that A/Bs an alternative, and watch the runtime resolve to the winner without the call site ever branching.
 
 ## Packages
 
@@ -64,15 +64,15 @@ The runtime works without it; [Plugin Kit Dialog](/guides/plugin-kit-dialog/) co
 
 Copy this into a fresh Dart file and run it. Walkthrough is below.
 
-<Code code={extractRegion(pluginLifecycleDart, 'session-plugin-basic')} lang="dart" />
+<Code code={extractRegion(pluginLifecycleDart, 'system-prompt-taste')} lang="dart" />
 
 Output:
 
 ```
-Good day, world.
+You are a helpful assistant. The user is Ada. Recent activity: Opened 3 PRs, reviewed 2 designs.
 ```
 
-Two plugins, one slot, one runtime, one winner. Now the parts.
+Two plugins, one slot, one runtime, one winner. The experimental plugin won. The chat plugin's default is still registered, sitting at the lower priority. Now the parts.
 
 ## What each piece is doing
 
@@ -80,18 +80,18 @@ Two plugins, one slot, one runtime, one winner. Now the parts.
 
 1. **Define the contract.**
 
-   `Greeter` is the abstract type that the host code asks for. Plugin Kit does NOT require interfaces, but they pay
+   `SystemPrompt` is the abstract type that the host code asks for. Plugin Kit does NOT require interfaces, but they pay
     off the moment more than one implementation is in play.
 
    ```dart
-   abstract class Greeter {
-     String greet(String name);
+   abstract class SystemPrompt {
+     String build({required User user});
    }
    ```
 
 2. **Define the implementations.**
 
-   `CasualGreeter` and `FormalGreeter` are regular Dart classes. The runtime never inspects them. How they are
+   `DefaultSystemPrompt` and `ActivityAwareSystemPrompt` are regular Dart classes. The runtime never inspects them. How they are
     constructed, mocked, or tested is entirely up to you.
 
 3. **Define the plugins.**
@@ -100,9 +100,9 @@ Two plugins, one slot, one runtime, one winner. Now the parts.
     hook is where the plugin contributes things to the session.
 
    ```dart
-   class CasualPlugin extends SessionPlugin {
+   class ChatPlugin extends SessionPlugin {
      @override
-     PluginId get pluginId => const PluginId('casual');
+     PluginId get pluginId => const PluginId('chat');
      // ...
    }
    ```
@@ -113,17 +113,17 @@ Two plugins, one slot, one runtime, one winner. Now the parts.
 
 4. **Register competing services.**
 
-   Both plugins register a `Greeter` for the same slot, identified by `const ServiceId('greeter')`. `FormalPlugin`
-   registers at `Priority.elevated`. `CasualPlugin` takes the default (`Priority.normal`). When the host resolves
-   `Greeter`, it gets the higher priority.
+   Both plugins register a `SystemPrompt` for the same slot, identified by `const ServiceId('system_prompt')`. `ActivityAwarePlugin`
+   registers at `Priority.elevated`. `ChatPlugin` takes the default (`Priority.normal`). When the host resolves
+   `SystemPrompt`, it gets the higher priority.
 
    The `ScopedServiceRegistry` already knows which plugin is doing the registering, so you only supply the
    `ServiceId` handle and a factory that constructs the instance.
 
    ```dart
-   registry.registerSingleton<Greeter>(
-     const ServiceId('greeter'),
-     () => FormalGreeter(),
+   registry.registerSingleton<SystemPrompt>(
+     const ServiceId('system_prompt'),
+     () => ActivityAwareSystemPrompt(),
      priority: Priority.elevated,
    );
    ```
@@ -131,11 +131,16 @@ Two plugins, one slot, one runtime, one winner. Now the parts.
 5. **Start the runtime.**
 
    `PluginRuntime` is the long-lived host for all your plugins. `init()` prepares the global scope. After that,
-   it is ready to spawn sessions.
+   it is ready to spawn sessions. The experimental plugin must be explicitly enabled in settings because of the
+   `FeatureFlag.experimental` flag; otherwise it ships off by default.
 
    ```dart
-   final runtime = PluginRuntime(plugins: [CasualPlugin(), FormalPlugin()])
-     ..init();
+   final runtime = PluginRuntime(plugins: [ChatPlugin(), ActivityAwarePlugin()])
+     ..init(
+       settings: const RuntimeSettings(
+         plugins: {PluginId('activity_aware'): PluginConfig(enabled: true)},
+       ),
+     );
    ```
 
 6. **Open a session.**
@@ -150,11 +155,11 @@ Two plugins, one slot, one runtime, one winner. Now the parts.
 7. **Resolve and use.**
 
    Ask for the service by its slot id. The session returns the winning implementation, which
-   is `FormalGreeter` in this case. The call site never knows there was a competition.
+   is `ActivityAwareSystemPrompt` in this case. The call site never knows there was a competition.
 
    ```dart
-   final greeter = session.resolve<Greeter>(const ServiceId('greeter'));
-   print(greeter.greet('world')); // Good day, world.
+   final prompt = session.resolve<SystemPrompt>(const ServiceId('system_prompt'));
+   print(prompt.build(user: User(name: 'Ada', recentActivity: '...')));
    ```
 
 8. **Shut it down.**
@@ -172,14 +177,14 @@ Two plugins, one slot, one runtime, one winner. Now the parts.
 
 The library only earns its weight when things change. Three quick experiments to convince yourself that something real is happening:
 
-- **Drop `FormalPlugin`** from the runtime's plugin list and re-run. Output flips to `Hello, world.` The host code did not change.
-- **Lower `FormalPlugin`'s priority below the default** (try `priority: Priority.low` or `Priority.lowest`) and re-run. Output flips back to `Hello, world.` Same plugins, different winner.
-- **Soft-disable `FormalPlugin` via config.** Pass `RuntimeSettings` to the runtime and mark the formal plugin disabled.
+- **Drop `ActivityAwarePlugin`** from the runtime's plugin list (or flip the `enabled` flag to `false`) and re-run. Output flips to the default prompt. The host code did not change.
+- **Lower `ActivityAwarePlugin`'s priority below the default** (try `priority: Priority.low` or `Priority.lowest`) and re-run. Output flips back to the default. Same plugins, different winner.
+- **Soft-disable `ActivityAwarePlugin` via config.** Pass `RuntimeSettings` to the runtime and mark the experimental plugin disabled.
  Both plugins still ship, both classes still exist, but the disabled one never wins:
 
-  <Code code={extractRegion(pluginLifecycleDart, 'getting-started-disable-plugin')} lang="dart" />
+  <Code code={extractRegion(pluginLifecycleDart, 'system-prompt-disable')} lang="dart" />
 
-  Output flips to `Hello, world.` This is the move a settings UI makes when a user turns a feature off: same build, same code path,
+  Output flips to the default prompt. This is the move a settings UI makes when a user turns a feature off: same build, same code path,
   different runtime answer. Settings can also be updated live mid-session, and the runtime will reconcile the registry around the change.
 
 That swap, where the winner changes and the call site does not, is the bet the rest of the library makes. A model selector that
@@ -192,9 +197,7 @@ constructed by hand above is what the dialog produces and saves.
 
 ## What you just built
 
-A feature has an identity (`formal`), a slot it claims (`greeter`), and a priority that says how seriously it wants to win.
-The runtime owns the lifecycle. The host code asks the session, not a concrete class. The casual implementation is still
-registered and still reachable as a fallback via `resolveAfter`; it just lost the active slot.
+A feature has an identity (`activity_aware`), a slot it claims (`system_prompt`), and a priority that says how seriously it wants to win. The runtime owns the lifecycle. The host code asks the session, not a concrete class. The default prompt is still registered and still reachable as a fallback via `resolveAfter`; it just lost the active slot.
 
 Everything else in Plugin Kit layers on top of this: events flying between plugins, settings flipping things live,
 session-scoped state that cleans itself up, capabilities that let you discover what a service can do without building

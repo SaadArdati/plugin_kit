@@ -44,10 +44,6 @@ class _OnBinding<E> implements EventBinding {
 
   @override
   EventSubscription attachTo(PluginSession session) {
-    return session.on<E>(
-      handler,
-      priority: priority,
-      identifier: identifier,
-    );
+    return session.on<E>(handler, priority: priority, identifier: identifier);
   }
 }

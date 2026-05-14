@@ -40,12 +40,12 @@ Future<void> main() async {
     if (passport.modelFamily == 'unknown') {
       // When no provider can serve a passport, maybeRequest returns null
       // rather than throwing an unhandled-request error.
-      final visa = await session.maybeRequest<AgentBoardingCall, ModelVisa?>(
+      final visa = await session.maybeRequest<AgentBoardingCall, ModelVisa>(
         AgentBoardingCall(passport),
       );
       results.add((passport, visa));
     } else {
-      final visa = await session.request<AgentBoardingCall, ModelVisa?>(
+      final visa = await session.maybeRequest<AgentBoardingCall, ModelVisa>(
         AgentBoardingCall(passport),
       );
       results.add((passport, visa));

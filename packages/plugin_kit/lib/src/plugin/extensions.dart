@@ -23,7 +23,7 @@ extension PluginHelper on Plugin {
   EventSubscription on<E>(
     PluginContext context,
     EventHandler<E> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   }) {
     final sub = context.bus.on<E>(
@@ -42,7 +42,7 @@ extension PluginHelper on Plugin {
   EventSubscription onRequest<Request, Response>(
     PluginContext context,
     RequestHandler<Request, Response> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   }) {
     final sub = context.bus.onRequest<Request, Response>(
@@ -61,7 +61,7 @@ extension PluginHelper on Plugin {
   EventSubscription onRequestSync<Request, Response>(
     PluginContext context,
     SyncRequestHandler<Request, Response> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   }) {
     final sub = context.bus.onRequestSync<Request, Response>(
@@ -160,7 +160,7 @@ extension StatefulPluginServiceHelper on StatefulPluginService {
   /// Auto-tracked and cancelled when the framework unbinds the service.
   EventSubscription onRequest<Request, Response>(
     RequestHandler<Request, Response> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   }) {
     final sub = context.bus.onRequest<Request, Response>(
@@ -176,7 +176,7 @@ extension StatefulPluginServiceHelper on StatefulPluginService {
   /// Auto-tracked and cancelled when the framework unbinds the service.
   EventSubscription onRequestSync<Request, Response>(
     SyncRequestHandler<Request, Response> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   }) {
     final sub = context.bus.onRequestSync<Request, Response>(
@@ -197,7 +197,7 @@ extension StatefulPluginServiceHelper on StatefulPluginService {
   /// the handler explicitly before then.
   EventSubscription on<E>(
     EventHandler<E> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   }) {
     final sub = context.bus.on<E>(
@@ -274,14 +274,14 @@ extension SessionHelper on PluginSession {
   /// mutate `e.event` and call [EventEnvelope.stop] to halt the cascade.
   EventSubscription on<T>(
     EventHandler<T> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   }) => bus.on<T>(handler, priority: priority, identifier: identifier);
 
   /// Register a request handler on the session's event bus.
   EventSubscription onRequest<Request, Response>(
     RequestHandler<Request, Response> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   }) => bus.onRequest<Request, Response>(
     handler,
@@ -292,7 +292,7 @@ extension SessionHelper on PluginSession {
   /// Registers a synchronous request handler on this session's event bus.
   EventSubscription onRequestSync<Request, Response>(
     SyncRequestHandler<Request, Response> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   }) => bus.onRequestSync<Request, Response>(
     handler,
@@ -309,25 +309,47 @@ extension SessionHelper on PluginSession {
   /// observer should stop.
   void Function() bind(EventBindingCallback callback) => bus.bind(callback);
 
-  /// Send a typed request and await a response on the session's event bus.
+  /// Send a typed request on the session's event bus. Assertion variant.
+  ///
+  /// Delegates to [EventBus.request]. Prefer [maybeRequest] when
+  /// concession is a valid outcome at your call site; reach for `request`
+  /// only when you have asserted at least one handler will claim.
+  /// Throws [RequestNotWiredException] if no handler is registered for
+  /// the type pair (or none matches the identifier), and
+  /// [AllConcededException] if every handler conceded and `Response` is
+  /// non-nullable. Handler-thrown exceptions propagate unchanged.
   Future<Response> request<Request, Response>(
     Request request, {
     String? identifier,
   }) => bus.request<Request, Response>(request, identifier: identifier);
 
-  /// Sends a typed request and returns null if no handler can satisfy it.
+  /// Send a typed request on the session's event bus and return `null`
+  /// when the chain produced no answer. Canonical variant.
+  ///
+  /// Delegates to [EventBus.maybeRequest]. Returns `null` when no handler
+  /// is registered, no handler matched the identifier, or every handler
+  /// conceded. Handler-thrown exceptions propagate unchanged;
+  /// `maybeRequest` does not swallow them, it catches only the
+  /// framework's own [NoRequestAnswerException] subtypes.
   Future<Response?> maybeRequest<Request, Response>(
     Request request, {
     String? identifier,
   }) => bus.maybeRequest<Request, Response>(request, identifier: identifier);
 
-  /// Sends a typed request through synchronous request handlers.
+  /// Synchronous version of [request]. Assertion variant.
+  ///
+  /// Delegates to [EventBus.requestSync]. Same exception contract as
+  /// [request], plus [StateError] if any invoked handler returned a
+  /// [Future]. Prefer [maybeRequestSync] when concession is valid.
   Response requestSync<Request, Response>(
     Request request, {
     String? identifier,
   }) => bus.requestSync<Request, Response>(request, identifier: identifier);
 
-  /// Sends a sync request and returns null instead of throwing on failure.
+  /// Synchronous version of [maybeRequest]. Canonical variant.
+  ///
+  /// Delegates to [EventBus.maybeRequestSync]. Returns `null` for the
+  /// no-answer case; handler-thrown exceptions propagate unchanged.
   Response? maybeRequestSync<Request, Response>(
     Request request, {
     String? identifier,

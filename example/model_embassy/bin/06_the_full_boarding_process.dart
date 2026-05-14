@@ -64,7 +64,7 @@ Future<void> main() async {
       '(needs: ${_capabilitiesLabel(agent.passport.requiredCapabilities)})',
     );
 
-    final visa = await session.maybeRequest<AgentBoardingCall, ModelVisa?>(
+    final visa = await session.maybeRequest<AgentBoardingCall, ModelVisa>(
       AgentBoardingCall(agent.passport),
     );
 

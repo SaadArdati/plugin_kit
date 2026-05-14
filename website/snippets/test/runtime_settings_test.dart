@@ -26,7 +26,7 @@ void main() {
 
   group('runtime-settings-copy-with', () {
     test('produces updated settings with new plugin config', () {
-      const base = RuntimeSettings.empty();
+      const base = RuntimeSettings();
       final updated = updateAnalyticsEnabled(base, false);
       expect(updated.plugins[const PluginId('analytics')]?.enabled, isFalse);
     });
@@ -36,6 +36,31 @@ void main() {
     test('empty settings has no plugins or services', () {
       expect(emptySettings.plugins, isEmpty);
       expect(emptySettings.services, isEmpty);
+    });
+  });
+
+  group('runtime-settings-wildcard-follows-winner', () {
+    test('exposes a wildcard config and a plugin-specific priority bump', () {
+      // The wildcard entry uses the `*` wire form for the plugin half.
+      final wildcardEntry = wildcardFollowsWinner.services.entries.firstWhere(
+        (e) => e.key.isWildcard,
+      );
+      expect(
+        wildcardEntry.value.config['temperature'],
+        equals(0.5),
+        reason: 'wildcard supplies temperature config',
+      );
+
+      // The plugin-specific entry targets `beta` and only bumps priority.
+      final betaEntry = wildcardFollowsWinner.services.entries.firstWhere(
+        (e) => !e.key.isWildcard && e.key.wire.startsWith('beta:'),
+      );
+      expect(betaEntry.value.priority, equals(200));
+      expect(
+        betaEntry.value.config,
+        isEmpty,
+        reason: 'beta only changes priority; config comes from the wildcard',
+      );
     });
   });
 

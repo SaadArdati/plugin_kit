@@ -309,7 +309,7 @@ class _EditorScreenState extends State<EditorScreen> {
 Widget buildRuntimeScopeAutoCreate() {
   return PluginRuntimeScope(
     plugins: [ChatPlugin(), AssistantPlugin()],
-    initialSettings: const RuntimeSettings.empty(),
+    initialSettings: const RuntimeSettings(),
     child: const ChatScreen(),
   );
 }

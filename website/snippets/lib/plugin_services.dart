@@ -107,8 +107,9 @@ class ConversationState extends StatefulPluginService {
 // #docregion plugin-service-settings-runtime
 final serviceSettingsExample = RuntimeSettings(
   services: {
-    const PluginId('model_router').service('decider'):
-        const ServiceSettings(config: {'default_model': 'gpt-4.1-mini'}),
+    const PluginId('model_router').service('decider'): const ServiceSettings(
+      config: {'default_model': 'gpt-4.1-mini'},
+    ),
   },
 );
 // #enddocregion plugin-service-settings-runtime
@@ -178,7 +179,7 @@ class AssistantRequestService extends StatefulPluginService {
 
   @override
   void attach() {
-    onRequest<WaitForAssistant, AssistantClient?>((_) async {
+    onRequest<WaitForAssistant, AssistantClient>((_) async {
       return _assistant ??= await (_connecting ??= connectAssistant());
     });
   }
@@ -186,7 +187,7 @@ class AssistantRequestService extends StatefulPluginService {
 // #enddocregion migration-wait-for-assistant
 
 // #docregion session-stateful-plugin-service
-class ChatThread extends StatefulPluginService<SessionPluginContext> {
+class ChatThread extends StatefulPluginService {
   /// The accumulated messages for this session.
   final List<Message> messages = [];
 
@@ -213,8 +214,10 @@ class NotificationService {
 }
 // #enddocregion adding-plugin-notification-service
 
-/// A plugin that registers [NotificationService] in the session registry.
-class SimpleNotificationPlugin extends SessionPlugin {
+// #docregion adding-plugin-notification-plugin
+/// A plugin that gives the notification feature a runtime identity and
+/// contributes [NotificationService] to the session registry.
+class NotificationPlugin extends SessionPlugin {
   @override
   PluginId get pluginId => const PluginId('notifier');
 
@@ -226,12 +229,13 @@ class SimpleNotificationPlugin extends SessionPlugin {
     );
   }
 }
+// #enddocregion adding-plugin-notification-plugin
 
 // #docregion adding-plugin-run-notification
 /// Demonstrates constructing a runtime, creating a session,
 /// resolving [NotificationService], and sending a notification.
 Future<void> runNotificationExample() async {
-  final runtime = PluginRuntime(plugins: [SimpleNotificationPlugin()])..init();
+  final runtime = PluginRuntime(plugins: [NotificationPlugin()])..init();
 
   final session = await runtime.createSession();
 
@@ -343,10 +347,39 @@ class ServerStreamBridge extends StatefulPluginService {
 }
 // #enddocregion migrating-server-stream-plugin
 
-/// A Notification plugin with [NotificationService] registered.
-class NotificationPlugin extends SessionPlugin {
+/// Domain event the reactive notification plugin reacts to: a long-running
+/// task has finished.
+class TaskCompleted {
+  /// The task identifier that completed.
+  final String taskId;
+
+  /// Creates a [TaskCompleted] with [taskId].
+  const TaskCompleted(this.taskId);
+}
+
+// #docregion adding-plugin-notification-reactive
+/// Reactive service: subscribes to [TaskCompleted] during attach and
+/// dispatches a notification via the registered [NotificationService].
+/// Subscriptions registered through [on] are cancelled on detach.
+class TaskCompletionWatcher extends StatefulPluginService {
   @override
-  PluginId get pluginId => const PluginId('notification_plugin');
+  void attach() {
+    on<TaskCompleted>((envelope) async {
+      final notifications = resolve<NotificationService>(
+        const ServiceId('notification_service'),
+      );
+      await notifications.send('Task ${envelope.event.taskId} completed.');
+    });
+  }
+}
+
+/// The same notification plugin, now also registering a reactive watcher.
+/// No `attach(...)` override is needed: the base plugin walks every
+/// registered [StatefulPluginService] and attaches each one when the session
+/// opens.
+class ReactiveNotificationPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('notifier');
 
   @override
   void register(ScopedServiceRegistry registry) {
@@ -354,5 +387,11 @@ class NotificationPlugin extends SessionPlugin {
       const ServiceId('notification_service'),
       () => NotificationService(),
     );
+    registry.registerSingleton<TaskCompletionWatcher>(
+      const ServiceId('task_completion_watcher'),
+      () => TaskCompletionWatcher(),
+    );
   }
 }
+
+// #enddocregion adding-plugin-notification-reactive

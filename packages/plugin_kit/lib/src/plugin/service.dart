@@ -256,7 +256,7 @@ abstract class StatefulPluginService<PKC extends PluginContext>
 /// [SessionPluginContext].
 ///
 /// Pure syntactic sugar. `extends SessionStatefulPluginService` is identical
-/// to `extends StatefulPluginService<SessionPluginContext>` at runtime; the
+/// to `extends StatefulPluginService` at runtime; the
 /// alias just removes the need to spell out the type argument when the
 /// service is session-scoped and uses the conventional context. Use the
 /// explicit generic form when the service uses a custom session context

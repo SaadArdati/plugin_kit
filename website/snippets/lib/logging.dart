@@ -68,8 +68,13 @@ Future<void> handleLifecycleException() async {
 Future<void> handleRequestUnavailable(PluginContext context) async {
   try {
     await context.bus.request<String, int>('query');
-  } on RequestUnavailableException catch (e) {
-    print('No handler for ${e.requestType} -> ${e.responseType}: ${e.reason}');
+  } on RequestNotWiredException catch (e) {
+    // Almost always a wiring bug: register a handler with onRequest.
+    print('No handler for ${e.requestType} -> ${e.responseType}');
+  } on AllConcededException catch (e) {
+    // Every handler ran and returned null. If concession is legitimate
+    // at this call site, prefer maybeRequest instead of request.
+    print('All handlers conceded for ${e.requestType}: ${e.suggestion}');
   }
 }
 // #enddocregion logging-request-unavailable

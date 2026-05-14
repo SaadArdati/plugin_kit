@@ -106,11 +106,11 @@ void main() {
 PluginRuntime<DialogGlobalContext, SessionPluginContext>
 _createDialogRuntime() {
   final targetRuntime = PluginRuntime();
-  targetRuntime.init(settings: RuntimeSettings.empty());
+  targetRuntime.init(settings: RuntimeSettings());
 
   final controller = PluginKitDialogController(
     runtime: targetRuntime,
-    initialSettings: RuntimeSettings.empty(),
+    initialSettings: RuntimeSettings(),
   );
 
   return PluginRuntime<DialogGlobalContext, SessionPluginContext>(

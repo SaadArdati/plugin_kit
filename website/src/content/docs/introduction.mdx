@@ -15,7 +15,7 @@ Events flow between parts of your app that have never been formally introduced.
 It has no opinion about what your app does. It does not know about Flutter, servers, agents, editors,
 or any particular settings backend. You build those on top. The runtime stays the same.
 
-For the design philosophy and three core values, [Why Plugin Kit?](/why-plugin-kit/) is the short read.
+For the origin story and the design decisions that follow from it, [Why Plugin Kit?](/why-plugin-kit/) is the short read.
 
 ## What it looks like in real work
 
@@ -43,9 +43,9 @@ For the design philosophy and three core values, [Why Plugin Kit?](/why-plugin-k
 
 ## A small taste
 
-Two plugins claim the same `'greeter'` slot at different priorities; the runtime resolves to the winner. The full runnable program is in [Getting Started](/getting-started/).
+Two plugins claim the same `'system_prompt'` slot at different priorities; the runtime resolves to the winner. The chat plugin ships the default; a teammate's experimental plugin wins by asking for higher priority. Disable the experiment via settings and the original wins again, no code change at the call site. The full runnable program is in [Getting Started](/getting-started/).
 
-<Code code={extractRegion(pluginLifecycleDart, 'introduction-plugin-taste')} lang="dart" />
+<Code code={extractRegion(pluginLifecycleDart, 'system-prompt-taste')} lang="dart" />
 
 That move, features owning slots and slots resolving to the current winner, is the vocabulary the rest of the library is built on.
 
@@ -54,7 +54,7 @@ That move, features owning slots and slots resolving to the current winner, is t
 <CardGrid>
   <LinkCard
     title="Why Plugin Kit?"
-    description="The short read on the symptoms that motivate the library and the three values it is built around."
+    description="The short read on the origin story, the symptoms that motivate the library, and the design decisions that follow."
     href="/why-plugin-kit/"
   />
   <LinkCard

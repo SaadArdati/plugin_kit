@@ -25,9 +25,9 @@ For "why does it work this way" questions about design choices, see the [FAQ](/f
 
 **Cause.** Both fields on `PluginService` are declared `late`. They are stamped by the `ServiceRegistry` at resolution time, not at construction. If your test code constructs a service directly with `MyService()` and then reads `service.pluginId` before any `resolve<T>` call, you get `LateInitializationError`.
 
-**Fix.** Construct the service through a `ServiceRegistry` so resolution actually runs. The simplest path is to use a real plugin that registers it, then resolve from a test context. See the [Testing guide](/guides/testing/) for the level-1 pattern (no registry, useful only when you do not need the stamped identity), and level 2 (real registry, real bus) for when you do.
+**Fix.** Construct the service through a `ServiceRegistry` so resolution actually runs. The simplest path is to register the service through its owning plugin and resolve from a test context. See the [Testing guide](/guides/testing/): the "does this service compute correctly?" section covers pure-logic tests that do not need the stamped identity; the "does it interact with the bus and registry?" section uses `SessionPluginContext.stub()` plus a registered service so `pluginId` and `serviceId` are populated.
 
-If you only need to test pure logic that does not read `pluginId` or `serviceId`, level 1 is fine. The moment your assertions touch identity, step up.
+If your assertions never read `pluginId` or `serviceId`, the pure-logic path is enough. The moment they touch identity, resolve through a registry instead.
 
 ### I get a `StateError` on `runtime.init` or `runtime.createSession` mentioning a missing factory
 
@@ -90,7 +90,7 @@ If you wanted reconciliation and got silence, you almost certainly called the sn
 
 The most common cause is forgetting to enable it. `RuntimeSettings` controls plugin enablement, and a plugin not listed in the active settings is not attached. Plugins with `FeatureFlag.experimental` are disabled by default and require explicit opt-in. Plugins with `FeatureFlag.locked` are always enabled and cannot be turned off.
 
-Pass `defaultEnabledPluginIds` to `runtime.init` if you want a specific subset enabled at startup, or build a `RuntimeSettings` that lists your plugins and pass that.
+Build a `RuntimeSettings` that lists your plugins and pass it to `runtime.init`.
 
 The next most common cause is a dependency that is not enabled. The runtime auto-disables a plugin whose declared `dependencies` are missing, and logs a warning. Look for a `WARNING` log entry mentioning your plugin id and the unmet dependency.
 
@@ -131,7 +131,7 @@ runtime.init(
 );
 ```
 
-The policy is set once on `init` and is read by every subsequent `createSession` / `updateSessionSettings` / `updateGlobalSettings` call on the same runtime.
+The policy is set once on `init` and is read by every subsequent `createSession` / `updateSessionSettings` / `updateGlobalSettings` call on the same runtime. See [`PluginRuntime` in the reference](/reference/plugins-and-lifecycle/#pluginruntimeg-s) for the full constructor signature and the rest of the runtime-level parameters.
 
 ## Service resolution issues
 

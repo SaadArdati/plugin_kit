@@ -5,7 +5,7 @@ import 'package:plugin_kit/plugin_kit.dart';
 /// observed on a [PluginSession] bus.
 ///
 /// Implements [ValueListenable] so it composes with any consumer of the
-/// foundation listenable interface — `ChangeNotifierProvider`,
+/// foundation listenable interface: `ChangeNotifierProvider`,
 /// `ValueListenableBuilder`, `ValueListenableProvider`, custom
 /// state-management glue. This package never imports a specific state
 /// library; the `Listenable` shape is the integration point.

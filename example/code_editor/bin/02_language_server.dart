@@ -3,9 +3,11 @@
 /// The event bus as a request/response channel.
 ///
 /// Both [SqlLanguagePlugin] and [DartLanguagePlugin] register
-/// `CompletionRequest -> CompletionResponse?` handlers via stateful
+/// `CompletionRequest -> CompletionResponse` handlers via stateful
 /// services. Each handler inspects the document's `languageId` and
 /// returns completions only when the language matches, or null to concede.
+/// Consumers call `maybeRequest` so a no-answer outcome surfaces as a
+/// plain `null` return, not an exception.
 library;
 
 import 'package:code_editor/code_editor.dart';
@@ -26,7 +28,7 @@ Future<void> main() async {
   );
 
   final sqlResponse = await session
-      .request<CompletionRequest, CompletionResponse?>(
+      .maybeRequest<CompletionRequest, CompletionResponse>(
         CompletionRequest(document: sqlDoc, line: 0, column: 14),
       );
 
@@ -46,7 +48,7 @@ Future<void> main() async {
   );
 
   final dartResponse = await session
-      .request<CompletionRequest, CompletionResponse?>(
+      .maybeRequest<CompletionRequest, CompletionResponse>(
         CompletionRequest(document: dartDoc, line: 0, column: 13),
       );
 

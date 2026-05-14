@@ -102,7 +102,13 @@ void main() {
         // permanently locked out. Start with the throwing plugin disabled
         // so init() does not blow up; the toggle-on call is what raises.
         final runtime = PluginRuntime(plugins: [_ThrowingOnEnablePlugin()])
-          ..init(defaultEnabledPluginIds: const {});
+          ..init(
+            settings: const RuntimeSettings(
+              plugins: {
+                PluginId('throw_on_enable'): PluginConfig(enabled: false),
+              },
+            ),
+          );
 
         try {
           await runtime.updateSettings(

@@ -36,15 +36,15 @@ PluginRuntime<DialogGlobalContext, SessionPluginContext> _dialogRuntime(
   List<Plugin> plugins,
 ) {
   final target = PluginRuntime();
-  target.init(settings: RuntimeSettings.empty());
+  target.init(settings: RuntimeSettings());
   final controller = PluginKitDialogController(
     runtime: target,
-    initialSettings: RuntimeSettings.empty(),
+    initialSettings: RuntimeSettings(),
   );
   return PluginRuntime<DialogGlobalContext, SessionPluginContext>(
     plugins: plugins,
   )..init(
-    settings: RuntimeSettings.empty(),
+    settings: RuntimeSettings(),
     globalContextFactory: (registry, bus, sessions) => DialogGlobalContext(
       registry: registry,
       bus: bus,

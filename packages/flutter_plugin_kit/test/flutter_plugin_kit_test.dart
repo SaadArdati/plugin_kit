@@ -1612,9 +1612,7 @@ class _ListenerProbeState extends State<_ListenerProbe>
   @override
   void initState() {
     super.initState();
-    listen<_Ping>(
-      (envelope) => setState(() => _value = envelope.event.value),
-    );
+    listen<_Ping>((envelope) => setState(() => _value = envelope.event.value));
   }
 
   @override
@@ -1666,9 +1664,7 @@ class _WidgetSessionProbeState extends State<_WidgetSessionProbe>
   @override
   void initState() {
     super.initState();
-    listen<_Ping>(
-      (envelope) => setState(() => _value = envelope.event.value),
-    );
+    listen<_Ping>((envelope) => setState(() => _value = envelope.event.value));
   }
 
   @override

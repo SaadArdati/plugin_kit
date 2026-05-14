@@ -3,7 +3,9 @@ title: The villain_lair scenarios
 description: Fifteen runnable Dart scenarios in example/villain_lair/, each isolating one piece of the runtime. This page maps each scenario to the concept it demonstrates.
 ---
 
-import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+
+import {CardGrid, LinkCard} from '@astrojs/starlight/components';
 
 `example/villain_lair/` is fifteen runnable Dart programs, one per file, each isolating one piece of the runtime. The cast (Dr. Nefarious, Gary, Janet, Mr. Whiskers, Doug) is window dressing that helps the file read; the substance is in the API calls and the plugin shapes.
 
@@ -111,36 +113,27 @@ The capstone. A full multi-plugin system in one file: a global coordinator, sess
 
 Concepts: every concept page touches this one.
 
-## Reading paths
-
-| If you are... | Read |
-|---|---|
-| New to the library | 01, 02, 04, 05 |
-| Learning the event bus | 02, 03, 06, 11, 14 |
-| Wiring runtime customization | 08, 09, 13 |
-| Stress-testing the model | 12, 15 |
-
 ## Where to next
 
 <CardGrid>
-  <LinkCard
-    title="Adding a Plugin"
-    description="The how-to guide. Take what scenarios 01 and 05 demonstrate and put it in your own app."
-    href="/guides/adding-a-plugin/"
-  />
-  <LinkCard
-    title="Concepts"
-    description="The mental model. Each scenario above links to the concept page that explains why the API behaves as it does."
-    href="/concepts/"
-  />
-  <LinkCard
-    title="API reference"
-    description="Lookup-shaped reference for the public types. Use it after a scenario introduces you to something."
-    href="/reference/"
-  />
-  <LinkCard
-    title="Read the source"
-    description="example/villain_lair/bin/. Fifteen self-contained Dart programs."
-    href="https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair"
-  />
+    <LinkCard
+        title="Adding a Plugin"
+        description="The how-to guide. Take what scenarios 01 and 05 demonstrate and put it in your own app."
+        href="/guides/adding-a-plugin/"
+    />
+    <LinkCard
+        title="Concepts"
+        description="The mental model. Each scenario above links to the concept page that explains why the API behaves as it does."
+        href="/concepts/"
+    />
+    <LinkCard
+        title="API reference"
+        description="Lookup-shaped reference for the public types. Use it after a scenario introduces you to something."
+        href="/reference/"
+    />
+    <LinkCard
+        title="Read the source"
+        description="example/villain_lair/bin/. Fifteen self-contained Dart programs."
+        href="https://github.com/SaadArdati/plugin_kit/tree/main/example/villain_lair"
+    />
 </CardGrid>

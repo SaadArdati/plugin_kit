@@ -11,13 +11,12 @@ final settings = RuntimeSettings(
     const PluginId('experimental_router'): const PluginConfig(enabled: false),
   },
   services: {
-    const PluginId(
-      'linter_suite',
-    ).service('line_length_linter'): const ServiceSettings(
-      config: {'max_line_length': 120},
+    const PluginId('linter_suite').service('line_length_linter'):
+        const ServiceSettings(config: {'max_line_length': 120}),
+    PluginId.wildcard.service('agent_service'): const ServiceSettings(
+      priority: 200,
+      config: {'provider': 'openai'},
     ),
-    PluginId.wildcard.service('agent_service'):
-        const ServiceSettings(priority: 200, config: {'provider': 'openai'}),
   },
 );
 // #enddocregion runtime-settings-construct
@@ -96,8 +95,27 @@ const pluginConfig = PluginConfig(
 // #enddocregion plugin-config-construct
 
 // #docregion runtime-settings-empty
-const emptySettings = RuntimeSettings.empty();
+const emptySettings = RuntimeSettings();
 // #enddocregion runtime-settings-empty
+
+// #docregion runtime-settings-wildcard-follows-winner
+/// Two plugins both register `model_router`. The wildcard supplies
+/// `temperature: 0.5`; the plugin-specific entry on `beta` only bumps
+/// priority. Result: `beta` is now the winning registration, and it
+/// resolves with `temperature: 0.5` from the wildcard. The wildcard
+/// targets the slot, not a plugin, so it follows whichever registration
+/// currently wins.
+final wildcardFollowsWinner = RuntimeSettings(
+  services: {
+    PluginId.wildcard.service('model_router'): const ServiceSettings(
+      config: {'temperature': 0.5},
+    ),
+    const PluginId('beta').service('model_router'): const ServiceSettings(
+      priority: 200,
+    ),
+  },
+);
+// #enddocregion runtime-settings-wildcard-follows-winner
 
 // #docregion runtime-settings-pin-json
 /// Demonstrates constructing [RuntimeSettings] with [Pin] keys and
@@ -173,16 +191,16 @@ void demonstrateConfigNodeListMap() {
 }
 // #enddocregion config-node-list-map
 
-// #docregion config-node-raw
 /// Demonstrates config.raw for untyped passthrough.
 void demonstrateConfigNodeRaw() {
+  // #docregion config-node-raw
   const node = ConfigNode({
     'advanced_payload': {'nested': true},
   });
   final payload = node.raw('advanced_payload');
   print(payload);
+  // #enddocregion config-node-raw
 }
-// #enddocregion config-node-raw
 
 // #docregion config-node-defaults
 /// Demonstrates applying defaults via ?? at the call site.

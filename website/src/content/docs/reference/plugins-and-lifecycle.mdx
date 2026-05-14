@@ -57,8 +57,8 @@ abstract class Plugin {
 | `dependencies` | Set of `PluginId`s this plugin requires. The runtime auto-disables a plugin whose dependency is not enabled. Locked plugins with unmet dependencies stay enabled and log at severe. |
 | `featureFlags` | Behavioral flags. Used by the runtime to set default enablement and by UI to render badges. |
 | `register` | Contributes services to the registry. Called once per scope on every enabled plugin before any `attach` runs. |
-| `attach` | Called after every plugin in the scope has registered. Subscribe to events here, not in `register`. Pure user hook with a no-op base implementation; do not call `super.attach`. The runtime binds the context and attaches owned `StatefulPluginService`s around your hook. |
-| `detach` | Mirror of attach. Pure user hook with a no-op base implementation; do not call `super.detach`. The runtime detaches owned services, cancels tracked plugin subscriptions, and clears the bound context around your hook. |
+| `attach` | Called after every plugin in the scope has registered. Subscribe to events here, not in `register`. Pure user hook with a no-op base implementation; do not call `super.attach`. The runtime attaches owned `StatefulPluginService`s before your hook runs, so the plugin's `attach(context)` can resolve and use its own services. |
+| `detach` | Mirror of attach. Pure user hook with a no-op base implementation; do not call `super.detach`. After your hook returns, the runtime detaches owned services and cancels every subscription and binding registered via `PluginHelper.on(context, ...)` / `bind(context, ...)`. |
 | `onPluginSettingsChanged` | Called for plugins that remain enabled across a settings update. Newly enabled or disabled plugins go through full attach/detach instead. |
 
 Equality is on `(runtimeType, pluginId)`. A `GlobalPlugin('x')` and a `SessionPlugin('x')` are distinct instances and do not collide.
@@ -137,7 +137,7 @@ Emit on `context.bus` for in-session communication, on `context.globalBus` to re
 
 ## `PluginSession<K>`
 
-A scoped session with its own registry, bus, and plugin attachments. The runtime constructs and tracks `PluginSession` instances; you receive them from `PluginRuntime.createSession` (or `PluginRuntime.createSession`) and dispose them when the session ends.
+A scoped session with its own registry, bus, and plugin attachments. The runtime constructs and tracks `PluginSession` instances; you receive them from `PluginRuntime.createSession` and dispose them when the session ends.
 
 <Code code={extractRegion(pluginLifecycleSource, 'session-plugin-attach')} lang="dart" />
 
@@ -154,7 +154,7 @@ A scoped session with its own registry, bus, and plugin attachments. The runtime
 
 ## `PluginRuntime<G, S>`
 
-The lifecycle engine. Owns the global scope, creates sessions, runs reconciliation. Type parameters: `G extends GlobalPluginContext` is the global context class, `S extends SessionPluginContext` is the session context class. Use the defaults when you do not need extra fields.
+The lifecycle engine. Owns the global scope, creates sessions, runs reconciliation. Generic over the global and session context types: `G extends GlobalPluginContext` and `S extends SessionPluginContext`. Use the defaults when you do not need custom fields; otherwise supply `globalContextFactory` to `init` and `contextFactory` to `createSession` so the runtime can construct your subtype.
 
 ```dart
 class PluginRuntime<G extends GlobalPluginContext, S extends SessionPluginContext> {
@@ -177,7 +177,6 @@ class PluginRuntime<G extends GlobalPluginContext, S extends SessionPluginContex
 
   PluginRuntime init({
     RuntimeSettings? settings,
-    Set<PluginId>? defaultEnabledPluginIds,
     GlobalContextFactory<G, S>? globalContextFactory,
     UnknownReferencePolicy unknownReferencePolicy =
         UnknownReferencePolicy.throwError,
@@ -221,7 +220,7 @@ Order of operations:
 4. Call `updateGlobalSettings` or `updateSessionSettings` to reconcile a settings change. The runtime diffs old against new, runs detach for newly disabled plugins, register/attach for newly enabled, and `onPluginSettingsChanged` for survivors.
 5. Call `dispose` once at shutdown. The runtime detaches global plugins, disposes every session, and disposes the global bus.
 
-`init` accepts `defaultEnabledPluginIds`. When `null`, plugins are enabled by default except those marked with `FeatureFlag.experimental`, which default off; when non-null, only listed ids are enabled by default. Explicit `RuntimeSettings.plugins` entries always override these defaults.
+Plugin enablement falls back through three rules: an explicit `RuntimeSettings.plugins` entry wins, then `FeatureFlag.locked` plugins are always on, then `FeatureFlag.experimental` plugins default off while all other plugins default on. Build a `RuntimeSettings` listing the subset you want enabled and pass it to `init` (or to `updateSettings` later).
 
 `globalContextFactory` is required when `G` is a custom subtype of `GlobalPluginContext`. The default factory builds a base `GlobalPluginContext`, which cannot be cast to a tighter type. Same rule for `contextFactory` on `createSession` when `S` is custom.
 
@@ -242,7 +241,7 @@ When attach throws inside `init`, `createSession`, or a settings update, the run
 | `isPluginEnabled` | Pass an explicit `RuntimeSettings` to preview, omit it to query the current snapshot. |
 | `updateSettings` | Full reconciliation: runs `updateGlobalSettings`, then `updateSessionSettings` for every active session sequentially in insertion order, then publishes the new snapshot. A failure in any phase aborts and preserves the prior snapshot. |
 | `updateSettingsSnapshot` | Stores and publishes the new snapshot without any lifecycle work. Use when listeners need to see the change but the runtime has already converged (or you intend to converge it later). |
-| `resetSettings` | Replaces stored settings with `RuntimeSettings.empty()`. No reconciliation. |
+| `resetSettings` | Replaces stored settings with `RuntimeSettings()`. No reconciliation. |
 
 <Code code={extractRegion(pluginLifecycleSource, 'runtime-update-snapshot')} lang="dart" />
 
@@ -255,7 +254,7 @@ Within a scope, every enabled plugin finishes each phase before any plugin start
 | Phase | When | What runs |
 |---|---|---|
 | `register` | During `runtime.init` (global) or `runtime.createSession` (session) | `plugin.register(scopedRegistry)` populates the registry. No bus access yet. |
-| `attach` | After every plugin in the scope has registered | The runtime binds the context, calls `plugin.attach(context)`, and attaches owned `StatefulPluginService`s. Plugins subscribe to events here. |
+| `attach` | After every plugin in the scope has registered | The runtime attaches owned `StatefulPluginService`s, then calls `plugin.attach(context)`. Plugins subscribe to events here. |
 | `onPluginSettingsChanged` | During `updateGlobalSettings` or `updateSessionSettings` for plugins enabled both before and after | Receives `oldContext` and `newContext` so the plugin can diff and react. |
 | `detach` | During `dispose`, or during a settings update for a plugin transitioning enabled to disabled | The runtime calls `plugin.detach(context)`, detaches owned services, cancels tracked subscriptions, and clears the bound context. |
 

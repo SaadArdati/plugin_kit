@@ -12,7 +12,7 @@ dependencies:
   flutter:
     sdk: flutter
   collection: ^1.19.1
-  plugin_kit: ^1.0.0
+  plugin_kit: ^0.1.0
 
 dev_dependencies:
   flutter_test:

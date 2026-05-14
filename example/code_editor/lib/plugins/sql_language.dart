@@ -304,7 +304,7 @@ class _SqlCompletionHandler extends SessionStatefulPluginService {
 
   @override
   void attach() {
-    onRequest<CompletionRequest, CompletionResponse?>((request) async {
+    onRequest<CompletionRequest, CompletionResponse>((request) async {
       final doc = request.event.document;
       if (doc.languageId != 'sql') return null;
       return const CompletionResponse(_items);

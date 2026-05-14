@@ -8,7 +8,7 @@ import 'session_scope.dart';
 /// changes.
 ///
 /// Bindings are registered via [listen] and [rebuildOn]. Both are
-/// callable from any lifecycle callback, including [State.initState] —
+/// callable from any lifecycle callback, including [State.initState];
 /// they only append to an internal descriptor list and the mixin
 /// activates them when a session becomes available.
 ///

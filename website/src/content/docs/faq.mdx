@@ -9,11 +9,22 @@ This page answers the recurring "why does it work this way" questions. Symptom-d
 
 ## Design and architecture
 
+### When should I not use Plugin Kit?
+
+If your app has one HTTP client, one auth service, one analytics service, and a few screens that call them, use the boring thing. Plugin Kit earns its weight when behavior needs to be replaced, layered, disabled, overridden, or vetoed while the app is running, and settings have stopped being data your app reads and started being something that actively reshapes the system. If you do not have those needs yet, adding Plugin Kit is overhead with no payoff.
+
 ### Should I use Plugin Kit, Provider, Riverpod, Bloc, or GetIt?
 
-There's overlap. Plugin Kit's primary job is runtime-replaceable behavior at the plugin boundary: priority-resolved services, typed event coordination, and a settings model that survives session lifetimes. The registry doubles as DI; the bus doubles as a state-update channel. Provider, Riverpod, Bloc, and GetIt cover the same DI/state-update space at the app layer with mature widget integrations.
+**State management owns presentation state. Plugin Kit owns participation.** They answer different questions.
 
-Most apps keep both because the libraries are cheap to add and the widget ergonomics (`context.watch`, `BlocBuilder`, `ref.watch`) pay for themselves. Some apps drop the state library and let the bus do that work; the reference `code_editor` example takes that path with plain `setState`. Either is fine; we don't pick for you.
+- A chat screen showing messages is presentation state.
+- A plugin deciding whether it wants to enrich an outgoing prompt is participation.
+- A model selector showing the current model is presentation state.
+- The list of available models changing because provider plugins were enabled or disabled is participation.
+- A loading spinner is presentation state.
+- A fallback provider taking over because the first one is unavailable is participation.
+
+Most apps keep both. Provider, Riverpod, Bloc, and GetIt cover the DI / widget-rebuild space at the app layer with mature widget integrations. Plugin Kit owns the runtime protocol underneath: priority-resolved services, typed event coordination, settings-driven plugin enable/disable. The registry doubles as DI; the bus doubles as a state-update channel. Some apps drop the state library and let the bus do that work; the reference `code_editor` example takes that path with plain `setState`. Either is fine.
 
 The [Migrating a Flutter App](/guides/migrating-flutter-app/) guide covers the canonical bridges (Provider/`ChangeNotifier`, Riverpod notifiers that surface bus events as `AsyncValue`, Cubits that translate user intents into `emit()` calls), and flags where those bridges turn into pure forwarding. If you have an existing app, that page is the right starting point.
 

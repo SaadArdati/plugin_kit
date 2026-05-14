@@ -1,9 +1,9 @@
 ---
 title: Plugin Kit
-description: A runtime for Dart and Flutter apps with real lifecycles, replaceable services, and isolated sessions.
+description: A Dart plugin runtime for apps that have grown into platforms. Replaceable services, isolated sessions, settings that reshape the running system.
 template: splash
 hero:
-  tagline: A plugin runtime for Dart and Flutter apps that have grown into platforms.
+  tagline: For apps where "just add a flag" has become the beginning of every bug.
   actions:
     - text: Introduction
       link: /introduction/
@@ -26,10 +26,14 @@ that have never been formally introduced.
 ## What it unlocks
 
 <CardGrid stagger>
+	<Card title="Toggle features live" icon="setting">
+		A customization dialog enables, disables, and reprioritizes plugins at
+		runtime. The runtime detaches losers, attaches winners, and keeps the
+		session coherent across the swap.
+	</Card>
 	<Card title="Swap features, not screens" icon="random">
 		A model selector, search box, or editor tool targets a slot instead of a
 		concrete service. The UI stays put while plugins compete underneath it.
-		Override stops being a code smell.
 	</Card>
 	<Card title="Open two sessions safely" icon="approve-check-circle">
 		Two chats, documents, or workspaces get separate registries, buses, and
@@ -41,12 +45,11 @@ that have never been formally introduced.
 		stop it entirely. The button that started it does not need to know who
 		helped or interfered.
 	</Card>
-	<Card title="Toggle features live" icon="setting">
-		A customization dialog enables, disables, and reprioritizes plugins at
-		runtime. The runtime detaches losers, attaches winners, and keeps the
-		session coherent across the swap.
-	</Card>
 </CardGrid>
+
+## Most apps don't need this
+
+If your app has one HTTP client, one auth service, and a few screens that call them, use the boring thing. Plugin Kit earns its weight when behavior needs to be replaced, layered, disabled, overridden, or vetoed while the app is running, and settings have stopped being data your app reads and started being something that actively reshapes the system. If you are wiring features by hand and noticing the same scaffolding for the third time, this is built for that case.
 
 ## Four primitives, composed
 
@@ -74,7 +77,7 @@ that have never been formally introduced.
 <CardGrid>
 	<LinkCard
 		title="Why Plugin Kit?"
-		description="The short read. The symptoms that motivate the library and the three values it is built around."
+		description="The short read. The origin story, the symptoms that motivate the library, and the design decisions that follow."
 		href="/why-plugin-kit/"
 	/>
 	<LinkCard

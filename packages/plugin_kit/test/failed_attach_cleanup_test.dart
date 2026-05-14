@@ -33,8 +33,7 @@ int _markerHandlerCount = 0;
 /// failed-attach cleanup detaches the service that already succeeded:
 /// a stranded subscription would still fire when the corresponding bus
 /// emits, bumping the module-level counter.
-class _SubscribingServiceBeforeFailure
-    extends StatefulPluginService<SessionPluginContext> {
+class _SubscribingServiceBeforeFailure extends StatefulPluginService {
   @override
   void attach() {
     on<_MarkerEvent>((env) {
@@ -74,8 +73,19 @@ void main() {
       'attach-time subscription is cancelled (no longer fires on emit)',
       () async {
         final plugin = _PluginThatAttachesAndThenThrows();
+        // Start with the plugin disabled so the failure surfaces via the
+        // off->on transition driven by updateSessionSettings, not on the
+        // initial createSession.
         final runtime = PluginRuntime(plugins: [plugin])
-          ..init(defaultEnabledPluginIds: const {});
+          ..init(
+            settings: const RuntimeSettings(
+              plugins: {
+                PluginId('attach_throws_after_service'): PluginConfig(
+                  enabled: false,
+                ),
+              },
+            ),
+          );
         final session = await runtime.createSession();
 
         // Trigger the failure path via settings reconciliation.

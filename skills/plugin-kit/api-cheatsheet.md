@@ -128,10 +128,10 @@ Failure isolation during attach/detach:
 
 FeatureFlag (`Plugin.featureFlags`):
 - `.locked`: always enabled; cannot be disabled via `RuntimeSettings`.
-- `.experimental`: disabled by default; requires opt-in via `RuntimeSettings` or by inclusion in `defaultEnabledPluginIds`.
+- `.experimental`: disabled by default; requires opt-in via an explicit `RuntimeSettings.plugins[id]` entry with `enabled: true`.
 - Custom flags: `const FeatureFlag('your_string')`. Zero-cost extension type over String.
 
-`PluginRuntime.init(defaultEnabledPluginIds: null)`: every non-experimental plugin is on by default. Non-null: only listed ids are on (experimental is overridden by explicit inclusion).
+Enablement precedence per plugin (highest to lowest): `.locked` (forced on) → explicit `RuntimeSettings.plugins[id].enabled` → experimental heuristic (non-experimental defaults on, `.experimental` defaults off). Build a `RuntimeSettings` listing the subset you want enabled to override the defaults.
 
 Scope:
 - `GlobalPlugin<G extends GlobalPluginContext>`: one instance per runtime; lifetime equals runtime.
@@ -141,7 +141,7 @@ User hooks never call super. `attach`, `detach`, and `onSettingsInjected` are fr
 
 Default-context generics are inferred. `extends SessionPlugin` infers `<SessionPluginContext>`; `extends GlobalPlugin` infers `<GlobalPluginContext>`; `PluginRuntime` and `PluginRuntime` default to `<GlobalPluginContext, SessionPluginContext>`; `PluginSession` defaults to `<SessionPluginContext>`. Spell the type parameters out only when using a custom context subclass.
 
-`StatefulPluginService<PKC extends PluginContext>` has a wider bound because it serves both global and session scopes. Bare `extends StatefulPluginService` infers `<PluginContext>`. Two typedef aliases give you the common cases without spelling the generic: `extends SessionStatefulPluginService` for session-scoped (`StatefulPluginService<SessionPluginContext>`), `extends GlobalStatefulPluginService` for global-scoped (`StatefulPluginService<GlobalPluginContext>`). Pure syntactic sugar; the explicit form still works.
+`StatefulPluginService<PKC extends PluginContext>` has a wider bound because it serves both global and session scopes. Bare `extends StatefulPluginService` infers `<PluginContext>`. Two typedef aliases give you the common cases without spelling the generic: `extends SessionStatefulPluginService` for session-scoped (`StatefulPluginService`), `extends GlobalStatefulPluginService` for global-scoped (`StatefulPluginService<GlobalPluginContext>`). Pure syntactic sugar; the explicit form still works.
 
 Plugin helpers (context required, auto-tracked per-context):
 - `on<E>(context, handler, {priority, identifier})` returns `EventSubscription`
@@ -191,23 +191,35 @@ Factory:        runs on every resolve. Rejects StatefulPluginService (lifecycle 
 Resolution from a context:
 ```dart
 /// Demonstrates request/response patterns on a standalone bus.
+///
+/// Handlers concede by returning `null` regardless of whether [Response]
+/// is nullable. Consumers pick between two methods at the call site:
+/// `maybeRequest` (canonical, returns null when nobody answered) and
+/// `request` (assertion variant, throws when nobody answered).
 Future<void> demonstrateRequestPatterns(PluginContext context) async {
-  // Nullable Response enables fall-through.
-  context.bus.onRequest<SearchQuery, SearchResults?>((env) async {
-    if (env.event.q.isEmpty) return null; // concede
+  context.bus.onRequest<SearchQuery, SearchResults>((env) async {
+    if (env.event.q.isEmpty) return null; // concede; next handler may claim
     return const SearchResults(results: ['result']);
   });
 
-  final response = await context.bus.request<SearchQuery, SearchResults?>(
+  // Assertion variant: throws AllConcededException if every handler
+  // conceded. Use only when at least one handler is guaranteed to claim.
+  final response = await context.bus.request<SearchQuery, SearchResults>(
+    const SearchQuery(q: 'dart patterns'),
+  );
+
+  // Canonical: returns null when nobody answered.
+  final maybe = await context.bus.maybeRequest<SearchQuery, SearchResults>(
     const SearchQuery(),
   );
-  final maybe = await context.bus.maybeRequest<SearchQuery, SearchResults?>(
-    const SearchQuery(),
+
+  // Sync assertion variant: same throws-on-no-answer semantics.
+  final sync = context.bus.requestSync<SearchQuery, SearchResults>(
+    const SearchQuery(q: 'dart patterns'),
   );
-  final sync = context.bus.requestSync<SearchQuery, SearchResults?>(
-    const SearchQuery(),
-  );
-  final maybeSync = context.bus.maybeRequestSync<SearchQuery, SearchResults?>(
+
+  // Sync canonical: returns null when nobody answered.
+  final maybeSync = context.bus.maybeRequestSync<SearchQuery, SearchResults>(
     const SearchQuery(),
   );
 
@@ -296,22 +308,22 @@ envelope.identifier;
 
 Requests:
 ```dart
-onRequest<RequestType, ResponseType?>((envelope) async {
+onRequest<RequestType, ResponseType>((envelope) async {
   if (canHandle) return ResponseType(...);
-  return null;            // null concedes; next handler tries
+  return null;            // null concedes; next handler tries (works even when Response is non-nullable)
 });
 
-final response  = await context.bus.request<RequestType, ResponseType?>(req);
-final maybe     = await context.bus.maybeRequest<RequestType, ResponseType?>(req);
+final maybe     = await context.bus.maybeRequest<RequestType, ResponseType>(req);   // canonical
+final response  = await context.bus.request<RequestType, ResponseType>(req);        // assertion variant; throws on no-answer
+final maybeSync = context.bus.maybeRequestSync<RequestType, ResponseType>(req);
 final sync      = context.bus.requestSync<RequestType, ResponseType>(req);
-final maybeSync = context.bus.maybeRequestSync<RequestType, ResponseType?>(req);
 ```
 
-Nullable `Response` enables fall-through. Non-nullable forces a winner or throws.
+Handlers concede by returning `null` regardless of whether `Response` is nullable. Pick `maybeRequest` / `maybeRequestSync` (canonical, returns null on no-answer) or `request` / `requestSync` (assertion variant, throws on no-answer; use only when at least one handler is guaranteed to claim).
 
 Failure shape:
-- `request` / `requestSync` throw `RequestUnavailableException` (`plugin/exceptions.dart`) carrying a `RequestUnavailableReason` enum: `noRegistration` (no handler for the `(Request, Response)` type pair), `noMatchingHandler` (handlers exist but none match the requested identifier scope), or `allConceded` (every handler ran and returned null on a non-nullable `Response`).
-- `maybeRequest` / `maybeRequestSync` convert ONLY that exception to null. Handler-thrown exceptions propagate; `null` means "request unavailable," not "handler crashed." Catch `RequestUnavailableException` and switch on `reason` to distinguish.
+- `request` / `requestSync` throw a `NoRequestAnswerException` subtype (`plugin/exceptions.dart`): `RequestNotWiredException` (no handler for the `(Request, Response)` type pair, or handlers exist but none match the requested identifier; carries `wasIdentifierMismatch` to distinguish) or `AllConcededException` (every handler ran and returned null on a non-nullable `Response`; message recommends `maybeRequest`).
+- `maybeRequest` / `maybeRequestSync` catch the sealed `NoRequestAnswerException` base and return null. Handler-thrown exceptions propagate unchanged through both methods; `null` from `maybeRequest` means "no one answered," not "a handler crashed." Catch `RequestNotWiredException` / `AllConcededException` separately, or the sealed base, when you need to distinguish at the catch site.
 
 Type-agnostic taps:
 ```dart
@@ -365,16 +377,16 @@ Map<String, dynamic> roundTripJson() {
 
 `const RuntimeSettings(...)` is const-evaluable when every key uses `Pin.fromWire('plugin:service')` and every value (`ServiceSettings(...)`) is const AND every config-map value is const-evaluable. The runtime constructors `Pin(plugin, segments)` / `Pin.wildcard(segments)` and `pluginId.service(...)` join segments at runtime, so settings using them must be `final`. Default to `final` since RuntimeSettings is typically built from JSON anyway; reach for `const` only when configs are fully literal and you want compile-time evaluation.
 
-`const RuntimeSettings.empty()` for an empty settings literal.
+`const RuntimeSettings()` for an empty settings literal.
 
 ## Sessions (`plugin/runtime.dart`)
 
 ```dart
 final runtime = PluginRuntime(plugins: [/* ... */]);
-runtime.init(settings: const RuntimeSettings.empty());
+runtime.init(settings: const RuntimeSettings());
 
 final session = await runtime.createSession(
-  settings: const RuntimeSettings.empty(),
+  settings: const RuntimeSettings(),
   contextFactory: (registry, sessionBus, globalBus) => MySessionContext(
     registry: registry,
     bus: sessionBus,
@@ -410,8 +422,7 @@ The lifecycle engine. Holds the current settings snapshot, exposes a stream, and
 ```dart
 final runtime = PluginRuntime(plugins: [/* ... */]);
 runtime.init(
-  settings: const RuntimeSettings.empty(),
-  defaultEnabledPluginIds: null,   // null: all on except experimental; non-null: only listed are on
+  settings: const RuntimeSettings(),
   // unknownReferencePolicy: defaults to throwError. Pass logAndSkip on production
   // load paths that read cached settings across app upgrades (renamed/removed ids
   // would otherwise crash startup). See "Validation" below.
@@ -438,7 +449,7 @@ runtime.resetSettings();
 await runtime.dispose();
 ```
 
-`enabledPlugins` reports settings-intent: locked + explicit settings + `defaultEnabledPluginIds` whitelist (when non-null) + experimental heuristic. Does not account for dependency cascade. `attachedPlugins` reports the post-cascade effective set the runtime actually attached. A plugin enabled in settings but cascade-disabled because its dependency is off appears in `enabledPlugins` but not `attachedPlugins`. Use `enabledPlugins` for settings UI; `attachedPlugins` for "is it actually running."
+`enabledPlugins` reports settings-intent: locked + explicit settings + experimental heuristic. Does not account for dependency cascade. `attachedPlugins` reports the post-cascade effective set the runtime actually attached. A plugin enabled in settings but cascade-disabled because its dependency is off appears in `enabledPlugins` but not `attachedPlugins`. Use `enabledPlugins` for settings UI; `attachedPlugins` for "is it actually running."
 
 `updateSettings` runs strictly sequentially (global reconcile first, then each session in order) and updates the stored snapshot only after all reconciles complete. If any reconcile throws, the snapshot stays at the previous value.
 
@@ -484,7 +495,7 @@ Plugin and service code stays the same. The mixins are widget-side adapters; the
 - `packages/plugin_kit/lib/src/plugin/core.dart`: Plugin base, FeatureFlag
 - `packages/plugin_kit/lib/src/plugin/plugin.dart`: GlobalPlugin, SessionPlugin
 - `packages/plugin_kit/lib/src/plugin/service.dart`: PluginService, StatefulPluginService, SessionStatefulPluginService / GlobalStatefulPluginService aliases
-- `packages/plugin_kit/lib/src/plugin/exceptions.dart`: PluginLifecycleException, PluginStepAggregateException, RequestUnavailableException
+- `packages/plugin_kit/lib/src/plugin/exceptions.dart`: PluginLifecycleException, PluginStepAggregateException, NoRequestAnswerException (sealed), RequestNotWiredException, AllConcededException
 - `packages/plugin_kit/lib/src/plugin/extensions.dart`: helpers
 - `packages/plugin_kit/lib/src/types.dart`: PluginContext variants
 - `packages/plugin_kit/lib/src/service_registry.dart`: ServiceRegistry, ScopedServiceRegistry

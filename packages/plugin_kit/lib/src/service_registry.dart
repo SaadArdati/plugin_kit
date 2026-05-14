@@ -51,7 +51,7 @@ sealed class RegistrationWrapper<T extends Object> {
   /// Read-only at the public surface. The registry itself owns mutation.
   int get priority => _priority;
 
-  /// The priority this wrapper was originally registered with — i.e.,
+  /// The priority this wrapper was originally registered with, i.e.,
   /// the value passed to `registerFactory` / `registerSingleton` /
   /// `registerLazySingleton`. Independent of any override applied later.
   final int basePriority;
@@ -416,33 +416,101 @@ class ServiceRegistry {
     return wrapper.basePriority;
   }
 
-  /// Returns the [LocalPluginOverride] to use for injecting settings into
-  /// the service registered by [wrapper] for [serviceId].
+  /// Returns the effective [LocalPluginOverride] for the service registered
+  /// by [wrapper] for [serviceId], merging every plugin-specific row with
+  /// every winner-scoped ([PluginId.winnerScoped]) row knob-by-knob.
   ///
-  /// Prefers a plugin-specific override, then falls back to a winner-scoped
-  /// ([PluginId.winnerScoped]) override.
+  /// Knob semantics across the merge:
+  /// - `enabled` AND-merges: if any row in either layer disables the slot,
+  ///   the slot stays disabled. A plugin-specific entry cannot force-enable
+  ///   a slot a wildcard disabled.
+  /// - `priority`: first non-null value wins, with plugin-specific rows
+  ///   consulted before wildcard rows. (Priority lookups for sort order go
+  ///   through [_effectivePriorityFor]; this knob is here so the merged
+  ///   override stays consistent.)
+  /// - `settings`: first non-empty map wins, plugin-specific before
+  ///   wildcard. A priority-only plugin-specific row therefore lets a
+  ///   wildcard's `settings` flow into the wrapper.
+  ///
+  /// Each layer is reduce-merged across its rows before the cross-layer
+  /// merge, so duplicate rows for the same `(plugin, serviceId)` pair
+  /// (which an external caller of [updateSettings] could hand in) cannot
+  /// shadow each other knob by knob. Within a layer, AND/first-non-null/
+  /// first-non-empty apply the same way.
+  ///
+  /// Returns `null` when neither layer has any matching row.
   LocalPluginOverride? _overrideForInjection(
     ServiceId serviceId,
     RegistrationWrapper wrapper,
   ) {
-    final pluginOverride = _overrides
-        .where((o) => o.serviceId == serviceId && o.plugin == wrapper.pluginId)
-        .firstOrNull;
-    if (pluginOverride != null) return pluginOverride;
-    return _overrides
-        .where(
-          (o) => o.serviceId == serviceId && o.plugin == PluginId.winnerScoped,
-        )
-        .firstOrNull;
+    final pluginOverride = _foldMergeOverrides(
+      _overrides.where(
+        (o) => o.serviceId == serviceId && o.plugin == wrapper.pluginId,
+      ),
+      plugin: wrapper.pluginId,
+      serviceId: serviceId,
+    );
+    final wildcardOverride = _foldMergeOverrides(
+      _overrides.where(
+        (o) => o.serviceId == serviceId && o.plugin == PluginId.winnerScoped,
+      ),
+      plugin: wrapper.pluginId,
+      serviceId: serviceId,
+    );
+    if (pluginOverride == null) return wildcardOverride;
+    if (wildcardOverride == null) return pluginOverride;
+    return LocalPluginOverride(
+      plugin: wrapper.pluginId,
+      serviceId: serviceId,
+      enabled: pluginOverride.enabled && wildcardOverride.enabled,
+      priority: pluginOverride.priority ?? wildcardOverride.priority,
+      settings: pluginOverride.settings.isNotEmpty
+          ? pluginOverride.settings
+          : wildcardOverride.settings,
+    );
+  }
+
+  /// Reduce-merge [rows] into a single [LocalPluginOverride] using the same
+  /// knob semantics as the cross-layer merge in [_overrideForInjection]:
+  /// AND on `enabled`, first non-null `priority`, first non-empty
+  /// `settings`. Returns `null` when [rows] is empty. The returned row is
+  /// stamped with [plugin] and [serviceId] so the caller does not need to
+  /// re-read them from the first row.
+  static LocalPluginOverride? _foldMergeOverrides(
+    Iterable<LocalPluginOverride> rows, {
+    required PluginId plugin,
+    required ServiceId serviceId,
+  }) {
+    bool any = false;
+    bool enabled = true;
+    int? priority;
+    Map<String, dynamic> settings = const {};
+    for (final row in rows) {
+      any = true;
+      enabled = enabled && row.enabled;
+      priority ??= row.priority;
+      if (settings.isEmpty && row.settings.isNotEmpty) {
+        settings = row.settings;
+      }
+    }
+    if (!any) return null;
+    return LocalPluginOverride(
+      plugin: plugin,
+      serviceId: serviceId,
+      enabled: enabled,
+      priority: priority,
+      settings: settings,
+    );
   }
 
   /// Whether [wrapper] is marked disabled by an active override.
   ///
   /// Resolution methods skip disabled wrappers and fall through to the
-  /// next-highest-priority enabled registration. A plugin-specific override
-  /// takes precedence over a wildcard (`*`) one, matching the semantics of
-  /// [_overrideForInjection]. If the matching override exists but leaves
-  /// `enabled: true`, the wrapper is considered live.
+  /// next-highest-priority enabled registration. The `enabled` decision
+  /// AND-merges across the plugin-specific override and the wildcard
+  /// fallback per [_overrideForInjection]: if either layer disables the
+  /// slot, the wrapper is treated as disabled. A plugin-specific entry
+  /// cannot force-enable a slot the wildcard disabled.
   bool _isDisabled(ServiceId serviceId, RegistrationWrapper wrapper) {
     final override = _overrideForInjection(serviceId, wrapper);
     return override != null && !override.enabled;
@@ -667,7 +735,32 @@ class ServiceRegistry {
       for (final wrapper in entry.value) {
         if (wrapper.pluginId != plugin) continue;
         if (skipFactories && wrapper is FactoryWrapper) continue;
+        if (_isDisabled(serviceId, wrapper)) continue;
         services.add(_provideAndInject<Object>(serviceId, wrapper));
+      }
+    }
+    return services;
+  }
+
+  /// Like [getPluginServices] but pairs every returned instance with its
+  /// [ServiceId]. Used by service-level lifecycle reconciliation, which
+  /// needs to know which slot each detected service occupies so it can
+  /// diff pre-update vs post-update enablement per (pluginId, serviceId).
+  List<(ServiceId, Object)> getPluginServicesWithIds(
+    PluginId plugin, {
+    bool skipFactories = false,
+  }) {
+    final services = <(ServiceId, Object)>[];
+    for (final entry in _registry.entries) {
+      final serviceId = entry.key;
+      for (final wrapper in entry.value) {
+        if (wrapper.pluginId != plugin) continue;
+        if (skipFactories && wrapper is FactoryWrapper) continue;
+        if (_isDisabled(serviceId, wrapper)) continue;
+        services.add((
+          serviceId,
+          _provideAndInject<Object>(serviceId, wrapper),
+        ));
       }
     }
     return services;

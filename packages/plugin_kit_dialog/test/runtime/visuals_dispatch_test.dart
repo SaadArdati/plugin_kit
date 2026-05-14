@@ -69,7 +69,7 @@ void main() {
     test('reads self-attached visuals when present', () {
       final runtime = PluginRuntime()
         ..addPlugin(_SelfDecorating())
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final visuals = runtime.globalRegistry.maybeResolve<PluginKitVisual>(
@@ -92,7 +92,7 @@ void main() {
             },
           ),
         )
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final visuals = runtime.globalRegistry.maybeResolve<PluginKitVisual>(
@@ -107,11 +107,11 @@ void main() {
     test('label falls back to raw pluginId when no override is registered', () {
       final runtime = PluginRuntime()
         ..addPlugin(_Plain('chat'))
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final rows = const PluginChipsBuilder()
-          .build(runtime, RuntimeSettings.empty())
+          .build(runtime, RuntimeSettings())
           .all;
       expect(rows.single.label, 'chat');
       expect(rows.single.description, isNull);
@@ -132,11 +132,11 @@ void main() {
             },
           ),
         )
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final row = const PluginChipsBuilder()
-          .build(runtime, RuntimeSettings.empty())
+          .build(runtime, RuntimeSettings())
           .all
           .firstWhere((r) => r.pluginId == const PluginId('self_decorating'));
       expect(row.label, 'Adapter Override');
@@ -158,11 +158,11 @@ void main() {
             },
           ),
         )
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final row = const PluginChipsBuilder()
-          .build(runtime, RuntimeSettings.empty())
+          .build(runtime, RuntimeSettings())
           .all
           .firstWhere((r) => r.pluginId == const PluginId('chat'));
       expect(row.label, 'Chat');
@@ -180,7 +180,7 @@ void main() {
           _Plain('beta_overridden_on', flags: const [FeatureFlag.experimental]),
           _Plain('beta_default_off', flags: const [FeatureFlag.experimental]),
         ],
-      )..init(settings: RuntimeSettings.empty());
+      )..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       const settings = RuntimeSettings(
@@ -216,7 +216,7 @@ void main() {
           _Plain('beta_on', flags: const [FeatureFlag.experimental]),
           _Plain('beta_off', flags: const [FeatureFlag.experimental]),
         ],
-      )..init(settings: RuntimeSettings.empty());
+      )..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       const settings = RuntimeSettings(
@@ -259,14 +259,14 @@ void main() {
       final runtime = PluginRuntime()
         ..addPlugin(_BuilderHost())
         ..addPlugin(_OverridingChipsBuilderPlugin())
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final builder = runtime.globalRegistry.resolve<PluginChipsBuilder>(
         PluginsTabPlugin.chipsBuilderId,
       );
 
-      final groups = builder.build(runtime, RuntimeSettings.empty());
+      final groups = builder.build(runtime, RuntimeSettings());
       // Override returns an empty groups regardless of runtime.plugins.
       expect(groups.all, isEmpty);
       expect(groups.stable, isEmpty);
@@ -298,7 +298,7 @@ void main() {
             },
           ),
         )
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       expect(
@@ -344,7 +344,7 @@ void main() {
           );
         addTearDown(runtime.dispose);
 
-        runtime.init(settings: RuntimeSettings.empty());
+        runtime.init(settings: RuntimeSettings());
         // Visual still registered for later use if the plugin shows up.
         expect(
           runtime.globalRegistry
@@ -375,7 +375,7 @@ void main() {
           );
         addTearDown(runtime.dispose);
 
-        runtime.init(settings: RuntimeSettings.empty());
+        runtime.init(settings: RuntimeSettings());
         // Visual is still registered (warn-only validation).
         expect(
           runtime.globalRegistry
@@ -405,7 +405,7 @@ void main() {
       addTearDown(runtime.dispose);
 
       // Must not throw; warn-only on miss.
-      runtime.init(settings: RuntimeSettings.empty());
+      runtime.init(settings: RuntimeSettings());
 
       // The unused namespace visual is still registered (no harm done).
       expect(

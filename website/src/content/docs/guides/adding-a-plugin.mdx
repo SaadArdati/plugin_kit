@@ -7,7 +7,6 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 import { Code } from '@astrojs/starlight/components';
 import { extractRegion } from '../../../utils/excerpt.mjs';
 import pluginLifecycleSource from '../../../../snippets/lib/plugin_lifecycle.dart?raw';
-import testingSource from '../../../../snippets/lib/testing.dart?raw';
 import pluginServicesSource from '../../../../snippets/lib/plugin_services.dart?raw';
 import runtimeSettingsSource from '../../../../snippets/lib/runtime_settings.dart?raw';
 import namingSource from '../../../../snippets/lib/naming.dart?raw';
@@ -49,7 +48,7 @@ identity, or lifecycle.
 
 Now give the feature an identity and register the service.
 
-<Code code={extractRegion(pluginLifecycleSource, 'session-plugin-attach')} lang="dart" />
+<Code code={extractRegion(pluginServicesSource, 'adding-plugin-notification-plugin')} lang="dart" />
 
 That is already a real plugin.
 
@@ -108,26 +107,29 @@ code may need to:
 - resolve services registered by other plugins
 
 The idiomatic home for that logic is a `StatefulPluginService`. Its
-`attach(...)` gives you `on`, `onRequest`, and `emit` helpers that
-track their own subscriptions and cancel them on detach, so you never
+`attach()` runs with the session context already bound, and inside it
+you can reach `on`, `onRequest`, `onRequestSync`, `bind`, and `emit`
+on the service. The four subscription helpers auto-track their handles
+and the framework cancels them after `detach()` returns, so you never
 have to remember the cleanup step.
 
-Here is the notification feature extended with a request/response handler:
+Here is the notification feature extended to react when a long-running
+task completes:
 
-<Code code={extractRegion(testingSource, 'testing-level-2-plugin')} lang="dart" />
+<Code code={extractRegion(pluginServicesSource, 'adding-plugin-notification-reactive')} lang="dart" />
 
-Notice that the plugin class did not override `attach(...)`. When the
-session starts, the plugin's base `attach(...)` walks every
-`StatefulPluginService` it owns and attaches each one for you.
+The plugin class itself did not override `attach(...)`. When the session
+starts, the framework walks every *winning* `StatefulPluginService` the plugin
+registered and attaches each one before invoking the plugin's own
+`attach(...)`. The watcher subscribes to `TaskCompleted` from inside its
+own `attach()`, and the framework cancels that subscription when the
+service detaches.
 
 You can still override the plugin's own `attach(...)` when you actually
 need it: resolving a service from a different plugin at startup,
 coordinating across plugins, or starting a shared resource. `Plugin.attach`
 and `Plugin.detach` are pure user hooks; the framework runs orchestration
-(stateful service attach/detach, subscription cleanup) around them, so no
-`super` call is needed. When you use `Plugin.on`, `onRequest`, `bind`, or
-`emit` inside the override, pass `context` as the first positional argument:
-`on<E>(context, (e) => ...)`.
+(stateful service attach/detach, subscription cleanup) around them.
 
 <Aside type="note" title="Resolve peers in attach, not register">
 `register(...)` is for contributing your own services. By the time
@@ -141,7 +143,6 @@ resolve other plugins' services.
 A plugin class should mostly be wiring:
 
 - `pluginId`
-- `description`
 - `register(...)`
 - `attach(...)`
 - `detach(...)`
@@ -233,9 +234,11 @@ And on the reading side:
 
 <Code code={extractRegion(capabilitiesSource, 'capability-resolve-raw-wrapper')} lang="dart" />
 
-`resolveCapability` returns the capability instance (or `null` when the
-slot's winner does not carry it), so the same call serves as a presence
-check and as access to capability fields like `SupportsFileFormats.extensions`.
+`resolveCapability` returns the capability instance, or `null` when the
+slot is unregistered, every registration is disabled, or the current
+winner does not carry that capability type. The same call serves as a
+presence check and as access to capability fields like
+`SupportsFileFormats.extensions`.
 
 The runtime does not know what `SupportsFileFormats` or `IsSlowCapability`
 mean. It just holds them. Defining a schema for your settings UI, tagging

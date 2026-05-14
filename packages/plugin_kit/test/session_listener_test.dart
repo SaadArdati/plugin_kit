@@ -52,7 +52,7 @@ class _SwappableRecorder with PluginSessionListener {
 
 Future<PluginSession> _newSession() async {
   final runtime = PluginRuntime(plugins: [_ListenerTestPlugin()])
-    ..init(settings: RuntimeSettings.empty());
+    ..init(settings: RuntimeSettings());
   addTearDown(runtime.dispose);
   final session = await runtime.createSession();
   addTearDown(session.dispose);
@@ -125,7 +125,7 @@ void main() {
       expect(recorder.ticks, equals([1]));
 
       recorder.switchTo(sessionB);
-      await sessionA.emit(const _Tick(2)); // old session — dropped
+      await sessionA.emit(const _Tick(2)); // old session, dropped
       await sessionB.emit(const _Tick(3));
       expect(recorder.ticks, equals([1, 3]));
     });

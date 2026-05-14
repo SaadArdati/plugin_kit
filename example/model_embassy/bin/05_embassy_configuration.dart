@@ -34,7 +34,7 @@ class ConfigurableVisaOffice extends SessionStatefulPluginService {
     print('    base_url     = $baseUrl');
     print('    default_model= $defaultModel');
 
-    onRequest<AgentBoardingCall, ModelVisa?>((req) async {
+    onRequest<AgentBoardingCall, ModelVisa>((req) async {
       final passport = req.event.passport;
 
       if (passport.modelFamily != 'anthropic') return null;
@@ -80,10 +80,14 @@ Future<void> _board(PluginSession session, String label) async {
     modelFamily: 'anthropic',
     modelId: 'claude-sonnet-4-5-20250929',
   );
-  final visa = await session.request<AgentBoardingCall, ModelVisa?>(
+  final visa = await session.maybeRequest<AgentBoardingCall, ModelVisa>(
     AgentBoardingCall(passport),
   );
-  final response = await visa!.client.chat('Hello from $label');
+  if (visa == null) {
+    print('  No visa issued for $label.');
+    return;
+  }
+  final response = await visa.client.chat('Hello from $label');
   print('  Response: $response');
 }
 

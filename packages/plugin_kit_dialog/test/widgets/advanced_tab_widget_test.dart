@@ -20,12 +20,12 @@ void main() {
     'AdvancedTab renders registry inspector + output options + JSON preview in order',
     (tester) async {
       final runtime = PluginRuntime();
-      runtime.init(settings: RuntimeSettings.empty());
+      runtime.init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final controller = PluginKitDialogController(
         runtime: runtime,
-        initialSettings: RuntimeSettings.empty(),
+        initialSettings: RuntimeSettings(),
       );
 
       await tester.pumpWidget(
@@ -53,19 +53,19 @@ void main() {
     tester,
   ) async {
     final targetRuntime = PluginRuntime();
-    targetRuntime.init(settings: RuntimeSettings.empty());
+    targetRuntime.init(settings: RuntimeSettings());
     addTearDown(targetRuntime.dispose);
 
     final controller = PluginKitDialogController(
       runtime: targetRuntime,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     final dialogRuntime =
         PluginRuntime<DialogGlobalContext, SessionPluginContext>(
           plugins: [AdvancedTabPlugin()],
         )..init(
-          settings: RuntimeSettings.empty(),
+          settings: RuntimeSettings(),
           globalContextFactory: (registry, bus, sessions) =>
               DialogGlobalContext(
                 registry: registry,

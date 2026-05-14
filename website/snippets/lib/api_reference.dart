@@ -114,23 +114,35 @@ RuntimeSettings roundTripSettings() {
 
 // #docregion api-reference-request-patterns
 /// Demonstrates request/response patterns on a standalone bus.
+///
+/// Handlers concede by returning `null` regardless of whether [Response]
+/// is nullable. Consumers pick between two methods at the call site:
+/// `maybeRequest` (canonical, returns null when nobody answered) and
+/// `request` (assertion variant, throws when nobody answered).
 Future<void> demonstrateRequestPatterns(PluginContext context) async {
-  // Nullable Response enables fall-through.
-  context.bus.onRequest<SearchQuery, SearchResults?>((env) async {
-    if (env.event.q.isEmpty) return null; // concede
+  context.bus.onRequest<SearchQuery, SearchResults>((env) async {
+    if (env.event.q.isEmpty) return null; // concede; next handler may claim
     return const SearchResults(results: ['result']);
   });
 
-  final response = await context.bus.request<SearchQuery, SearchResults?>(
+  // Assertion variant: throws AllConcededException if every handler
+  // conceded. Use only when at least one handler is guaranteed to claim.
+  final response = await context.bus.request<SearchQuery, SearchResults>(
+    const SearchQuery(q: 'dart patterns'),
+  );
+
+  // Canonical: returns null when nobody answered.
+  final maybe = await context.bus.maybeRequest<SearchQuery, SearchResults>(
     const SearchQuery(),
   );
-  final maybe = await context.bus.maybeRequest<SearchQuery, SearchResults?>(
-    const SearchQuery(),
+
+  // Sync assertion variant: same throws-on-no-answer semantics.
+  final sync = context.bus.requestSync<SearchQuery, SearchResults>(
+    const SearchQuery(q: 'dart patterns'),
   );
-  final sync = context.bus.requestSync<SearchQuery, SearchResults?>(
-    const SearchQuery(),
-  );
-  final maybeSync = context.bus.maybeRequestSync<SearchQuery, SearchResults?>(
+
+  // Sync canonical: returns null when nobody answered.
+  final maybeSync = context.bus.maybeRequestSync<SearchQuery, SearchResults>(
     const SearchQuery(),
   );
 
@@ -400,10 +412,10 @@ class CheatsheetStatefulService extends StatefulPluginService {
 /// Demonstrates the full runtime → session lifecycle with a custom context.
 Future<void> demonstrateRuntimeSessionPattern() async {
   final runtime = PluginRuntime(plugins: [CheatsheetPlugin()]);
-  runtime.init(settings: const RuntimeSettings.empty());
+  runtime.init(settings: const RuntimeSettings());
 
   final session = await runtime.createSession(
-    settings: const RuntimeSettings.empty(),
+    settings: const RuntimeSettings(),
     contextFactory: (registry, sessionBus, globalBus) => SessionPluginContext(
       registry: registry,
       bus: sessionBus,
@@ -437,12 +449,7 @@ void demonstrateContextStubs() {
 // #docregion api-cheatsheet-runtime-api
 /// Demonstrates the runtime management API surface.
 Future<void> demonstrateRuntimeApi() async {
-  final runtime = PluginRuntime(plugins: [CheatsheetPlugin()]);
-  runtime.init(
-    settings: const RuntimeSettings.empty(),
-    defaultEnabledPluginIds: null,
-    // null: all on except experimental; non-null: only listed are on
-  );
+  final runtime = PluginRuntime(plugins: [CheatsheetPlugin()])..init();
 
   print(runtime.settings);
   print(runtime.settingsStream.runtimeType);
@@ -459,8 +466,8 @@ Future<void> demonstrateRuntimeApi() async {
   runtime.addPlugins([]);
 
   final session = await runtime.createSession();
-  await runtime.updateSettings(const RuntimeSettings.empty());
-  runtime.updateSettingsSnapshot(const RuntimeSettings.empty());
+  await runtime.updateSettings(const RuntimeSettings());
+  runtime.updateSettingsSnapshot(const RuntimeSettings());
   runtime.resetSettings();
 
   await session.dispose();

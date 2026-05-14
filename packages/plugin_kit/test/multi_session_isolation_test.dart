@@ -58,7 +58,7 @@ class _OnRequestPlugin extends SessionPlugin {
 
   @override
   void attach(SessionPluginContext context) {
-    onRequest<_Question, String?>(context, (envelope) async {
+    onRequest<_Question, String>(context, (envelope) async {
       handledFor.add('${envelope.event.prompt}|sub-${context.hashCode}');
       return 'answer:${envelope.event.prompt}';
     });
@@ -436,7 +436,7 @@ void main() {
         'disposes', () async {
       final plugin = _OnSubscriberPlugin();
       final runtime = PluginRuntime(plugins: [plugin])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final sessionA = await runtime.createSession();
@@ -459,7 +459,7 @@ void main() {
       () async {
         final plugin = _OnSubscriberPlugin();
         final runtime = PluginRuntime(plugins: [plugin])
-          ..init(settings: RuntimeSettings.empty());
+          ..init(settings: RuntimeSettings());
         addTearDown(runtime.dispose);
 
         final sessionA = await runtime.createSession();
@@ -480,16 +480,16 @@ void main() {
         'session A disposes', () async {
       final plugin = _OnRequestPlugin();
       final runtime = PluginRuntime(plugins: [plugin])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final sessionA = await runtime.createSession();
       final sessionB = await runtime.createSession();
 
-      final answerA = await sessionA.bus.request<_Question, String?>(
+      final answerA = await sessionA.bus.request<_Question, String>(
         const _Question('alpha'),
       );
-      final answerB = await sessionB.bus.request<_Question, String?>(
+      final answerB = await sessionB.bus.request<_Question, String>(
         const _Question('beta'),
       );
       expect(answerA, equals('answer:alpha'));
@@ -497,7 +497,7 @@ void main() {
 
       await sessionA.dispose();
 
-      final answerB2 = await sessionB.bus.request<_Question, String?>(
+      final answerB2 = await sessionB.bus.request<_Question, String>(
         const _Question('gamma'),
       );
       expect(answerB2, equals('answer:gamma'));
@@ -507,7 +507,7 @@ void main() {
         'after session A disposes', () async {
       final plugin = _OnRequestSyncPlugin();
       final runtime = PluginRuntime(plugins: [plugin])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final sessionA = await runtime.createSession();
@@ -534,7 +534,7 @@ void main() {
         'session A disposes', () async {
       final plugin = _BindObserverPlugin();
       final runtime = PluginRuntime(plugins: [plugin])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final sessionA = await runtime.createSession();
@@ -556,7 +556,7 @@ void main() {
   group('StatefulPluginService per-session isolation', () {
     test('each session resolves a distinct service instance', () async {
       final runtime = PluginRuntime(plugins: [_CounterPlugin()])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final sessionA = await runtime.createSession();
@@ -574,7 +574,7 @@ void main() {
 
     test('events on session A only update session A\'s service', () async {
       final runtime = PluginRuntime(plugins: [_CounterPlugin()])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final sessionA = await runtime.createSession();
@@ -597,7 +597,7 @@ void main() {
       'disposing session A leaves session B\'s service receiving events',
       () async {
         final runtime = PluginRuntime(plugins: [_CounterPlugin()])
-          ..init(settings: RuntimeSettings.empty());
+          ..init(settings: RuntimeSettings());
         addTearDown(runtime.dispose);
 
         final sessionA = await runtime.createSession();
@@ -621,7 +621,7 @@ void main() {
         'or plugin attach(); failure still surfaces to runtime', () async {
       final plugin = _PartialAttachFailurePlugin();
       final runtime = PluginRuntime(plugins: [plugin])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       // Runtime collects the failure and surfaces it. Without this, a failing
@@ -645,7 +645,7 @@ void main() {
         'detach; failure still surfaces to runtime', () async {
       final plugin = _PartialDetachFailurePlugin();
       final runtime = PluginRuntime(plugins: [plugin])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       // Session is disposed manually below; runtime.dispose with no remaining
       // sessions is a clean no-op for cleanup.
       addTearDown(runtime.dispose);
@@ -679,7 +679,7 @@ void main() {
         'clears the bound context', () async {
       final plugin = _SubCancelThrowingPlugin();
       final runtime = PluginRuntime(plugins: [plugin])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final session = await runtime.createSession();
@@ -710,7 +710,7 @@ void main() {
         'subscription is dropped from activeSubscriptions', () async {
       final plugin = _ReentrantOnCancelPlugin();
       final runtime = PluginRuntime(plugins: [plugin])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final session = await runtime.createSession();
@@ -763,7 +763,7 @@ void main() {
       // extra unwrap step.
       final plugin = _PartialAttachFailurePlugin();
       final runtime = PluginRuntime(plugins: [plugin])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       late PluginLifecycleException caught;
@@ -800,7 +800,7 @@ void main() {
         'PluginStepAggregateException with both step entries', () async {
       final plugin = _TwoStepFailurePlugin();
       final runtime = PluginRuntime(plugins: [plugin])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       late PluginLifecycleException caught;
@@ -845,7 +845,7 @@ void main() {
       // not just the first.
       final plugin = _TwoThrowingCancelsPlugin();
       final runtime = PluginRuntime(plugins: [plugin])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final session = await runtime.createSession();
@@ -890,7 +890,7 @@ void main() {
     test('OutOfMemoryError in plugin attach() is not caught by the '
         'framework and propagates uncaught past the runtime', () async {
       final runtime = PluginRuntime(plugins: [_OOMOnAttachPlugin()])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(() async {
         // Best-effort cleanup; runtime never reached a stable state.
         try {

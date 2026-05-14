@@ -3,51 +3,126 @@ title: Why Plugin Kit?
 description: "When apps grow into platforms, the same plumbing keeps reappearing. Plugin Kit packages it once: real feature lifecycles, replaceable services, sealed sessions, typed events."
 ---
 
-Plugin Kit reduces the manual lifecycle wiring and override branching that build up in apps that have grown into platforms: apps with real feature lifecycles, replaceable services, isolated sessions, and typed events between parts that have never been formally introduced.
+A year ago I was building an AI agent platform inside Codelessly with around thirty different capabilities: auto-model routing, context injection, auto-retry with fallback agents, secret resolution, MCP server integrations, custom system prompts, live-tunable temperature and tools, per-session sandboxing. Every one of those capabilities had to be enable-able, override-able, settings-tunable, and hot-swappable at runtime. A user toggling the testing-agent off in their settings UI had to actually unwire it from the bus, free its resources, and let any higher-priority replacement take over without a restart.
 
-When an app grows past a few features, the same patterns keep showing up:
+State management did not prepare me for this. DI containers did not prepare me for this. What I needed was something that behaves like your IDE's plugin and extension system, but in Dart. So I wrote one. It is now `plugin_kit`, the backbone of Codelessly's agent platform.
 
-- A feature wants its own lifecycle (set up, run, tear down) instead of leaning on `initState`.
-- Two implementations want to compete for the same slot, and the loser should still be reachable as a fallback.
-- A second document, tab, or chat needs its own state without leaking into the first.
-- A settings dialog wants to enable, disable, or reprioritize features at runtime.
-- Features need to coordinate without holding references to each other.
-- You want to prototype a third-party service integration without disrupting the original third-party service.
-- Your boss wants a new feature you hate, but you want to build it in a way that does not mess with the code you like.
+## DI container vs plugin runtime
 
-Most teams build that runtime by accident. A DI container learns priorities. A feature flag service learns to disable subsystems. A controller learns request and response. After enough additions, a team has rebuilt a substantial slice of a plugin framework without noticing.
+A DI container answers the question *"give me an instance of X."* It wires up a fixed graph at startup.
 
-Plugin Kit packages all of that into one runtime with explicit rules. You write plugins; it does the choreography.
+A plugin runtime answers a different question: *"given this set of capabilities, this user's settings, and this session's scope, compose a coherent system and let me change my mind at any time."* The graph is dynamic. It responds to settings changes, plugin enable/disable, priority overrides, and session boundaries while the application is running.
 
-There are many ways to structure a Dart or Flutter app, and there is no single right answer. What matters is whether the structure helps you ship the kind of app you actually want to ship. If you are wiring features by hand and noticing the same scaffolding for the third time, Plugin Kit is built for that case.
+## Most apps do not need this
 
-The value shines when you want to develop features in complete isolation, systems that may collide with each other,
-or features that can be turned on and off at runtime.
+If your app has one HTTP client, one auth service, one analytics service, and a few screens that call them, use the boring thing. Instantiate the client. Register the service. Ship the app. Nobody gets a trophy for turning a todo app into a miniature operating system.
 
-Worked example:
+Plugin Kit starts making sense at the exact moment the word "just" starts lying to you:
 
-- A chat agent plugin ships a system prompt as an independent service inside the plugin.
-- A teammate wants to iterate on the system prompt without touching the original. Instead of editing the existing service, the teammate writes a new plugin that claims the same registration slot at a higher priority. The teammate iterates in isolation; if the variant pays off, the plugin stays enabled.
-- A non-coder on the team wants their own system-prompt experiment. They edit the JSON config through a settings page from `plugin_kit_dialog` and override the active system prompt at runtime.
-- An end user disables the "experimental" system prompt because they prefer the original. The toggle takes effect live.
-- The original system prompt is still registered the whole time, ready as a fallback whenever someone wants it back.
+- *"Just add a setting to disable this provider."*
+- *"Just let enterprise customers override this behavior."*
+- *"Just let the admin dashboard turn this feature off without redeploying."*
+- *"Just experiment quickly with this implementation."*
+- *"Just make sure the original runs if this way fails."*
 
-Plugin Kit is designed around three values:
+Each of those sounds small. One flag. One `if` statement. One extra service. But after a while, the app stops being a clean tree of dependencies and becomes a negotiation between features, settings, tenants, sessions, fallbacks, priorities, and runtime decisions. That is the point where a singleton is no longer the architecture; it is just the place where the architecture is hiding.
 
-- **Composable**: Features stack through priority, namespaces, and capability tags rather than through scattered `if`
-statements. Override stops being a code smell, and "the current implementation of X" becomes something the runtime
-answers instead of the host code guessing.
+## A worked escalation: a chat plugin and a teammate's experiment
 
-- **Isolated**: Sessions are sealed by default. Cross-scope routing is always explicit. Open ten documents, and they
-do not leak into each other; close one and everything session-scoped cleans up on the way out.
+The original system prompt lives inside the chat plugin. It is boring at its best:
 
-- **Reconcilable**: Settings, priorities, and enablement converge at runtime without a restart. Hand the runtime a new
-`RuntimeSettings` and it works out which plugins to detach, which to attach, and which to leave alone.
+```dart
+abstract class SystemPrompt {
+  String build({required User user});
+}
 
-Overall, Plugin Kit makes feature lifecycles explicit, so you can compose, override, and reconfigure features without
-writing teardown code by hand each time.
+class DefaultSystemPrompt implements SystemPrompt {
+  @override
+  String build({required User user}) =>
+      'You are a helpful assistant. The user is $user.';
+}
 
-## Design decisions that follow from those values
+class ChatPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('chat');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<SystemPrompt>(
+      const ServiceId('system_prompt'),
+      () => DefaultSystemPrompt(),
+    );
+  }
+}
+```
+
+A teammate wants to A/B a more aggressive prompt that injects the user's recent activity. They do not want to touch the chat plugin. They do not want to add an `if` statement. They want their experiment to live as its own plugin, opt in for testing, and disappear cleanly when nobody wants it.
+
+```dart
+class ActivityAwarePlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('activity_aware');
+
+  @override
+  List<FeatureFlag> get featureFlags => const [FeatureFlag.experimental];
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<SystemPrompt>(
+      const ServiceId('system_prompt'),
+      () => ActivityAwareSystemPrompt(),
+      priority: Priority.elevated, // wins
+    );
+  }
+}
+```
+
+Two plugins, one slot. The experimental plugin wins because it asked for higher priority. The chat plugin's prompt is still registered, sitting at the lower priority, ready as a fallback.
+
+The agent loop has not changed:
+
+```dart
+final prompt = session.resolve<SystemPrompt>(const ServiceId('system_prompt'));
+final reply = await agent.sendMessage(prompt.build(user: myUser));
+```
+
+No conditional. No flag. No branch. Whatever is registered at the highest priority for that slot is what `resolve` returns. The call site does not know it is in an experiment.
+
+Ship to production. A user pulls up the settings dialog and decides they want the original back. The settings UI does not need to know what these plugins do; it just hands the runtime a new settings JSON:
+
+```dart
+await runtime.updateSettings(
+  const RuntimeSettings(
+    plugins: {
+      PluginId('activity_aware'): PluginConfig(enabled: false),
+    },
+  ),
+);
+```
+
+The experimental plugin detaches. Its instance is torn down. The chat plugin's original prompt becomes the winner again, because nothing higher is fighting for the slot. The next message uses the original prompt. No reload, no rebuild of the session, no `if (experimentalMode)` flag scrubbed across the codebase. Flip it back to `true` and the experiment re-attaches.
+
+A few things to notice. The chat plugin and the experiment plugin do not know about each other. Neither checks for the other. They both register into a slot named `system_prompt`; the registry decides who wins. The settings change was a statement of intent, not a script. You did not write code that said "when the experiment toggle goes off, restart the agent loop with the default prompt." You handed the runtime a new picture of the world and it converged on that state.
+
+## Plugin Kit vs your state management library
+
+A Flutter developer reading this far is probably thinking: *this is yet another state management solution.* A little.
+Plugin Kit has a registry, a typed event bus, session-scoped services, and a lifecycle.
+If you squint, it sounds like the job a Riverpod, Bloc, Provider, GetIt, or ChangeNotifier pile usually does.
+
+The overlap is not the interesting part. The boundary is.
+
+**State management owns presentation state. Plugin Kit owns participation.**
+
+- A chat screen showing messages is presentation state. A plugin deciding whether it wants to enrich an outgoing prompt is participation.
+- A model selector showing the current model is presentation state. The list of available models changing because provider plugins were enabled or disabled is participation.
+- A loading spinner is presentation state. A fallback provider taking over because the first one is unavailable is participation.
+
+Plugin Kit can sit beside Provider, Riverpod, Bloc, or GetIt instead of replacing them.
+Let your state library keep doing widget-facing work; let Plugin Kit own the runtime protocol underneath.
+Do not move everything into Plugin Kit if you're not starting from scratch. Move the seams where participation matters.
+
+## Design decisions
 
 **Domain-agnostic core.** The runtime knows nothing about Flutter, servers, editors, agents, or any specific UI framework. Client code extends `PluginContext`, `Plugin`, and `PluginService` to model domain concepts. The same runtime drops into a CLI, a server, or a Flutter app unchanged.
 

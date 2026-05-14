@@ -78,7 +78,7 @@ Every `on` handler receives an `EventEnvelope<T>`. What the handler *does* with 
 There is no separate API to opt into participation; the capability is always there in the envelope.
 If a handler does not need to mutate or stop, it simply does not.
 
-## Subscribing from a plugin (escape hatch, not the recommended path)
+## Subscribing from a plugin
 
 You can subscribe directly from `SessionPlugin.attach(...)`. After importing `plugin_kit`, `Plugin` itself
 gains the same auto-tracking helpers stateful services use: `on<T>()`, `onRequest<Req, Res>()`,
@@ -89,21 +89,23 @@ into `activeBindings`, all torn down automatically when the plugin detaches. `Pl
 
 Plugin helpers take `context` as the first positional argument, since plugins are shared across sessions.
 
+This shape is the right home for trivial wiring: a one-off debug log, a tracing tap, a small bridge
+between two services the same plugin owns. The auto-tracking means you do not have to remember the
+cleanup step, and the call site stays in the plugin class instead of growing a service for a single line.
+
 <Code code={extractRegion(pluginLifecycleSnippets, 'session-plugin-attach')} lang="dart" />
 
 Reach for `context.bus.on(...)` only when you genuinely need to manage a subscription's lifetime
 by hand: the bus call returns a `EventSubscription` you have to cancel yourself, and is not tracked.
 
-<Aside type="caution" title="Behavior on the plugin gives up composition">
+<Aside type="note" title="Promote to a service when behavior needs to be a seam">
 A handler attached on the plugin is bound to that plugin's enabled state, full stop. It cannot be
 overridden by a higher-priority replacement, disabled independently of its siblings, or tuned via
 `RuntimeSettings.services` the way a service can. Those mechanics only apply to things that live in the
 service registry. If you want behavior to be replaceable, settings-tunable, or hot-swappable, put it in
 a `StatefulPluginService`.
 
-Plugin-level subscriptions are appropriate for trivial wiring (one debug log, a tracing tap, a small
-bridge between two services the same plugin owns). For anything you want to be a real seam, write a
-service. If a plugin's `attach` starts accumulating handlers, that is a smell: extract a service.
+If a plugin's `attach` starts accumulating handlers, that is a smell: extract a service.
 </Aside>
 
 ## Fire and await

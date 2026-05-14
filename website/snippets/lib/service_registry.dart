@@ -162,7 +162,7 @@ class BetterDartFormatter extends StatefulPluginService implements Formatter {
       // Our specialty. Format it ourselves.
       return input.trim();
     }
-    // Not a Dart file. Hand off to whichever Formatter was the previous winner.
+    // Hand off to whichever Formatter would be next in line for this slot.
     return context.registry
         .resolveAfter<Formatter>(pluginId: pluginId, serviceId: serviceId)
         .format(path, input);
@@ -184,12 +184,15 @@ class OptionalFallbackFormatter extends StatefulPluginService
   // #docregion service-registry-maybe-resolve-after
   Formatter? _maybeNext() {
     try {
-      return context.registry
-          .resolveAfter<Formatter>(pluginId: pluginId, serviceId: serviceId);
+      return context.registry.resolveAfter<Formatter>(
+        pluginId: pluginId,
+        serviceId: serviceId,
+      );
     } on StateError {
       return null;
     }
   }
+
   // #enddocregion service-registry-maybe-resolve-after
 }
 
@@ -285,10 +288,10 @@ void getLoggerDB(PluginContext context) {
 }
 // #enddocregion service-registry-resolve-basic
 
-// #docregion service-registry-priority-competing
 /// Two plugins register the same code_formatter slot at different priorities.
 /// Higher number wins on resolution.
 void registerCompetingFormatters(ServiceRegistry registry) {
+  // #docregion service-registry-priority-competing
   // plugin: core
   registry.registerSingleton<Formatter>(
     pluginId: const PluginId('core'),
@@ -304,8 +307,8 @@ void registerCompetingFormatters(ServiceRegistry registry) {
     create: () => PrettierFormatter(),
     priority: Priority.elevated,
   );
+  // #enddocregion service-registry-priority-competing
 }
-// #enddocregion service-registry-priority-competing
 
 // #docregion service-registry-namespace-panel
 /// Registers a namespaced panel service and resolves it.

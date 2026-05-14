@@ -175,14 +175,14 @@ class PluginKitDialogController extends ChangeNotifier {
 
   void setPluginEnabled(PluginId pluginId, bool enabled);
   void setServiceField({
-    required String scopedKey,
+    required Pin scopedKey,
     required String fieldKey,
     required Object? value,
   });
-  void setServiceEnabled(String scopedKey, bool enabled);
-  void setServicePriority(String scopedKey, int? priority);
-  void resetField(String scopedKey, String fieldKey);
-  void resetService(String scopedKey);
+  void setServiceEnabled(Pin scopedKey, bool enabled);
+  void setServicePriority(Pin scopedKey, int? priority);
+  void resetField(Pin scopedKey, String fieldKey);
+  void resetService(Pin scopedKey);
   void resetPlugin(PluginId pluginId);
   void resetAll();
   void replaceWorking(RuntimeSettings parsed);
@@ -201,7 +201,7 @@ class PluginKitDialogController extends ChangeNotifier {
 The mutators are designed to be safe to call repeatedly. Setting a field to a value that matches the defaults plus baseline collapses the override to nothing (no-op deletion), so saving from a dirty-then-reset draft produces minimal `RuntimeSettings`.
 
 <Aside type="note" title="Mutator key shape">
-`setServiceField`, `setServiceEnabled`, `setServicePriority`, `resetField`, and `resetService` all take a `scopedKey` of the form `'pluginId:serviceKey'` (for example `'main_agent:agent.temperature'`). This is the same shape used everywhere services are addressed across plugin boundaries.
+`setServiceField`, `setServiceEnabled`, `setServicePriority`, `resetField`, and `resetService` all take a `Pin scopedKey`. Build it via `Pin('main_agent', ['agent', 'temperature'])`, `Pin.wildcard(['agent', 'temperature'])`, or the typed-chain helpers; this is the same `Pin` shape `RuntimeSettings.services` is keyed by.
 </Aside>
 
 ## Visuals (`PluginKitVisualsPlugin`)
@@ -212,10 +212,10 @@ Visuals are a Flutter-only concern (icons and colors), so the canonical attachme
 
 ```dart
 class PluginKitVisualsPlugin extends GlobalPlugin {
-  static const String pluginVisualNamespace = 'plugin_visual';
-  static const String namespaceVisualNamespace = 'namespace_visual';
-  static const String serviceVisualNamespace = 'service_visual';
-  static const int dialogVisualsAdapterPriority = 100;
+  static const Namespace pluginVisualNamespace = Namespace('plugin_visual');
+  static const Namespace namespaceVisualNamespace = Namespace('namespace_visual');
+  static const Namespace serviceVisualNamespace = Namespace('service_visual');
+  static const int dialogVisualsAdapterPriority = Priority.elevated; // 1000
   static const id = PluginId('plugin_kit_visuals');
 
   final Map<PluginId, PluginKitVisual> pluginVisuals;
@@ -232,7 +232,7 @@ class PluginKitVisualsPlugin extends GlobalPlugin {
 
 Locked `GlobalPlugin` (not user-toggleable) that registers host-app visual overrides. Three independent maps so a Flutter host can decorate plugins owned by Dart-only packages without those packages depending on Flutter.
 
-The plugin uses priority `100`, above the default registry priority (`50`), so host overrides beat anything a Flutter plugin self-attaches from its own `register()`. When two host plugins decorate the same key, the standard registry priority and registration order rules apply.
+The plugin registers each visual at `Priority.elevated` (1000), above the default registry priority `Priority.normal` (500), so host overrides beat anything a Flutter plugin self-attaches at the default. When two host plugins decorate the same key, the standard registry priority and registration order rules apply.
 
 Unknown keys are accepted silently. A `PluginId`, `Namespace`, or `ServiceId` that no current plugin registers is retained without warning, so the visual picks up automatically when the matching plugin gets enabled later. Resolution happens at the consumption site (the dialog's chip builder, the services tab card list); the visuals plugin itself never inspects the registry on attach. If you need to detect leftover or typo'd keys, resolve at the consumption site.
 

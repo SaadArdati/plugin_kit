@@ -1,3 +1,4 @@
+import 'package:meta/meta.dart';
 import 'package:plugin_kit/plugin_kit.dart';
 
 /// Context object passed to plugin lifecycle hooks.
@@ -83,32 +84,38 @@ class PluginContext {
     required ServiceId serviceId,
   }) => registry.resolveAfter<T>(pluginId: pluginId, serviceId: serviceId);
 
-  /// Send a typed request and await an envelope.
+  /// Send a typed request and await a response. Assertion variant.
   ///
-  /// Delegates to [EventBus.request]: handlers for the
-  /// `Request`/`Response` type pair (merged general + identifier-scoped) are
-  /// walked in priority order and the first non-null response wins. A
-  /// handler returning null concedes to the next; this requires [Response]
-  /// to be nullable for that concession to be expressible.
-  ///
-  /// Throws if no handler is registered, or if every handler concedes and
-  /// [Response] is non-nullable.
+  /// Delegates to [EventBus.request]. Prefer [maybeRequest] when
+  /// concession is a valid outcome at your call site; reach for `request`
+  /// only when you have asserted at least one handler will claim.
+  /// Throws [RequestNotWiredException] if no handler is registered for
+  /// the type pair (or none matches the identifier), and
+  /// [AllConcededException] if every handler conceded and [Response] is
+  /// non-nullable. Handler-thrown exceptions propagate unchanged.
   Future<Response> request<Request, Response>(
     Request request, {
     String? identifier,
   }) => bus.request<Request, Response>(request, identifier: identifier);
 
-  /// Sends a typed request and returns null if no handler can satisfy it.
+  /// Send a typed request and return `null` when the chain produced no
+  /// answer. Canonical variant.
+  ///
+  /// Delegates to [EventBus.maybeRequest]. Returns `null` when no handler
+  /// is registered, no handler matched the identifier, or every handler
+  /// conceded. Handler-thrown exceptions propagate unchanged;
+  /// `maybeRequest` does not swallow them, it catches only the
+  /// framework's own [NoRequestAnswerException] subtypes.
   Future<Response?> maybeRequest<Request, Response>(
     Request request, {
     String? identifier,
   }) => bus.maybeRequest<Request, Response>(request, identifier: identifier);
 
-  /// Synchronous version of [request]. The handler must have been registered
-  /// via [EventBus.onRequestSync]. Throws [StateError] if no handler is
-  /// registered or the handler returns a Future. When [identifier] is
-  /// supplied, identifier-scoped handlers merge with general handlers in
-  /// priority order.
+  /// Synchronous version of [request]. Assertion variant.
+  ///
+  /// Delegates to [EventBus.requestSync]. Same exception contract as
+  /// [request], plus [StateError] if any invoked handler returned a
+  /// [Future]. Prefer [maybeRequestSync] when concession is valid.
   Response requestSync<Request, Response>(
     Request request, {
     String? identifier,
@@ -119,7 +126,10 @@ class PluginContext {
   bool hasRequestHandler<Request, Response>({String? identifier}) =>
       bus.hasRequestHandler<Request, Response>(identifier: identifier);
 
-  /// Like [requestSync] but returns null instead of throwing.
+  /// Synchronous version of [maybeRequest]. Canonical variant.
+  ///
+  /// Delegates to [EventBus.maybeRequestSync]. Returns `null` for the
+  /// no-answer case; handler-thrown exceptions propagate unchanged.
   Response? maybeRequestSync<Request, Response>(
     Request request, {
     String? identifier,
@@ -131,6 +141,25 @@ class PluginContext {
   /// [registry] defaults to a shallow copy of the current registry
   /// (via [ServiceRegistry.copy]) to preserve isolation between original
   /// and copy.
+  ///
+  /// Subclasses MUST override this method to return their own subclass type.
+  /// The framework calls `copyWith()` on the live context to snapshot pre-
+  /// reconcile state and pass it to [Plugin.onPluginSettingsChanged] as
+  /// `oldContext`. Without an override, virtual dispatch falls through to
+  /// this base implementation and the snapshot has the wrong runtime type,
+  /// which causes covariant overrides of `onPluginSettingsChanged` to throw
+  /// `TypeError` mid-reconciliation. See `concepts/custom-context` for the
+  /// required override shape.
+  ///
+  /// TODO(2.0): Replace this annotation-based contract with a typed
+  /// `ContextChange<C>` envelope passed to `Plugin.onPluginSettingsChanged`,
+  /// removing the need for subclasses to override `copyWith()` at all and
+  /// moving the type-preservation guarantee from "subclasser remembers to
+  /// override" to "framework owns the snapshot type." The current contract
+  /// is enforced by `@mustBeOverridden` (analyzer hint, opt-in lint) and a
+  /// debug-only `assert` in the framework's reconcile paths; both can be
+  /// missed in release builds.
+  @mustBeOverridden
   PluginContext copyWith({
     ServiceRegistry? registry,
     Map<String, Object>? extras,
@@ -192,6 +221,7 @@ class GlobalPluginContext extends PluginContext {
   }
 
   @override
+  @mustBeOverridden
   GlobalPluginContext copyWith({
     ServiceRegistry? registry,
     Map<String, Object>? extras,
@@ -243,6 +273,7 @@ class SessionPluginContext extends PluginContext {
   }
 
   @override
+  @mustBeOverridden
   SessionPluginContext copyWith({
     ServiceRegistry? registry,
     Map<String, Object>? extras,

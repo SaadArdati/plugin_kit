@@ -7,15 +7,15 @@ on user intent.
 
 The four cards correspond to the four exposed reading paths:
 
-1. `ClockCard` — `BuildContext.watchEvent<TickEvent>()` inside a
+1. `ClockCard`: `BuildContext.watchEvent<TickEvent>()` inside a
    `StatelessWidget`. Smallest possible call site.
-2. `CounterCard` — `PluginSessionScope.of(context).emit(...)` plus
+2. `CounterCard`: `PluginSessionScope.of(context).emit(...)` plus
    `context.watchEvent<CounterChanged>()`. User intents go in, plugin
    state comes back out.
-3. `HistoryCard` — `SessionListener` mixin on a `State` subclass with
+3. `HistoryCard`: `SessionListener` mixin on a `State` subclass with
    `listen<TickEvent>`. Subscriptions are cancelled in `dispose`
    automatically; the example keeps a rolling window of recent ticks.
-4. `NotifierCard` — `PluginEventNotifier<TickEvent>` consumed through a
+4. `NotifierCard`: `PluginEventNotifier<TickEvent>` consumed through a
    `ValueListenableBuilder`. Same shape that drops directly into
    `ChangeNotifierProvider`, `ValueListenableProvider`, etc., without
    `flutter_plugin_kit` taking a dependency on any of them.

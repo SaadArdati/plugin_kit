@@ -35,6 +35,47 @@ Session plugins can now type their context directly:
 
 No casting, no re-resolving. `context.document` and `context.user` are always there.
 
+## Override `copyWith()` on every subclass
+
+Every subclass MUST override `copyWith()` to return its own type. The framework calls `copyWith()` on the live context to snapshot pre-reconcile state and pass it to `Plugin.onPluginSettingsChanged(oldContext, newContext)` as `oldContext`. Without an override, virtual dispatch falls through to the parent's `copyWith`, which constructs the parent type. Any plugin that overrides `onPluginSettingsChanged` with a covariant subtype will then throw `TypeError` at runtime when `oldContext` arrives as a base-type instance.
+
+```dart
+class EditorSessionContext extends SessionPluginContext {
+  final Document document;
+  final User user;
+
+  EditorSessionContext({
+    required this.document,
+    required this.user,
+    required super.registry,
+    required super.bus,
+    required super.globalBus,
+    super.extras,
+  });
+
+  @override
+  EditorSessionContext copyWith({
+    ServiceRegistry? registry,
+    Map<String, Object>? extras,
+    EventBus? bus,
+    EventBus? globalBus,
+    Document? document,
+    User? user,
+  }) {
+    return EditorSessionContext(
+      document: document ?? this.document,
+      user: user ?? this.user,
+      registry: registry ?? this.registry.copy(),
+      bus: bus ?? this.bus,
+      globalBus: globalBus ?? this.globalBus,
+      extras: extras ?? this.extras,
+    );
+  }
+}
+```
+
+The annotation `@mustBeOverridden` on the parent's `copyWith()` causes the analyzer to warn if you forget. The runtime additionally asserts `oldContext.runtimeType == liveContext.runtimeType` during reconciliation in debug mode, so a missed override surfaces immediately in tests rather than at the first covariant `onPluginSettingsChanged` call.
+
 ## Telling the runtime about it
 
 The runtime does not know your custom context type unless you hand it a factory.

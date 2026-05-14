@@ -11,8 +11,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  plugin_kit: ^1.0.0
-  flutter_plugin_kit: ^0.1.0
+  plugin_kit:
+    path: ../../plugin_kit
+  flutter_plugin_kit:
+    path: ../
 
 dev_dependencies:
   flutter_test:

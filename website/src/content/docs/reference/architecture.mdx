@@ -34,8 +34,8 @@ Plus two orchestration types.
 
 | Type | Role |
 |---|---|
-| `PluginRuntime<G, S>` | The lifecycle engine. Owns the global scope. Creates and reconciles sessions. |
-| `PluginRuntime<G, S>` | Convenience wrapper: stores current settings, streams updates, applies reconciliation across the runtime and all sessions. |
+| `PluginRuntime<G, S>` | The lifecycle engine. Owns the global scope, stores current settings, streams updates, creates and reconciles sessions. |
+| `PluginSession<S>` | A single session's enabled-plugin set, scoped registry, scoped bus, and scoped `SessionPluginContext`. Created and torn down by the runtime; observable via `runtime.sessions`. |
 
 ## Registration, attachment, disposal
 
@@ -58,18 +58,23 @@ After all registrations are in, the runtime:
 
 **Attach phase**
 
-For each enabled plugin in the scope:
+For each enabled plugin in the scope, the runtime runs an internal `_runAttach(context)` step:
 
-1. The runtime binds the context, then calls the user's `plugin.attach(context)` hook.
-2. The runtime iterates `StatefulPluginService`s owned by the plugin, binds each one's context, and calls their `attach()` hook.
-3. Plugins subscribe to events, kick off background work, resolve other services.
+1. Iterate the plugin's owned `StatefulPluginService`s, bind each service's context, and call its `attach()` hook.
+2. Call the user's `plugin.attach(context)` hook.
+
+Each hook runs in isolation: a failure is logged and captured, the remaining services and the plugin's own `attach` still run, and captured failures surface as a `PluginStepAggregateException` once the phase completes. Because services are activated first, the plugin's `attach(context)` can already resolve and use its own services, peer services, and the bus.
 
 **Detach phase**
 
-Mirror of attach, in reverse:
+`_runDetach(context)` mirrors attach in reverse, but with broader cleanup:
 
-1. The user's `plugin.detach(context)` hook runs.
-2. The runtime detaches owned `StatefulPluginService`s (calling each one's `detach()` hook), cancels their tracked subscriptions, and clears bound contexts.
+1. Call the user's `plugin.detach(context)` hook.
+2. For each owned `StatefulPluginService`: call `detach()`, then unbind the service's context (cancels its tracked subscriptions).
+3. Cancel any subscriptions the plugin registered via `PluginHelper.on(context, ...)` / `onRequest(context, ...)` for this context.
+4. Cancel any bindings the plugin registered via `PluginHelper.bind(context, ...)` for this context.
+
+Re-subscribing or re-binding inside a cancel callback is flagged as a leak step failure rather than being silently dropped or re-cancelled.
 
 The practical rule: "I need information from another plugin" belongs in `attach`, not `register`. At register time, peers may not have registered yet.
 
@@ -121,8 +126,8 @@ Overrides from `RuntimeSettings` are applied at registration time. When settings
 
 `resolveAfter` enters the same list at the entry following the caller's `pluginId` and walks the tail. `resolveRaw` returns the wrapper without instantiating; useful for capability inspection.
 
-<Aside type="note" title="Why priorities go in two different directions">
-Service priorities are descending (higher wins). Event priorities are ascending (lower runs first). The reason is that the registry is a competition (who answers this call?) and the bus is a pipeline (who gets to handle this first?). Pipelines want lower numbers to run earlier; competitions want higher numbers to win. Unifying the two would make one of them feel unnatural.
+<Aside type="note" title="Why priorities run in the same direction in both subsystems">
+Service priorities and event priorities are both descending: higher numbers win, higher numbers run first. The registry is a competition (who answers this call?) and the bus is also a competition (who intercepts this event first?). One rule covers both: higher numbers have more authority. Default priority in both subsystems is `Priority.normal` (500), with named stops (`low`, `normal`, `elevated`, `high`, `system`) and `Priority.above(...) / Priority.below(...)` helpers for relative positioning.
 </Aside>
 
 ## Event dispatch
@@ -131,7 +136,7 @@ Service priorities are descending (higher wins). Event priorities are ascending 
 
 1. Build an `EventEnvelope<T>` around the payload.
 2. Notify every `bind` observer.
-3. Merge general handlers with identifier-scoped handlers (if an identifier was provided). Sort ascending by priority.
+3. Merge general handlers with identifier-scoped handlers (if an identifier was provided). Sort descending by priority (higher first).
 4. For each handler, await its execution. Handlers can mutate the payload or call `envelope.stop(...)` to halt propagation.
 5. Return the envelope to the emitter.
 

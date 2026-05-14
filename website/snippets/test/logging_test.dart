@@ -26,7 +26,7 @@ void main() {
         final runtime = PluginRuntime();
         try {
           runtime.init();
-          // If we reach here, no exception was thrown — that is fine.
+          // If we reach here, no exception was thrown, which is fine.
         } on PluginLifecycleException catch (_) {
           // A lifecycle exception from the empty runtime is also acceptable.
         }

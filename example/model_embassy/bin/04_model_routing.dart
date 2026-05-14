@@ -76,13 +76,18 @@ Future<void> _runScenario(
   final finalPassport = prepEvent.passport;
   print('Final passport after routing: $finalPassport');
 
-  final visa = await session.request<AgentBoardingCall, ModelVisa?>(
+  final visa = await session.maybeRequest<AgentBoardingCall, ModelVisa>(
     AgentBoardingCall(finalPassport),
   );
 
+  if (visa == null) {
+    print('No visa issued for the routed passport.');
+    return;
+  }
+
   print('Visa issued: $visa');
 
-  final response = await visa!.client.chat(prompt);
+  final response = await visa.client.chat(prompt);
   print('Response: $response');
 }
 

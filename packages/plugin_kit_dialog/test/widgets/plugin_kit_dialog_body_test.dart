@@ -20,12 +20,12 @@ void main() {
     tester,
   ) async {
     final runtime = PluginRuntime();
-    runtime.init(settings: RuntimeSettings.empty());
+    runtime.init(settings: RuntimeSettings());
     addTearDown(runtime.dispose);
 
     final controller = PluginKitDialogController(
       runtime: runtime,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     await tester.pumpWidget(
@@ -55,12 +55,12 @@ void main() {
     addTearDown(tester.view.reset);
 
     final runtime = PluginRuntime();
-    runtime.init(settings: RuntimeSettings.empty());
+    runtime.init(settings: RuntimeSettings());
     addTearDown(runtime.dispose);
 
     final controller = PluginKitDialogController(
       runtime: runtime,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     await tester.pumpWidget(
@@ -85,7 +85,7 @@ void main() {
     (tester) async {
       late BuildContext capturedContext;
       final runtime = PluginRuntime();
-      runtime.init(settings: RuntimeSettings.empty());
+      runtime.init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       await tester.pumpWidget(
@@ -103,7 +103,7 @@ void main() {
       final futureResult = showPluginKitDialog(
         context: capturedContext,
         runtime: runtime,
-        initialSettings: RuntimeSettings.empty(),
+        initialSettings: RuntimeSettings(),
         onSave: (settings) async => onSaveReceived = settings,
       );
 
@@ -122,7 +122,7 @@ void main() {
   ) async {
     late BuildContext capturedContext;
     final runtime = PluginRuntime()..addPlugin(_StubPlugin());
-    runtime.init(settings: RuntimeSettings.empty());
+    runtime.init(settings: RuntimeSettings());
     addTearDown(runtime.dispose);
 
     await tester.pumpWidget(
@@ -140,7 +140,7 @@ void main() {
     final futureResult = showPluginKitDialog(
       context: capturedContext,
       runtime: runtime,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
       onSave: (settings) async => onSaveReceived = settings,
     );
 
@@ -162,7 +162,7 @@ void main() {
     (tester) async {
       late BuildContext capturedContext;
       final runtime = PluginRuntime()..addPlugin(_StubPlugin());
-      runtime.init(settings: RuntimeSettings.empty());
+      runtime.init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       await tester.pumpWidget(
@@ -180,7 +180,7 @@ void main() {
       final futureResult = showPluginKitDialog(
         context: capturedContext,
         runtime: runtime,
-        initialSettings: RuntimeSettings.empty(),
+        initialSettings: RuntimeSettings(),
         onSave: (_) => saveCompleter.future,
       );
 
@@ -225,7 +225,7 @@ void main() {
   ) async {
     late BuildContext capturedContext;
     final runtime = PluginRuntime();
-    runtime.init(settings: RuntimeSettings.empty());
+    runtime.init(settings: RuntimeSettings());
     addTearDown(runtime.dispose);
 
     await tester.pumpWidget(
@@ -242,7 +242,7 @@ void main() {
     final futureResult = showPluginKitDialog(
       context: capturedContext,
       runtime: runtime,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
       onSave: (_) async {},
     );
 

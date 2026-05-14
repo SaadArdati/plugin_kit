@@ -91,7 +91,7 @@ void main() {
       expect(callCount, 1);
 
       bus.dispose();
-      // After dispose, emit throws StateError — the handler is gone.
+      // After dispose, emit throws StateError; the handler is gone.
       expect(() => bus.emit<String>(event: 'test'), throwsA(isA<StateError>()));
       expect(callCount, 1);
     });
@@ -100,7 +100,7 @@ void main() {
       var called = false;
       bus.bind((e) => called = true);
       bus.dispose();
-      // After dispose, emit throws StateError — no silent no-op.
+      // After dispose, emit throws StateError; no silent no-op.
       expect(() => bus.emit<String>(event: 'test'), throwsA(isA<StateError>()));
       expect(called, isFalse);
     });
@@ -745,7 +745,7 @@ void main() {
     test('throws when no handler is registered', () async {
       expect(
         () => bus.request<SearchQuery, SearchResults>(SearchQuery('x')),
-        throwsA(isA<RequestUnavailableException>()),
+        throwsA(isA<RequestNotWiredException>()),
       );
     });
 
@@ -762,7 +762,13 @@ void main() {
         // merged list for 'agent2' is empty (no general, no agent2-scoped)
         expect(
           () => bus.request<String, String>('query', identifier: 'agent2'),
-          throwsA(isA<RequestUnavailableException>()),
+          throwsA(
+            isA<RequestNotWiredException>().having(
+              (e) => e.wasIdentifierMismatch,
+              'wasIdentifierMismatch',
+              isTrue,
+            ),
+          ),
         );
       },
     );
@@ -799,7 +805,7 @@ void main() {
 
       expect(
         () => bus.request<String, String>('query'),
-        throwsA(isA<RequestUnavailableException>()),
+        throwsA(isA<RequestNotWiredException>()),
       );
     });
 
@@ -827,7 +833,7 @@ void main() {
       bus.onRequest<int, int>((req) async => 42);
       expect(
         () => bus.request<String, String>('query'),
-        throwsA(isA<RequestUnavailableException>()),
+        throwsA(isA<RequestNotWiredException>()),
       );
     });
 
@@ -856,15 +862,15 @@ void main() {
       expect(result, 5);
     });
 
-    test('throws RequestUnavailableException when no handler registered', () {
+    test('throws RequestNotWiredException when no handler registered', () {
       expect(
         () => bus.requestSync<String, int>('hello'),
-        throwsA(isA<RequestUnavailableException>()),
+        throwsA(isA<RequestNotWiredException>()),
       );
     });
 
     test(
-      'throws RequestUnavailableException when handlers exist but merged list is empty for identifier',
+      'throws RequestNotWiredException when handlers exist but merged list is empty for identifier',
       () {
         // Register a handler scoped to 'agent1' only
         bus.onRequestSync<String, int>((req) => 42, identifier: 'agent1');
@@ -873,7 +879,13 @@ void main() {
         // merged list for 'agent2' is empty (no general, no agent2-scoped)
         expect(
           () => bus.requestSync<String, int>('hello', identifier: 'agent2'),
-          throwsA(isA<RequestUnavailableException>()),
+          throwsA(
+            isA<RequestNotWiredException>().having(
+              (e) => e.wasIdentifierMismatch,
+              'wasIdentifierMismatch',
+              isTrue,
+            ),
+          ),
         );
       },
     );
@@ -905,12 +917,12 @@ void main() {
       );
     });
 
-    test('type mismatch throws RequestUnavailableException', () {
+    test('type mismatch throws RequestNotWiredException', () {
       bus.onRequestSync<int, int>((req) => 42);
 
       expect(
         () => bus.requestSync<String, String>('query'),
-        throwsA(isA<RequestUnavailableException>()),
+        throwsA(isA<RequestNotWiredException>()),
       );
     });
 
@@ -972,6 +984,204 @@ void main() {
         throwsA(isA<Exception>()),
       );
     });
+  });
+
+  // ===========================================================================
+  // Exception hierarchy: assertion semantics and handler-throw behavior.
+  // Probes the contract directly: which subtype fires when, whether
+  // handler-thrown exceptions are ever swallowed, and which handlers
+  // beyond a thrower or conceder run.
+  // ===========================================================================
+  group('NoRequestAnswerException hierarchy', () {
+    test(
+      'all handlers concede with non-nullable Response: request throws AllConcededException',
+      () async {
+        bus.onRequest<String, String>((req) async => null);
+        bus.onRequest<String, String>((req) async => null);
+
+        await expectLater(
+          () => bus.request<String, String>('q'),
+          throwsA(isA<AllConcededException>()),
+        );
+      },
+    );
+
+    test(
+      'all handlers concede with non-nullable Response: maybeRequest returns null',
+      () async {
+        bus.onRequest<String, String>((req) async => null);
+        bus.onRequest<String, String>((req) async => null);
+
+        expect(await bus.maybeRequest<String, String>('q'), isNull);
+      },
+    );
+
+    test(
+      'all handlers concede with non-nullable Response (sync): requestSync throws AllConcededException',
+      () {
+        bus.onRequestSync<String, int>((req) => null);
+        bus.onRequestSync<String, int>((req) => null);
+
+        expect(
+          () => bus.requestSync<String, int>('q'),
+          throwsA(isA<AllConcededException>()),
+        );
+      },
+    );
+
+    test(
+      'all handlers concede with non-nullable Response (sync): maybeRequestSync returns null',
+      () {
+        bus.onRequestSync<String, int>((req) => null);
+        bus.onRequestSync<String, int>((req) => null);
+
+        expect(bus.maybeRequestSync<String, int>('q'), isNull);
+      },
+    );
+
+    test(
+      'single handler throws: request propagates the original exception unwrapped',
+      () async {
+        bus.onRequest<String, String>(
+          (req) async => throw StateError('handler exploded'),
+        );
+
+        await expectLater(
+          () => bus.request<String, String>('q'),
+          throwsA(isA<StateError>()),
+        );
+      },
+    );
+
+    test(
+      'single handler throws: maybeRequest propagates the original exception (does not swallow)',
+      () async {
+        bus.onRequest<String, String>(
+          (req) async => throw StateError('handler exploded'),
+        );
+
+        await expectLater(
+          () => bus.maybeRequest<String, String>('q'),
+          throwsA(isA<StateError>()),
+        );
+      },
+    );
+
+    test(
+      'first handler concedes, second throws: throwing handler exception wins; first is not retried',
+      () async {
+        var firstCalls = 0;
+        bus.onRequest<String, String>((req) async {
+          firstCalls++;
+          return null;
+        }, priority: 10);
+        bus.onRequest<String, String>(
+          (req) async => throw StateError('second boom'),
+          priority: 5,
+        );
+
+        await expectLater(
+          () => bus.request<String, String>('q'),
+          throwsA(isA<StateError>()),
+        );
+        expect(firstCalls, 1);
+      },
+    );
+
+    test(
+      'first handler throws: second handler is not reached for either method',
+      () async {
+        var secondCalls = 0;
+        bus.onRequest<String, String>(
+          (req) async => throw StateError('first boom'),
+          priority: 10,
+        );
+        bus.onRequest<String, String>((req) async {
+          secondCalls++;
+          return 'never';
+        }, priority: 5);
+
+        await expectLater(
+          () => bus.request<String, String>('q'),
+          throwsA(isA<StateError>()),
+        );
+        expect(secondCalls, 0);
+
+        // Same expectation with maybeRequest: exception still propagates,
+        // second handler still not reached.
+        await expectLater(
+          () => bus.maybeRequest<String, String>('q'),
+          throwsA(isA<StateError>()),
+        );
+        expect(secondCalls, 0);
+      },
+    );
+
+    test(
+      'RequestNotWiredException.toString mentions wiring guidance',
+      () async {
+        try {
+          await bus.request<String, String>('q');
+          fail('expected RequestNotWiredException');
+        } on RequestNotWiredException catch (e) {
+          expect(
+            e.toString(),
+            contains('Register a handler with EventBus.onRequest'),
+          );
+        }
+      },
+    );
+
+    test(
+      'AllConcededException.toString mentions maybeRequest suggestion',
+      () async {
+        bus.onRequest<String, String>((req) async => null);
+
+        try {
+          await bus.request<String, String>('q');
+          fail('expected AllConcededException');
+        } on AllConcededException catch (e) {
+          expect(e.toString(), contains('maybeRequest'));
+          expect(e.suggestion, contains('maybeRequest'));
+        }
+      },
+    );
+
+    test(
+      'maybeRequest catches both subtypes via shared NoRequestAnswerException base',
+      () async {
+        // No handler at all: RequestNotWiredException would fire on request,
+        // but maybeRequest returns null.
+        final r1 = await bus.maybeRequest<String, String>('q');
+        expect(r1, isNull);
+
+        // Handlers registered, all concede: AllConcededException would
+        // fire on request, but maybeRequest returns null.
+        bus.onRequest<String, String>((req) async => null);
+        final r2 = await bus.maybeRequest<String, String>('q');
+        expect(r2, isNull);
+      },
+    );
+
+    test(
+      'subtypes are catchable via the sealed base NoRequestAnswerException',
+      () async {
+        try {
+          await bus.request<String, String>('q');
+          fail('expected NoRequestAnswerException');
+        } on NoRequestAnswerException catch (e) {
+          expect(e, isA<RequestNotWiredException>());
+        }
+
+        bus.onRequest<String, String>((req) async => null);
+        try {
+          await bus.request<String, String>('q');
+          fail('expected NoRequestAnswerException');
+        } on NoRequestAnswerException catch (e) {
+          expect(e, isA<AllConcededException>());
+        }
+      },
+    );
   });
 
   // ===========================================================================
@@ -1149,7 +1359,7 @@ void main() {
       sub.cancel();
       expect(
         () => bus.requestSync<String, int>('q'),
-        throwsA(isA<RequestUnavailableException>()),
+        throwsA(isA<RequestNotWiredException>()),
       );
     });
 

@@ -18,7 +18,7 @@ class _DialogResultHarness extends StatefulWidget {
 class _DialogResultHarnessState extends State<_DialogResultHarness> {
   late final PluginRuntime _runtime;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
-  RuntimeSettings _settings = RuntimeSettings.empty();
+  RuntimeSettings _settings = RuntimeSettings();
 
   @override
   void initState() {
@@ -26,7 +26,7 @@ class _DialogResultHarnessState extends State<_DialogResultHarness> {
     _runtime = PluginRuntime()
       ..addPlugins(demoPlugins())
       ..addPlugin(visualsPlugin())
-      ..init(settings: RuntimeSettings.empty());
+      ..init(settings: RuntimeSettings());
   }
 
   @override
@@ -92,7 +92,7 @@ void main() {
   });
 
   testWidgets('dialog cancels cleanly and returns null', (tester) async {
-    RuntimeSettings? returned = RuntimeSettings.empty();
+    RuntimeSettings? returned = RuntimeSettings();
     await tester.pumpWidget(
       _DialogResultHarness(
         onReturned: (RuntimeSettings? value) {

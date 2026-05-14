@@ -45,8 +45,16 @@ class UnicornRequest {
   const UnicornRequest();
 }
 
-/// Registers three request handlers: Janet's async review, the sync stock
-/// room, and a VIP lane keyed on a nullable response type.
+/// Registers three request handlers on the same `(SupplyRequest,
+/// SupplyResponse)` bucket plus a synchronous stock-room lookup:
+///
+/// 1. Janet's async review at default priority.
+/// 2. The sync stock room on `(InventoryCheck, StockLevel)`.
+/// 3. Dr. Nefarious's VIP lane at `Priority.elevated`, which runs first
+///    and concedes (returns `null`) for non-VIP requesters so Janet's
+///    handler takes the call. Concession works regardless of whether
+///    `Response` is nullable; `null` is the framework's "I won't answer"
+///    signal.
 class ProcurementPlugin extends SessionPlugin {
   @override
   PluginId get pluginId => const PluginId('procurement');
@@ -97,11 +105,12 @@ class ProcurementPlugin extends SessionPlugin {
       return StockLevel(req.event.item, count);
     });
 
-    // Dr. Nefarious's VIP lane. Keyed on (SupplyRequest, SupplyResponse?),
-    // a different bucket from Janet's (SupplyRequest, SupplyResponse).
-    // Requests issued against the nullable type land here; non-VIP requests
-    // fall through to null.
-    context.bus.onRequest<SupplyRequest, SupplyResponse?>((req) async {
+    // Dr. Nefarious's VIP lane. Runs first by virtue of its elevated
+    // priority. Non-VIP requests concede via null so the next handler
+    // (Janet) gets a turn. Concession works whether or not Response is
+    // nullable; returning null is the framework's "I won't answer"
+    // signal regardless of the typedef.
+    context.bus.onRequest<SupplyRequest, SupplyResponse>((req) async {
       if (req.event.requestedBy == 'Dr. Nefarious') {
         return SupplyResponse(
           approved: true,
@@ -110,8 +119,8 @@ class ProcurementPlugin extends SessionPlugin {
               '(${req.event.quantity}x ${req.event.item})',
         );
       }
-      return null; // No downstream handler; caller gets null.
-    }, priority: 0);
+      return null; // Concession; Janet's lower-priority handler takes over.
+    }, priority: Priority.elevated);
   }
 }
 
@@ -121,12 +130,11 @@ Future<void> main() async {
 
   print('=== Supply Requisitions ===\n');
 
+  // Doug isn't on the VIP list, so the elevated-priority handler concedes
+  // and Janet's default-priority handler answers. Demonstrates the normal
+  // approval branch of Janet's review.
   final capeRequest = await session.request<SupplyRequest, SupplyResponse>(
-    const SupplyRequest(
-      'Villain Capes (Medium)',
-      5,
-      requestedBy: 'Dr. Nefarious',
-    ),
+    const SupplyRequest('Villain Capes (Medium)', 5, requestedBy: 'Doug'),
   );
   print('Cape request: ${capeRequest.message}');
 
@@ -171,12 +179,12 @@ Future<void> main() async {
 
   print('\n=== Priority Cascade ===\n');
 
-  final vipRequest = await session.request<SupplyRequest, SupplyResponse?>(
+  final vipRequest = await session.maybeRequest<SupplyRequest, SupplyResponse>(
     const SupplyRequest('Death Ray Mk V', 1, requestedBy: 'Dr. Nefarious'),
   );
   print('VIP request: ${vipRequest?.message}');
 
-  final garyRequest = await session.request<SupplyRequest, SupplyResponse?>(
+  final garyRequest = await session.maybeRequest<SupplyRequest, SupplyResponse>(
     const SupplyRequest('Stapler (gold-plated)', 1, requestedBy: 'Gary'),
   );
   print("Gary's request: ${garyRequest?.message}");

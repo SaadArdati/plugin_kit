@@ -38,9 +38,7 @@ When you call `runtime.init(...)`, this happens in order:
 
 After that, the runtime is ready to spawn sessions. You can open one per user action, keep one long-lived session, or mix the two.
 
-<Code code={extractRegion(pluginLifecycleDart, 'runtime-init-default-enabled')} lang="dart" />
-
-`defaultEnabledPluginIds` is the "if settings say nothing, turn these on" set. Omit it and unspecified stable plugins default to on, experimental ones default to off.
+Plugins not listed in `RuntimeSettings.plugins` default on, unless they carry `FeatureFlag.experimental`, which defaults off. To narrow the enabled set, build a `RuntimeSettings` listing the plugin ids you want and pass it to `init` (or, later, to `updateSettings`).
 
 ## Settings reconciliation
 
@@ -73,8 +71,7 @@ When deciding which plugins are enabled for a given settings snapshot, the runti
 
 1. `FeatureFlag.locked` wins immediately. Nothing can disable a locked plugin.
 2. Explicit `RuntimeSettings.plugins[pluginId].enabled` is respected next.
-3. If the runtime was initialized with a `defaultEnabledPluginIds` set, unspecified plugins fall back to that.
-4. Otherwise the experimental heuristic: stable plugins default on, experimental plugins default off.
+3. Otherwise the experimental heuristic: stable plugins default on, experimental plugins default off.
 
 </Steps>
 

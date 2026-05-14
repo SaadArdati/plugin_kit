@@ -80,21 +80,34 @@ typedef EventHandler<T> = FutureOr<void> Function(EventEnvelope<T> e);
 /// Used with [EventBus.onSync] and safe to invoke via [EventBus.emitSync].
 typedef SyncEventHandler<T> = void Function(EventEnvelope<T> e);
 
-/// Handler function for request/response communication.
+/// Handler function for request/response communication on an [EventBus].
 ///
-/// Receives the request wrapped in a [EventEnvelope] and must
-/// return a response of type [Response].
+/// Receives the request wrapped in an [EventEnvelope]. Returns a value
+/// of type [Response] to claim the request, or `null` to concede so the
+/// next handler in priority order can claim. Concession by `null` is
+/// supported regardless of whether [Response] is itself nullable.
 ///
-/// See [EventBus.onRequest] and [EventBus.request].
+/// Throwing from a handler signals a real error. The chain stops and
+/// the original exception propagates to the caller. Do not throw to
+/// express concession; return `null`. The framework never converts a
+/// throw into a "try the next handler" signal.
+///
+/// See [EventBus.onRequest] for handler registration, and
+/// [EventBus.request] / [EventBus.maybeRequest] for the consumer-side
+/// semantics (especially which method to choose when concession is a
+/// valid outcome at the call site).
 typedef RequestHandler<Request, Response> =
-    FutureOr<Response> Function(EventEnvelope<Request> e);
+    FutureOr<Response?> Function(EventEnvelope<Request> e);
 
 /// Synchronous handler function for request/response communication.
 ///
 /// Like [RequestHandler] but guaranteed to return synchronously.
 /// Used with [EventBus.onRequestSync] and [EventBus.requestSync].
+/// Same concession-by-`null` and throw-stops-chain rules apply: returning
+/// `null` concedes to the next handler regardless of whether [Response]
+/// is nullable; throwing stops the chain and propagates.
 typedef SyncRequestHandler<Request, Response> =
-    Response Function(EventEnvelope<Request> e);
+    Response? Function(EventEnvelope<Request> e);
 
 /// Callback for observing all non-internal events emitted on the bus.
 ///
@@ -288,8 +301,21 @@ class EventBus {
     return list != null && list.isNotEmpty;
   }
 
-  /// Send a typed request and walk registered handlers in priority
-  /// order until one claims it.
+  /// Send a typed request and walk registered handlers in priority order
+  /// until one claims it.
+  ///
+  /// Prefer [maybeRequest] over this method when concession is a valid
+  /// outcome at your call site. `request` is the assertion variant: it
+  /// throws if the chain bottoms out without an answer. Use it only when
+  /// the caller has guaranteed (by construction, by invariant, by
+  /// registration order) that at least one handler will claim. If that
+  /// guarantee ever breaks, the thrown exception surfaces the violation
+  /// loudly, which is the assertion's purpose.
+  ///
+  /// For chains where the answer can legitimately be "no one could
+  /// handle this," reach for [maybeRequest]: it returns `null` for the
+  /// same case and propagates handler-thrown exceptions unchanged, so
+  /// real errors and "no answer" remain distinguishable.
   ///
   /// Dispatch model (mirrors [emit]):
   ///
@@ -297,19 +323,29 @@ class EventBus {
   ///     into a single descending-priority sequence (higher priority
   ///     number runs first).
   ///   * Each handler is invoked with the wrapped request. A handler
-  ///     claims the call by returning a non-null [Response];
-  ///     dispatch stops and that value is returned.
-  ///   * A handler concedes by returning `null`: the next
-  ///     handler in priority order gets a turn. This requires
-  ///     [Response] to be nullable; for non-nullable [Response] the
-  ///     first handler to return wins (handlers can't return null,
-  ///     so cascade is a no-op).
+  ///     claims the call by returning a non-null [Response]; dispatch
+  ///     stops and that value is returned.
+  ///   * A handler concedes by returning `null`. Dispatch continues to
+  ///     the next handler.
+  ///   * A handler that throws stops dispatch immediately; the original
+  ///     exception propagates to this method's caller. Subsequent
+  ///     handlers do not run.
   ///
-  /// Throws if no handler is registered, or if every registered
-  /// handler concedes and [Response] is non-nullable.
+  /// Throws:
+  /// - [RequestNotWiredException] if no handler is registered for the
+  ///   `(Request, Response)` type pair, or no handler matched the
+  ///   requested [identifier]. Wire a handler with [onRequest].
+  /// - [AllConcededException] if every handler ran and returned `null`
+  ///   and [Response] is non-nullable. The exception message recommends
+  ///   switching to [maybeRequest]. When [Response] is nullable, this
+  ///   method returns `null` instead of throwing.
+  /// - Any exception a handler raised, unwrapped.
   ///
-  /// Example:
+  /// Example (asserted-success case):
   /// ```dart
+  /// // The runtime always registers a fallback CompletionProvider, so
+  /// // we assert at least one handler will claim. If that assumption
+  /// // breaks, AllConcededException tells us our setup is wrong.
   /// final results = await bus.request<SearchQuery, SearchResults>(
   ///   SearchQuery(query: 'dart patterns'),
   /// );
@@ -321,11 +357,10 @@ class EventBus {
     _checkNotDisposed();
     final raw = _requestHandlers[(Request, Response)];
     if (raw == null) {
-      throw RequestUnavailableException(
+      throw RequestNotWiredException(
         requestType: Request,
         responseType: Response,
         identifier: identifier,
-        reason: RequestUnavailableReason.noRegistration,
       );
     }
     final buckets = raw as _RequestBuckets<Request, Response>;
@@ -334,11 +369,11 @@ class EventBus {
     buckets.ensureIdSorted(identifier);
     final merged = _mergePrioritized(buckets.general, buckets.byId[identifier]);
     if (merged.isEmpty) {
-      throw RequestUnavailableException(
+      throw RequestNotWiredException(
         requestType: Request,
         responseType: Response,
         identifier: identifier,
-        reason: RequestUnavailableReason.noMatchingHandler,
+        wasIdentifierMismatch: true,
       );
     }
 
@@ -355,19 +390,51 @@ class EventBus {
     }
 
     if (null is Response) return lastResponse as Response;
-    throw RequestUnavailableException(
+    throw AllConcededException(
       requestType: Request,
       responseType: Response,
       identifier: identifier,
-      reason: RequestUnavailableReason.allConceded,
     );
   }
 
-  /// Sends a typed request and returns `null` if no handler is registered or
-  /// every registered handler concedes (returns `null`).
+  /// Send a typed request and return `null` when the chain produced no
+  /// answer.
   ///
-  /// Exceptions thrown by handlers propagate. A `null` return means the
-  /// request was unavailable, not that handler execution failed.
+  /// The canonical method for chains where concession is a valid outcome.
+  /// Walks the same priority-ordered handler list as [request], with one
+  /// critical difference at the consumer's call site:
+  ///
+  /// - First non-null handler response is returned (as `Future<Response>`
+  ///   inside the nullable wrapper).
+  /// - No handler registered, or no handler matched [identifier], or
+  ///   every handler conceded, returns `null`.
+  /// - Handler threw: original exception propagates. `maybeRequest`
+  ///   does NOT swallow handler exceptions; it catches only the
+  ///   framework's own [NoRequestAnswerException] subtypes
+  ///   ([RequestNotWiredException] and [AllConcededException]).
+  ///
+  /// This preserves the distinction between "no one could answer"
+  /// (returned as `null`) and "a handler had a real failure"
+  /// (propagated as the original exception type). A typical consumer:
+  ///
+  /// ```dart
+  /// try {
+  ///   final visa = await bus.maybeRequest<AgentBoardingCall, ModelVisa>(
+  ///     AgentBoardingCall(passport),
+  ///   );
+  ///   if (visa == null) {
+  ///     // No provider could serve this passport; normal flow.
+  ///     return _refusalResponse(passport);
+  ///   }
+  ///   return await visa.client.chat(prompt);
+  /// } on UpstreamApiException catch (e) {
+  ///   // A handler errored. Real failure, surface it.
+  ///   return _errorResponse(e);
+  /// }
+  /// ```
+  ///
+  /// Reach for [request] (which throws on the no-answer case) only when
+  /// the caller has guaranteed at least one handler will claim.
   Future<Response?> maybeRequest<Request, Response>(
     Request request, {
     String? identifier,
@@ -377,21 +444,36 @@ class EventBus {
         request,
         identifier: identifier,
       );
-    } on RequestUnavailableException {
+    } on NoRequestAnswerException {
       return null;
     }
   }
 
   /// Register a handler for request/response communication.
   ///
-  /// When [request] is called with matching `Request`/`Response` types,
-  /// this handler is invoked to produce the envelope. Returns an
-  /// [EventSubscription] for cancellation.
+  /// When `request<Request, Response>(...)` is called with a matching
+  /// `(Request, Response)` type pair (and, optionally, [identifier]),
+  /// handlers walk in descending priority. Each handler may:
+  ///
+  /// - Return a non-null value to claim the call; dispatch stops there.
+  /// - Return `null` to concede so the next handler can claim.
+  /// - Throw to signal a real error; the chain stops and the exception
+  ///   propagates to the caller unchanged. Subsequent handlers do not
+  ///   run.
+  ///
+  /// Concession by `null` works whether or not [Response] is nullable.
+  /// `null` is the framework's "I won't answer" signal. Throws are
+  /// reserved for genuine errors. See [request] for how the consumer
+  /// observes the all-conceded case (it depends on which method they
+  /// call).
+  ///
+  /// Returns an [EventSubscription] for cancellation.
   ///
   /// Example:
   /// ```dart
-  /// final sub = bus.onRequest<SearchQuery, SearchResults>((req) async {
-  ///   return await performSearch(req.event.query);
+  /// final sub = bus.onRequest<SearchQuery, SearchResults>((env) async {
+  ///   final hit = await tryProvider(env.event);
+  ///   return hit; // null to let the next provider try
   /// }, priority: 10);
   /// ```
   EventSubscription onRequest<Request, Response>(
@@ -442,13 +524,30 @@ class EventBus {
     );
   }
 
-  /// Synchronous priority-cascade version of [request]. Same dispatch
-  /// model: handlers tried in priority order, first non-null wins,
-  /// nullable [Response] enables concession via `null`: but every
-  /// invoked handler must return synchronously.
+  /// Synchronous priority-cascade version of [request].
   ///
-  /// Handlers MUST have been registered via [onRequestSync]; if any
-  /// invoked handler returns a [Future], throws [StateError].
+  /// Prefer [maybeRequestSync] over this method when concession is a
+  /// valid outcome at your call site. `requestSync` is the assertion
+  /// variant: it throws if the chain bottoms out without an answer. Use
+  /// it only when the caller has guaranteed that at least one handler
+  /// will claim.
+  ///
+  /// Dispatch model mirrors [request]: handlers walk in priority order,
+  /// first non-null wins, concession via `null` continues to the next
+  /// handler, throws stop the chain and propagate. Every invoked
+  /// handler must return synchronously; if any invoked handler returns a
+  /// [Future], throws [StateError].
+  ///
+  /// Throws:
+  /// - [RequestNotWiredException] if no handler is registered for the
+  ///   `(Request, Response)` type pair, or no handler matched the
+  ///   requested [identifier].
+  /// - [AllConcededException] if every handler ran and returned `null`
+  ///   and [Response] is non-nullable. The message recommends switching
+  ///   to [maybeRequestSync]. When [Response] is nullable, this method
+  ///   returns `null` instead of throwing.
+  /// - [StateError] if any invoked handler returned a [Future].
+  /// - Any exception a handler raised, unwrapped.
   ///
   /// ```dart
   /// final passport = bus.requestSync<ModelRef, ModelPassport>(
@@ -462,11 +561,10 @@ class EventBus {
     _checkNotDisposed();
     final raw = _requestHandlers[(Request, Response)];
     if (raw == null) {
-      throw RequestUnavailableException(
+      throw RequestNotWiredException(
         requestType: Request,
         responseType: Response,
         identifier: identifier,
-        reason: RequestUnavailableReason.noRegistration,
       );
     }
     final buckets = raw as _RequestBuckets<Request, Response>;
@@ -475,11 +573,11 @@ class EventBus {
     buckets.ensureIdSorted(identifier);
     final merged = _mergePrioritized(buckets.general, buckets.byId[identifier]);
     if (merged.isEmpty) {
-      throw RequestUnavailableException(
+      throw RequestNotWiredException(
         requestType: Request,
         responseType: Response,
         identifier: identifier,
-        reason: RequestUnavailableReason.noMatchingHandler,
+        wasIdentifierMismatch: true,
       );
     }
 
@@ -493,7 +591,7 @@ class EventBus {
       final result = entry.run(wrapped);
       if (result is Future) {
         throw StateError(
-          'requestSync called but handler for ${Request.toString()} → ${Response.toString()} '
+          'requestSync called but handler for ${Request.toString()} -> ${Response.toString()} '
           'returned a Future. Use request() instead, or register with onRequestSync().',
         );
       }
@@ -502,26 +600,32 @@ class EventBus {
     }
 
     if (null is Response) return lastResponse as Response;
-    throw RequestUnavailableException(
+    throw AllConcededException(
       requestType: Request,
       responseType: Response,
       identifier: identifier,
-      reason: RequestUnavailableReason.allConceded,
     );
   }
 
-  /// Sends a typed request synchronously and returns `null` if no handler is
-  /// registered or every registered handler concedes (returns `null`).
+  /// Synchronous priority-cascade version of [maybeRequest].
   ///
-  /// Exceptions thrown by handlers propagate. A `null` return means the
-  /// request was unavailable, not that handler execution failed.
+  /// The canonical synchronous method for chains where concession is a
+  /// valid outcome. Returns `null` when no handler is registered, no
+  /// handler matched [identifier], or every registered handler conceded.
+  /// Exceptions thrown by handlers propagate unchanged; `maybeRequestSync`
+  /// does NOT swallow handler exceptions, only the framework's own
+  /// [NoRequestAnswerException] subtypes
+  /// ([RequestNotWiredException] and [AllConcededException]).
+  ///
+  /// Reach for [requestSync] (which throws on the no-answer case) only
+  /// when the caller has guaranteed at least one handler will claim.
   Response? maybeRequestSync<Request, Response>(
     Request request, {
     String? identifier,
   }) {
     try {
       return requestSync<Request, Response>(request, identifier: identifier);
-    } on RequestUnavailableException {
+    } on NoRequestAnswerException {
       return null;
     }
   }
@@ -529,12 +633,14 @@ class EventBus {
   /// Register a synchronous handler for request/response communication.
   ///
   /// Like [onRequest] but enforces at compile time that the handler
-  /// returns synchronously. Handlers registered this way are safe to
-  /// invoke via [requestSync].
+  /// returns synchronously. Same concession-by-`null` and
+  /// throw-stops-chain semantics; see [requestSync] / [maybeRequestSync]
+  /// for consumer-side details (and especially which method to choose
+  /// when concession is a valid outcome at the call site).
   ///
   /// ```dart
   /// bus.onRequestSync<ModelRef, ModelPassport>((req) {
-  ///   return findModel(req.event); // must be sync
+  ///   return findModel(req.event); // null to let the next provider try
   /// });
   /// ```
   EventSubscription onRequestSync<Request, Response>(
@@ -751,7 +857,7 @@ class _EventBuckets<T> {
 class _RequestEntry<Request, Response> implements _PriorityEntry {
   @override
   final int priority;
-  final FutureOr<Response> Function(EventEnvelope<Request>) run;
+  final FutureOr<Response?> Function(EventEnvelope<Request>) run;
 
   _RequestEntry({required this.priority, required this.run});
 }

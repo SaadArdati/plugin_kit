@@ -41,20 +41,20 @@ The bus distinguishes user-emitted events (visible to `bind` callbacks) from int
 ```dart
 EventSubscription on<T>(
   EventHandler<T> handler, {
-  int priority = 0,
+  int priority = Priority.normal,
   String? identifier,
 });
 
 EventSubscription onSync<T>(
   SyncEventHandler<T> handler, {
-  int priority = 0,
+  int priority = Priority.normal,
   String? identifier,
 });
 ```
 
 `EventHandler<T>` is `FutureOr<void> Function(EventEnvelope<T>)`. `SyncEventHandler<T>` is the strictly-synchronous variant, `void Function(EventEnvelope<T>)`. Use `onSync` when the handler will be invoked through `emitSync` and async would be a bug.
 
-Default priority is `0`. Lower runs first, mirroring the pipeline metaphor. Registry priority is the opposite (higher wins); the rationale is in the concept doc.
+Default priority is `Priority.normal` (500). Higher runs first, matching the registry: in both subsystems, higher numbers mean more authority. A handler at `Priority.elevated` (1000) runs before one at `Priority.normal` (500).
 
 The returned `EventSubscription` is a typed handle that supports only `cancel()`. It is intentionally NOT a `StreamSubscription` because the bus is not stream-backed and has no backpressure, data callbacks, or `asFuture` semantics. Distinct from `EventBinding`, which is the declarative descriptor consumed by the Flutter listener-lifecycle utilities.
 
@@ -94,7 +94,7 @@ The `internal` parameter on `emit` itself is rarely used directly; prefer `emitI
 
 ## Request/response
 
-The same bus also does typed RPC. The dispatch model mirrors `emit`: general handlers are merged with identifier-scoped handlers into one ascending-priority sequence. Each handler is invoked in turn. The first handler to return a non-null `Response` wins; returning `null` concedes to the next handler.
+The same bus also does typed RPC. The dispatch model mirrors `emit`: general handlers are merged with identifier-scoped handlers into one descending-priority sequence (higher first). Each handler is invoked in turn. The first handler to return a non-null `Response` wins; returning `null` concedes to the next handler.
 
 For non-nullable `Response`, the first handler that runs wins by definition (it cannot return null). The cascade behavior matters most when `Response` is nullable, which is the usual shape.
 
@@ -103,7 +103,7 @@ For non-nullable `Response`, the first handler that runs wins by definition (it 
 ```dart
 EventSubscription onRequest<Request, Response>(
   RequestHandler<Request, Response> handler, {
-  int priority = 0,
+  int priority = Priority.normal,
   String? identifier,
 });
 
@@ -118,16 +118,23 @@ Future<Response?> maybeRequest<Request, Response>(
 });
 ```
 
-`RequestHandler<Request, Response>` is `FutureOr<Response> Function(EventEnvelope<Request>)`. The handler reads `envelope.event` to get the request payload.
+`RequestHandler<Request, Response>` is `FutureOr<Response?> Function(EventEnvelope<Request>)`. The handler reads `envelope.event` to get the request payload, returns a non-null `Response` to claim, returns `null` to concede (so the next handler in priority order can try), or throws to signal a real error (the chain stops and the original exception propagates).
 
-`request` throws `RequestUnavailableException` (which `implements Exception`) carrying a `RequestUnavailableReason` enum: `noRegistration` (no handler for the type pair), `noMatchingHandler` (handlers exist but none match the requested identifier scope), or `allConceded` (every handler returned null on a non-nullable `Response`). `maybeRequest` catches `RequestUnavailableException` and returns `null`; any *other* exception thrown by a handler still propagates, which is what most call sites actually want. Switch on `reason` when you need to distinguish causes.
+Pick the right method at the call site. `maybeRequest` is the canonical method when concession is a valid outcome: it returns `null` for the no-answer case. `request` is the assertion variant; use it only when at least one handler is guaranteed to claim.
+
+When the chain produces no answer, `request` throws one of two sealed subtypes of `NoRequestAnswerException`:
+
+- `RequestNotWiredException`: no handler is registered for the type pair, or no handler matched the requested identifier (carries a `wasIdentifierMismatch` boolean to distinguish). Almost always a wiring bug.
+- `AllConcededException`: every registered handler ran and returned `null` on a non-nullable `Response`. The message recommends switching to `maybeRequest`.
+
+`maybeRequest` catches `NoRequestAnswerException` and converts it to `null`. Any *other* exception thrown by a handler propagates unchanged through both methods; `maybeRequest` does not swallow handler exceptions.
 
 ### Sync
 
 ```dart
 EventSubscription onRequestSync<Request, Response>(
   SyncRequestHandler<Request, Response> handler, {
-  int priority = 0,
+  int priority = Priority.normal,
   String? identifier,
 });
 
@@ -142,9 +149,9 @@ Response? maybeRequestSync<Request, Response>(
 });
 ```
 
-`SyncRequestHandler<Request, Response>` is `Response Function(EventEnvelope<Request>)`. Handlers registered via `onRequestSync` are stored in the same buckets as async ones; the sync wrapper exists to refuse `Future` returns at the call boundary.
+`SyncRequestHandler<Request, Response>` is `Response? Function(EventEnvelope<Request>)`. Same concession-by-`null` and throw-stops-chain rules as the async variant. Handlers registered via `onRequestSync` are stored in the same buckets as async ones; the sync wrapper exists to refuse `Future` returns at the call boundary.
 
-`requestSync` throws `StateError` if any invoked handler returns a `Future`. Same throw conditions as `request` for missing or fully-conceding handlers; both surface as `RequestUnavailableException`. `maybeRequestSync` catches `RequestUnavailableException` and returns `null` on availability failure; any *other* exception thrown by a handler (including the `StateError` on a Future-returning sync handler) propagates, matching the async `maybeRequest` contract.
+`requestSync` throws `StateError` if any invoked handler returns a `Future`. Same no-answer throw conditions as `request`: `RequestNotWiredException` for missing handlers, `AllConcededException` for fully-conceding chains with non-nullable `Response`. `maybeRequestSync` catches `NoRequestAnswerException` and returns `null` on the no-answer case; any *other* exception thrown by a handler (including the `StateError` on a Future-returning sync handler) propagates, matching the async `maybeRequest` contract.
 
 ## Identifier scoping
 
@@ -175,19 +182,19 @@ extension PluginHelper on Plugin {
   EventSubscription on<E>(
     PluginContext context,
     EventHandler<E> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   });
   EventSubscription onRequest<Request, Response>(
     PluginContext context,
     RequestHandler<Request, Response> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   });
   EventSubscription onRequestSync<Request, Response>(
     PluginContext context,
     SyncRequestHandler<Request, Response> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   });
   void Function() bind(PluginContext context, EventBindingCallback callback);
@@ -208,15 +215,15 @@ Each subscription helper registers on `context.bus` and bookkeeps the returned `
 `StatefulPluginService` exposes the same shape via the `StatefulPluginServiceHelper` extension. The service holds its own `context` reference (bound by the framework before `attach()` runs), so these helpers do NOT take a `PluginContext` parameter:
 
 ```dart
-EventSubscription on<E>(EventHandler<E> handler, {int priority = 0, String? identifier});
+EventSubscription on<E>(EventHandler<E> handler, {int priority = Priority.normal, String? identifier});
 EventSubscription onRequest<Request, Response>(
   RequestHandler<Request, Response> handler, {
-  int priority = 0,
+  int priority = Priority.normal,
   String? identifier,
 });
 EventSubscription onRequestSync<Request, Response>(
   SyncRequestHandler<Request, Response> handler, {
-  int priority = 0,
+  int priority = Priority.normal,
   String? identifier,
 });
 void Function() bind(EventBindingCallback callback);
@@ -236,17 +243,17 @@ extension SessionHelper on PluginSession {
 
   EventSubscription on<T>(
     EventHandler<T> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   });
   EventSubscription onRequest<Request, Response>(
     RequestHandler<Request, Response> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   });
   EventSubscription onRequestSync<Request, Response>(
     SyncRequestHandler<Request, Response> handler, {
-    int priority = 0,
+    int priority = Priority.normal,
     String? identifier,
   });
 
@@ -280,7 +287,7 @@ extension SessionBroadcast on List<PluginSession> {
 }
 ```
 
-It awaits each session's emit in sequence. A handler that throws on one session aborts the broadcast for the rest; if you need fan-out with isolation, iterate and `try`/`catch` per session yourself.
+Each session's cascade starts concurrently (`Future.wait` with `eagerError: false`); every session runs to completion regardless of whether a peer threw, and the first error encountered surfaces on the returned future once all sessions have settled. If you need to inspect each session's outcome independently, iterate the list and `try`/`catch` around `session.bus.emit` yourself.
 
 The full cross-scope story, including why isolation defaults are intentional, is on [Sessions](/concepts/sessions/).
 

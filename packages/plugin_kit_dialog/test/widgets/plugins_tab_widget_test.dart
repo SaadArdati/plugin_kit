@@ -24,7 +24,7 @@ PluginKitDialogController _stubController({
         featureFlags: [if (spec.experimental) FeatureFlag.experimental],
       ),
   ]);
-  runtime.init(settings: RuntimeSettings.empty());
+  runtime.init(settings: RuntimeSettings());
   runtime.globalRegistry.registerSingleton<PluginChipsBuilder>(
     pluginId: const PluginId('test'),
     serviceId: PluginsTabPlugin.chipsBuilderId,
@@ -33,7 +33,7 @@ PluginKitDialogController _stubController({
 
   final controller = PluginKitDialogController(
     runtime: runtime,
-    initialSettings: RuntimeSettings.empty(),
+    initialSettings: RuntimeSettings(),
   );
 
   controller.replaceWorking(

@@ -56,7 +56,7 @@ JSON-round-trippable, value-equal.
 Both key types are typed handles, not raw `String`s. A `Map<String, PluginConfig>` or `Map<String, ServiceSettings>` literal will not type-check against the corresponding field.
 
 Both constructors are `const`. The default constructor's parameters default
-to `const {}`. `RuntimeSettings.empty()` is the canonical "no overrides"
+to `const {}`. `RuntimeSettings()` is the canonical "no overrides"
 starting point; prefer it over passing two empty maps explicitly.
 
 <Code code={extractRegion(runtimeSettingsSource, 'runtime-settings-empty')} lang="dart" />
@@ -80,7 +80,7 @@ Map<String, dynamic> getServiceConfig(Pin scopedKey);
 `isPluginEnabled` reads only the explicit `PluginConfig.enabled` value. It
 does not consult feature flags or experimental defaults. For the
 fully-resolved enablement decision (locked plugins, experimental fallback,
-`defaultEnabledPluginIds`), use `PluginRuntime.isPluginEnabled`. See [Plugins
+dependency cascade), use `PluginRuntime.isPluginEnabled`. See [Plugins
 & Lifecycle](/reference/plugins-and-lifecycle/).
 
 ### `copyWith`
@@ -179,9 +179,10 @@ class ServiceSettings {
 | `config` | `Map<String, dynamic>` | `const {}` | Injected into `PluginService.injectSettings` on resolve. The service reads it via `config` (a `ConfigNode`). |
 | `priority` | `int?` | `null` | Optional override. Replaces the priority used at registration. `null` means "leave the registration default in place". |
 
-Higher priority wins resolution; the default registration priority is `50`.
-A `priority` override applies to the targeted registration, not the slot, so
-two competing plugins on the same slot can each carry independent overrides.
+Higher priority wins resolution; the default registration priority is
+`Priority.normal` (500). A `priority` override applies to the targeted
+registration, not the slot, so two competing plugins on the same slot can
+each carry independent overrides.
 
 `copyWith({bool? enabled, Map<String, dynamic>? config, int? priority})`
 follows standard semantics.

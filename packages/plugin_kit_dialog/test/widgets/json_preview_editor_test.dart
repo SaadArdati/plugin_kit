@@ -12,11 +12,11 @@ Widget _wrap(PluginKitDialogController controller, Widget child) => MaterialApp(
 );
 
 PluginKitDialogController _ctrl() {
-  final runtime = PluginRuntime()..init(settings: RuntimeSettings.empty());
+  final runtime = PluginRuntime()..init(settings: RuntimeSettings());
   addTearDown(runtime.dispose);
   return PluginKitDialogController(
     runtime: runtime,
-    initialSettings: RuntimeSettings.empty(),
+    initialSettings: RuntimeSettings(),
   );
 }
 
@@ -46,7 +46,7 @@ void main() {
     );
 
     await tester.pump(const Duration(milliseconds: 100));
-    expect(controller.draft.working, RuntimeSettings.empty());
+    expect(controller.draft.working, RuntimeSettings());
   });
 
   testWidgets('debounce fires on valid JSON and updates controller draft', (
@@ -80,7 +80,7 @@ void main() {
       await tester.enterText(find.byType(TextField), '{not json');
       await tester.pump(const Duration(milliseconds: 350));
 
-      expect(controller.draft.working, RuntimeSettings.empty());
+      expect(controller.draft.working, RuntimeSettings());
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
     },
   );
@@ -99,7 +99,7 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 350));
 
-    expect(controller.draft.working, RuntimeSettings.empty());
+    expect(controller.draft.working, RuntimeSettings());
     expect(find.textContaining('Settings shape mismatch'), findsOneWidget);
   });
 
@@ -184,12 +184,12 @@ void main() {
     'showAllServices keeps editable JSON minimal and shows read-only expansion',
     (tester) async {
       final runtime = PluginRuntime()..addPlugin(_JsonPreviewPlugin());
-      runtime.init(settings: RuntimeSettings.empty());
+      runtime.init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final controller = PluginKitDialogController(
         runtime: runtime,
-        initialSettings: RuntimeSettings.empty(),
+        initialSettings: RuntimeSettings(),
       );
 
       await tester.pumpWidget(
@@ -242,12 +242,12 @@ void main() {
     tester,
   ) async {
     final runtime = PluginRuntime()..addPlugin(_JsonPreviewPlugin());
-    runtime.init(settings: RuntimeSettings.empty());
+    runtime.init(settings: RuntimeSettings());
     addTearDown(runtime.dispose);
 
     final controller = PluginKitDialogController(
       runtime: runtime,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     await tester.pumpWidget(
@@ -267,7 +267,7 @@ void main() {
     controller.showAllServices = false;
     await tester.pump();
 
-    expect(controller.draft.working, RuntimeSettings.empty());
+    expect(controller.draft.working, RuntimeSettings());
     expect(controller.isDirty, isFalse);
   });
 }

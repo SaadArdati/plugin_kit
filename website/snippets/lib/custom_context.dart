@@ -61,9 +61,27 @@ class EditorSessionContext extends SessionPluginContext {
     required super.registry,
     required super.bus,
     required super.globalBus,
+    super.extras,
     required this.document,
     required this.user,
   });
+
+  @override
+  EditorSessionContext copyWith({
+    ServiceRegistry? registry,
+    Map<String, Object>? extras,
+    EventBus? bus,
+    EventBus? globalBus,
+  }) {
+    return EditorSessionContext(
+      registry: registry ?? this.registry.copy(),
+      bus: bus ?? this.bus,
+      globalBus: globalBus ?? this.globalBus,
+      extras: extras ?? this.extras,
+      document: document,
+      user: user,
+    );
+  }
 }
 // #enddocregion session-plugin-context-subclass
 
@@ -94,9 +112,27 @@ class EditorGlobalContext extends GlobalPluginContext {
     required super.registry,
     required super.bus,
     required super.sessions,
+    super.extras,
     required this.application,
     required this.flags,
   });
+
+  @override
+  EditorGlobalContext copyWith({
+    ServiceRegistry? registry,
+    Map<String, Object>? extras,
+    EventBus? bus,
+    List<PluginSession<SessionPluginContext>>? sessions,
+  }) {
+    return EditorGlobalContext(
+      registry: registry ?? this.registry.copy(),
+      bus: bus ?? this.bus,
+      sessions: sessions ?? this.sessions,
+      extras: extras ?? this.extras,
+      application: application,
+      flags: flags,
+    );
+  }
 }
 // #enddocregion global-plugin-context-subclass
 
@@ -116,26 +152,21 @@ class AnalyticsPlugin extends GlobalPlugin<EditorGlobalContext> {
 
 // #docregion plugin-context-stub
 PluginContext makeTestContext() {
-  return PluginContext.stub(registry: ServiceRegistry.empty(), bus: EventBus());
+  // `.stub()` defaults to `ServiceRegistry.empty()` and a fresh `EventBus()`.
+  // Pass overrides only when you need to swap in a fake.
+  return PluginContext.stub();
 }
 // #enddocregion plugin-context-stub
 
 // #docregion session-plugin-context-stub
 SessionPluginContext makeTestSessionContext() {
-  return SessionPluginContext.stub(
-    registry: ServiceRegistry.empty(),
-    bus: EventBus(),
-    globalBus: EventBus(),
-  );
+  return SessionPluginContext.stub();
 }
 // #enddocregion session-plugin-context-stub
 
 // #docregion global-plugin-context-stub
 GlobalPluginContext makeTestGlobalContext() {
-  return GlobalPluginContext.stub(
-    registry: ServiceRegistry.empty(),
-    bus: EventBus(),
-  );
+  return GlobalPluginContext.stub();
 }
 // #enddocregion global-plugin-context-stub
 

@@ -31,9 +31,29 @@ class DialogGlobalContext extends GlobalPluginContext {
     required super.registry,
     required super.bus,
     super.sessions,
+    super.extras,
     required this.runtime,
     required this.controller,
     required this.onSave,
     required this.onCancel,
   });
+
+  @override
+  DialogGlobalContext copyWith({
+    ServiceRegistry? registry,
+    Map<String, Object>? extras,
+    EventBus? bus,
+    List<PluginSession<SessionPluginContext>>? sessions,
+  }) {
+    return DialogGlobalContext(
+      registry: registry ?? this.registry.copy(),
+      bus: bus ?? this.bus,
+      sessions: sessions ?? this.sessions,
+      extras: extras ?? this.extras,
+      runtime: runtime,
+      controller: controller,
+      onSave: onSave,
+      onCancel: onCancel,
+    );
+  }
 }

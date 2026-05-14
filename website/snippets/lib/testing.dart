@@ -1,16 +1,8 @@
-/// Snippets for test patterns: PluginContext.stub, level 1/2/3 testing.
+/// Snippets for test patterns: pure service tests, stub-based bus tests,
+/// and runtime end-to-end tests.
 library;
 
 import 'package:plugin_kit/plugin_kit.dart';
-
-/// A notification request used in testing snippets.
-class NotificationRequest {
-  /// The notification message.
-  final String message;
-
-  /// Creates a [NotificationRequest] with [message].
-  const NotificationRequest(this.message);
-}
 
 /// A new message event used in ChatBuffer tests.
 class NewMessageEvent {
@@ -89,39 +81,55 @@ Future<void> testAssertCascade() async {
 }
 // #enddocregion testing-assert-cascade
 
-/// A notification plugin that answers notification requests.
-class NotificationPlugin extends SessionPlugin {
+/// Event the stub-based test below drives through the session bus.
+class UserJoined {
+  /// The username that just joined.
+  final String username;
+
+  /// Creates a [UserJoined] with [username].
+  const UserJoined(this.username);
+}
+
+/// A plugin whose reactive logic lives in [Plugin.attach] using the
+/// inherited `on` helper. Tests against a [SessionPluginContext.stub]
+/// only work when the reactive code is wired this way; plugins that
+/// delegate to a [StatefulPluginService] need a real runtime, because
+/// the stateful service's context binding only happens inside
+/// `PluginRuntime`'s attach orchestration.
+class UsernameRecorderPlugin extends SessionPlugin {
+  /// Usernames the handler has recorded.
+  final List<String> recorded = [];
+
   @override
-  PluginId get pluginId => const PluginId('notifier');
+  PluginId get pluginId => const PluginId('username_recorder');
 
   @override
   void attach(SessionPluginContext context) {
-    onRequest<NotificationRequest, bool>(context, (req) async {
-      return req.event.message.isNotEmpty;
+    on<UserJoined>(context, (envelope) {
+      recorded.add(envelope.event.username);
     });
   }
 }
 
 // #docregion testing-level-2-plugin
-/// Level 2: test a plugin against a real context.
-Future<bool> testPluginAnswersRequest() async {
-  final registry = ServiceRegistry();
-  final bus = EventBus();
-  final context = SessionPluginContext(
-    registry: registry,
-    bus: bus,
-    globalBus: EventBus(),
+/// Drive a plugin's [Plugin.attach] handlers against a
+/// [SessionPluginContext.stub] and emit on the stub's bus. No runtime
+/// orchestration: cheaper than `PluginRuntime` when the question is "does
+/// this plugin react to this event correctly?" rather than "does the
+/// runtime sequence things correctly?".
+Future<void> testPluginRecordsOnEvent() async {
+  final ctx = SessionPluginContext.stub();
+  final plugin = UsernameRecorderPlugin();
+
+  plugin.register(ctx.registry.scopedFor(plugin.pluginId));
+  plugin.attach(ctx);
+
+  await ctx.bus.emit<UserJoined>(event: const UserJoined('alice'));
+
+  assert(
+    plugin.recorded.single == 'alice',
+    'attach should have wired the handler against the stub bus',
   );
-
-  final plugin = NotificationPlugin();
-  plugin.register(registry.scopedFor(plugin.pluginId));
-  plugin.attach(context);
-
-  final result = await bus.request<NotificationRequest, bool>(
-    const NotificationRequest('hello'),
-  );
-
-  return result; // true
 }
 // #enddocregion testing-level-2-plugin
 

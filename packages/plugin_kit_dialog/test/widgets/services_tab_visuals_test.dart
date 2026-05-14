@@ -62,14 +62,14 @@ Future<TabDescriptor> _buildServicesTabDescriptor({
 }) async {
   final controller = PluginKitDialogController(
     runtime: targetRuntime,
-    initialSettings: RuntimeSettings.empty(),
+    initialSettings: RuntimeSettings(),
   );
 
   final dialogRuntime =
       PluginRuntime<DialogGlobalContext, SessionPluginContext>(
         plugins: [FieldRenderersPlugin(), ServicesTabPlugin()],
       )..init(
-        settings: RuntimeSettings.empty(),
+        settings: RuntimeSettings(),
         globalContextFactory: (registry, bus, sessions) => DialogGlobalContext(
           registry: registry,
           bus: bus,
@@ -107,7 +107,7 @@ void main() {
           },
         ),
       )
-      ..init(settings: RuntimeSettings.empty());
+      ..init(settings: RuntimeSettings());
     addTearDown(targetRuntime.dispose);
 
     final descriptor = await _buildServicesTabDescriptor(
@@ -137,7 +137,7 @@ void main() {
             },
           ),
         )
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(targetRuntime.dispose);
 
       final descriptor = await _buildServicesTabDescriptor(
@@ -157,7 +157,7 @@ void main() {
     (tester) async {
       final targetRuntime = PluginRuntime()
         ..addPlugin(_DartOnlyConfigurablePlugin())
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(targetRuntime.dispose);
 
       final descriptor = await _buildServicesTabDescriptor(
@@ -192,12 +192,12 @@ void main() {
             },
           ),
         )
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       addTearDown(targetRuntime.dispose);
 
       final controller = PluginKitDialogController(
         runtime: targetRuntime,
-        initialSettings: RuntimeSettings.empty(),
+        initialSettings: RuntimeSettings(),
       );
 
       await tester.pumpWidget(

@@ -4,6 +4,7 @@
       "source": "website/snippets/lib/plugin_lifecycle.dart",
       "region": "session-plugin-basic"
     },
+    null,
     {
       "source": "website/snippets/lib/logging.dart",
       "region": "logging-root-listen-main"
@@ -198,8 +199,8 @@
   ],
   "skills/plugin-kit/testing.md": [
     {
-      "source": "website/snippets/lib/custom_context.dart",
-      "region": "plugin-context-stub"
+      "source": "website/snippets/lib/testing.dart",
+      "region": "testing-level-1-service"
     },
     {
       "source": "website/snippets/lib/testing.dart",
@@ -207,7 +208,15 @@
     },
     {
       "source": "website/snippets/lib/testing.dart",
+      "region": "testing-level-2-plugin"
+    },
+    {
+      "source": "website/snippets/lib/testing.dart",
       "region": "testing-assert-cascade"
+    },
+    {
+      "source": "website/snippets/lib/testing.dart",
+      "region": "testing-level-3-lifecycle"
     }
   ]
 }

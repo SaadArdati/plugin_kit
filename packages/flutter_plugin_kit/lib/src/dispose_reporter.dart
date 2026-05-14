@@ -8,9 +8,9 @@ import 'package:flutter/foundation.dart';
 ///
 /// Used internally by `PluginRuntimeScope` and `PluginSessionScope` for
 /// every owned-resource teardown. The handler captures `Object`, not a
-/// concrete type, so any exception thrown by the underlying `dispose()` —
-/// `PluginLifecycleException`, `StateError`, anything else a plugin
-/// raises — surfaces in `tester.takeException()` rather than disappearing.
+/// concrete type, so any exception thrown by the underlying `dispose()`
+/// (`PluginLifecycleException`, `StateError`, anything else a plugin
+/// raises) surfaces in `tester.takeException()` rather than disappearing.
 ///
 /// Both sync and async throws are reported. [Future.sync] catches a
 /// synchronous throw from invoking [dispose] and routes it through the

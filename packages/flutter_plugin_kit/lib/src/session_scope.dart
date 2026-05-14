@@ -31,7 +31,7 @@ class PluginSessionScope extends StatefulWidget {
   /// Creates a session scope. At most one of [session] or [runtime] may
   /// be supplied; with neither, the scope falls back to the ambient
   /// [PluginRuntimeScope]. The assertion in the initializer list catches
-  /// the misconfiguration in debug mode — supplying both would otherwise
+  /// the misconfiguration in debug mode; supplying both would otherwise
   /// silently prefer [session], which is rarely what the caller intends.
   const PluginSessionScope({
     super.key,

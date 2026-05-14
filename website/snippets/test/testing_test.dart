@@ -22,9 +22,8 @@ void main() {
   });
 
   group('testing-level-2-plugin', () {
-    test('plugin answers notification request', () async {
-      final result = await testPluginAnswersRequest();
-      expect(result, isTrue);
+    test('plugin records username through stub bus', () async {
+      await testPluginRecordsOnEvent();
     });
   });
 

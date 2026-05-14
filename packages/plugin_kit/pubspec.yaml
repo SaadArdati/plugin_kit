@@ -1,6 +1,6 @@
 name: plugin_kit
 description: A powerful plug'n'play plugin system for any Dart project.
-version: 1.0.0
+version: 0.1.0
 publish_to: none
 resolution: workspace
 

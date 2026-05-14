@@ -24,10 +24,8 @@ class _PluginKitDialogDemoAppState extends State<PluginKitDialogDemoApp> {
 
   late final PluginRuntime _runtime;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
-  RuntimeSettings _settings = RuntimeSettings.empty();
-  String _settingsPreview = _jsonEncoder.convert(
-    RuntimeSettings.empty().toJson(),
-  );
+  RuntimeSettings _settings = RuntimeSettings();
+  String _settingsPreview = _jsonEncoder.convert(RuntimeSettings().toJson());
 
   @override
   void initState() {
@@ -35,7 +33,7 @@ class _PluginKitDialogDemoAppState extends State<PluginKitDialogDemoApp> {
     _runtime = PluginRuntime()
       ..addPlugins(demoPlugins())
       ..addPlugin(visualsPlugin())
-      ..init(settings: RuntimeSettings.empty());
+      ..init(settings: RuntimeSettings());
   }
 
   @override

@@ -9,12 +9,12 @@ import 'package:plugin_kit_dialog/src/runtime/plugins/services_tab_plugin.dart';
 void main() {
   test('dialog runtime constructs and disposes cleanly', () async {
     final target = PluginRuntime();
-    target.init(settings: RuntimeSettings.empty());
+    target.init(settings: RuntimeSettings());
     addTearDown(target.dispose);
 
     final controller = PluginKitDialogController(
       runtime: target,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     final runtime =

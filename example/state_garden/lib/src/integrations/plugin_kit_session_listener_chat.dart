@@ -19,7 +19,7 @@ import '../widgets/chat_view.dart';
 /// Use this mixin when the host is a pure-Dart object (cubit, controller,
 /// `ChangeNotifier`) that owns its session for its full lifetime. For a
 /// `State<W>` subscribing to an ambient session, prefer
-/// `PluginSessionStateListener` from `package:flutter_plugin_kit` — it
+/// `PluginSessionStateListener` from `package:flutter_plugin_kit`; it
 /// re-attaches across session swaps automatically and ties cancellation
 /// to the State's dispose.
 class ChatSessionListenerNotifier extends ChangeNotifier

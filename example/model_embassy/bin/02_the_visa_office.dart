@@ -29,7 +29,7 @@ class VerboseVisaOffice extends VisaOffice {
     // single verbose handler so every claim/concede decision is visible.
     print('  [Visa Office] Attached and listening for boarding calls.\n');
 
-    onRequest<AgentBoardingCall, ModelVisa?>((req) async {
+    onRequest<AgentBoardingCall, ModelVisa>((req) async {
       final passport = req.event.passport;
       print(
         '  [Visa Office] Reviewing passport: '
@@ -86,10 +86,11 @@ Future<void> main() async {
   );
 
   print('Presenting passport: $anthropicPassport');
-  final anthropicVisa = await session.request<AgentBoardingCall, ModelVisa?>(
-    AgentBoardingCall(anthropicPassport),
-  );
-  print('Result: $anthropicVisa\n');
+  final anthropicVisa = await session
+      .maybeRequest<AgentBoardingCall, ModelVisa>(
+        AgentBoardingCall(anthropicPassport),
+      );
+  print('Result: ${anthropicVisa ?? 'No visa issued.'}\n');
 
   // Passport 2: an unrecognised family. maybeRequest returns null instead
   // of throwing when every handler concedes.
@@ -99,7 +100,7 @@ Future<void> main() async {
   );
 
   print('Presenting passport: $unknownPassport');
-  final unknownVisa = await session.maybeRequest<AgentBoardingCall, ModelVisa?>(
+  final unknownVisa = await session.maybeRequest<AgentBoardingCall, ModelVisa>(
     AgentBoardingCall(unknownPassport),
   );
   print(

@@ -57,18 +57,18 @@ class BeforeSaveEvent {
   const BeforeSaveEvent({required this.documentId});
 }
 
-// #docregion event-bus-on-emit
 Future<void> demonstrateOnAndEmit(PluginContext context) async {
+  // #docregion event-bus-on-emit
   context.bus.on<UserLoggedInEvent>((env) {
     print('User logged in: ${env.event.userId}');
   });
 
   await context.bus.emit<UserLoggedInEvent>(event: UserLoggedInEvent('u_123'));
+  // #enddocregion event-bus-on-emit
 }
-// #enddocregion event-bus-on-emit
 
-// #docregion event-bus-priority
 void demonstratePriority(PluginContext context) {
+  // #docregion event-bus-priority
   context.bus.on<UserMessage>((env) {
     if (env.event.text.contains('spam')) {
       env.stop(const UserMessage(text: '[blocked]'));
@@ -78,8 +78,8 @@ void demonstratePriority(PluginContext context) {
   context.bus.on<UserMessage>((env) {
     print('Processing: ${env.event.text}');
   }, priority: 10);
+  // #enddocregion event-bus-priority
 }
-// #enddocregion event-bus-priority
 
 // #docregion event-bus-bind
 void Function() demonstrateBind(PluginContext context) {
@@ -92,13 +92,17 @@ void Function() demonstrateBind(PluginContext context) {
 
 // #docregion event-bus-request-response
 Future<SearchResults?> demonstrateRequest(PluginContext context) async {
-  context.bus.onRequest<SearchQuery, SearchResults?>((req) async {
+  // Concession works regardless of whether [Response] is nullable;
+  // return null to let the next handler claim.
+  context.bus.onRequest<SearchQuery, SearchResults>((req) async {
     if (req.event.query.isEmpty) return null;
 
     return SearchResults(results: ['result_${req.event.query}']);
   }, priority: 0);
 
-  return context.bus.request<SearchQuery, SearchResults?>(
+  // Canonical: maybeRequest returns null if no handler claims. Reach for
+  // request only when at least one handler is guaranteed to claim.
+  return context.bus.maybeRequest<SearchQuery, SearchResults>(
     const SearchQuery(query: 'dart patterns'),
   );
 }
@@ -217,21 +221,28 @@ Future<void> correctEmitUsage(PluginContext context) async {
 
 // #docregion event-bus-maybe-request
 /// Demonstrates maybeRequest returning null when no handler answers.
+///
+/// `maybeRequest` is the canonical method when concession is a valid
+/// outcome: returns `null` for the no-answer case (no handler wired or
+/// every handler conceded) and propagates handler-thrown exceptions
+/// unchanged. Reach for `request` only when at least one handler is
+/// guaranteed to claim; the assertion fires loudly if it ever breaks.
 Future<void> demonstrateMaybeRequest(PluginContext context) async {
-  context.bus.onRequest<SearchQuery, SearchResults?>((env) async {
+  context.bus.onRequest<SearchQuery, SearchResults>((env) async {
     if (env.event.query.isEmpty) return null;
     return SearchResults(results: ['result_${env.event.query}']);
   });
 
-  final result = await context.bus.maybeRequest<SearchQuery, SearchResults?>(
+  // Canonical: returns null when nobody answered.
+  final result = await context.bus.maybeRequest<SearchQuery, SearchResults>(
     const SearchQuery(query: 'dart'),
   );
-  // result is SearchResults?
 
-  final result2 = await context.bus.request<SearchQuery, SearchResults?>(
+  // Assertion variant: throws AllConcededException if every handler
+  // conceded. Use only when at least one handler is guaranteed to claim.
+  final result2 = await context.bus.request<SearchQuery, SearchResults>(
     const SearchQuery(query: 'dart'),
   );
-  // result2 is SearchResults?, no throw on null cascade.
   print('$result $result2');
 }
 // #enddocregion event-bus-maybe-request
@@ -273,8 +284,12 @@ class FindOpenPort {
 
 // #docregion events-request-find-port
 /// Demonstrates request/response for finding an open port.
+///
+/// Multiple port providers may register handlers and concede when they
+/// cannot serve. `maybeRequest` is canonical here: returns `null` when
+/// no provider could find a port.
 Future<int?> requestOpenPort(PluginContext context) async {
-  final port = await context.bus.request<FindOpenPort, int?>(
+  final port = await context.bus.maybeRequest<FindOpenPort, int>(
     const FindOpenPort(),
   );
   return port;

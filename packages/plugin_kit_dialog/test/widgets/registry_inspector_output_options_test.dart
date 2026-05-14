@@ -13,7 +13,7 @@ Widget _wrap(Widget child) => MaterialApp(
 PluginKitDialogController _controllerFor(PluginRuntime runtime) {
   return PluginKitDialogController(
     runtime: runtime,
-    initialSettings: RuntimeSettings.empty(),
+    initialSettings: RuntimeSettings(),
   );
 }
 
@@ -31,7 +31,7 @@ void main() {
   testWidgets('OutputOptionsCard toggles via Switch', (tester) async {
     final controller = PluginKitDialogController(
       runtime: PluginRuntime(),
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
     await tester.pumpWidget(_wrap(OutputOptionsCard(controller: controller)));
 
@@ -44,7 +44,7 @@ void main() {
   testWidgets(
     'ServiceRegistryInspector renders without crashing on an empty runtime',
     (tester) async {
-      final runtime = PluginRuntime()..init(settings: RuntimeSettings.empty());
+      final runtime = PluginRuntime()..init(settings: RuntimeSettings());
       final controller = _controllerFor(runtime);
       addTearDown(runtime.dispose);
 
@@ -66,7 +66,7 @@ void main() {
         _StubPlugin('alpha', ['foo', 'bar.baz']),
         _StubPlugin('beta', ['qux']),
       ])
-      ..init(settings: RuntimeSettings.empty());
+      ..init(settings: RuntimeSettings());
     final controller = _controllerFor(runtime);
     addTearDown(runtime.dispose);
 
@@ -93,7 +93,7 @@ void main() {
         _StubPlugin('alpha', ['foo']),
         _StubPlugin('beta', ['bar']),
       ])
-      ..init(settings: RuntimeSettings.empty());
+      ..init(settings: RuntimeSettings());
     final controller = _controllerFor(runtime);
     addTearDown(runtime.dispose);
 
@@ -112,7 +112,7 @@ void main() {
   });
 
   testWidgets('selected filter chip label is emphasized', (tester) async {
-    final runtime = PluginRuntime()..init(settings: RuntimeSettings.empty());
+    final runtime = PluginRuntime()..init(settings: RuntimeSettings());
     final controller = _controllerFor(runtime);
     addTearDown(runtime.dispose);
 
@@ -147,7 +147,7 @@ void main() {
             priority: 100,
           ),
         ])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       final controller = _controllerFor(runtime);
       addTearDown(runtime.dispose);
 
@@ -196,7 +196,7 @@ void main() {
           _StubPlugin('alpha', ['agent.model']),
           _StubPlugin('plugin_kit_visuals', ['plugin_visual.auto_retry']),
         ])
-        ..init(settings: RuntimeSettings.empty());
+        ..init(settings: RuntimeSettings());
       final controller = _controllerFor(runtime);
       addTearDown(runtime.dispose);
 
@@ -243,7 +243,7 @@ void main() {
           priority: 100,
         ),
       ])
-      ..init(settings: RuntimeSettings.empty());
+      ..init(settings: RuntimeSettings());
     final controller = _controllerFor(runtime);
     controller.setPluginEnabled(const PluginId('low'), false);
     addTearDown(runtime.dispose);

@@ -75,8 +75,26 @@ class CustomGlobalContext extends GlobalPluginContext {
     required super.registry,
     required super.bus,
     required this.custom,
+    super.extras,
     super.sessions,
   });
+
+  @override
+  CustomGlobalContext copyWith({
+    ServiceRegistry? registry,
+    Map<String, Object>? extras,
+    EventBus? bus,
+    List<PluginSession<SessionPluginContext>>? sessions,
+    String? custom,
+  }) {
+    return CustomGlobalContext(
+      registry: registry ?? this.registry.copy(),
+      bus: bus ?? this.bus,
+      extras: extras ?? this.extras,
+      sessions: sessions ?? this.sessions,
+      custom: custom ?? this.custom,
+    );
+  }
 }
 
 class CustomSessionContext extends SessionPluginContext {
@@ -87,7 +105,25 @@ class CustomSessionContext extends SessionPluginContext {
     required super.bus,
     required super.globalBus,
     required this.custom,
+    super.extras,
   });
+
+  @override
+  CustomSessionContext copyWith({
+    ServiceRegistry? registry,
+    Map<String, Object>? extras,
+    EventBus? bus,
+    EventBus? globalBus,
+    String? custom,
+  }) {
+    return CustomSessionContext(
+      registry: registry ?? this.registry.copy(),
+      bus: bus ?? this.bus,
+      globalBus: globalBus ?? this.globalBus,
+      extras: extras ?? this.extras,
+      custom: custom ?? this.custom,
+    );
+  }
 }
 
 class TestSessionPlugin extends SessionPlugin {

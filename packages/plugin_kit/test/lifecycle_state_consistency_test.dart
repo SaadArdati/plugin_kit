@@ -66,9 +66,17 @@ void main() {
     test(
       'session-plugin register throw leaves session.isPluginEnabled false',
       () async {
+        // Start the plugin disabled so init / createSession do not trip
+        // the failure path. The test drives the throw via the off->on
+        // transition in updateSessionSettings below.
+        const initial = RuntimeSettings(
+          plugins: {
+            PluginId('session_register_throw'): PluginConfig(enabled: false),
+          },
+        );
         final runtime = PluginRuntime(plugins: [_ThrowsOnSessionRegister()])
-          ..init(defaultEnabledPluginIds: const {});
-        final session = await runtime.createSession();
+          ..init(settings: initial);
+        final session = await runtime.createSession(settings: initial);
 
         await expectLater(
           () => runtime.updateSessionSettings(
@@ -97,9 +105,14 @@ void main() {
     test(
       'session-plugin attach throw leaves session.isPluginEnabled false',
       () async {
+        const initial = RuntimeSettings(
+          plugins: {
+            PluginId('session_attach_throw'): PluginConfig(enabled: false),
+          },
+        );
         final runtime = PluginRuntime(plugins: [_ThrowsOnSessionAttach()])
-          ..init(defaultEnabledPluginIds: const {});
-        final session = await runtime.createSession();
+          ..init(settings: initial);
+        final session = await runtime.createSession(settings: initial);
 
         await expectLater(
           () => runtime.updateSessionSettings(
@@ -130,8 +143,16 @@ void main() {
     test(
       'global-plugin register throw leaves attachedGlobalPluginIds clean',
       () async {
+        // Start the plugin disabled so init does not trip the failure
+        // path. The test drives the throw via updateSettings below.
         final runtime = PluginRuntime(plugins: [_ThrowsOnGlobalRegister()])
-          ..init(defaultEnabledPluginIds: const {});
+          ..init(
+            settings: const RuntimeSettings(
+              plugins: {
+                PluginId('global_register_throw'): PluginConfig(enabled: false),
+              },
+            ),
+          );
 
         await expectLater(
           () => runtime.updateSettings(
@@ -164,7 +185,13 @@ void main() {
       'global-plugin attach throw leaves attachedGlobalPluginIds clean',
       () async {
         final runtime = PluginRuntime(plugins: [_ThrowsOnGlobalAttach()])
-          ..init(defaultEnabledPluginIds: const {});
+          ..init(
+            settings: const RuntimeSettings(
+              plugins: {
+                PluginId('global_attach_throw'): PluginConfig(enabled: false),
+              },
+            ),
+          );
 
         await expectLater(
           () => runtime.updateSettings(

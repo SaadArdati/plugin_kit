@@ -44,7 +44,7 @@ Future<void> _pumpDialog(
 PluginKitDialogController _buildController(PluginRuntime runtime) {
   return PluginKitDialogController(
     runtime: runtime,
-    initialSettings: RuntimeSettings.empty(),
+    initialSettings: RuntimeSettings(),
   );
 }
 
@@ -52,7 +52,7 @@ PluginRuntime _buildRuntime() {
   final runtime = PluginRuntime();
   runtime.addPlugins(demoPlugins());
   runtime.addPlugin(visualsPlugin());
-  runtime.init(settings: RuntimeSettings.empty());
+  runtime.init(settings: RuntimeSettings());
   return runtime;
 }
 

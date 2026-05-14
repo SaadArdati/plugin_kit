@@ -1,102 +1,105 @@
 ---
 title: Testing
-description: Patterns for unit-testing plugins, services, and runtime behavior.
+description: "Test plugin behavior at the right depth: pure service logic, stub-based bus tests, or runtime end-to-end."
 ---
 
-import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import { Code } from '@astrojs/starlight/components';
 import { extractRegion } from '../../../utils/excerpt.mjs';
 import testingSnippets from '../../../../../website/snippets/lib/testing.dart?raw';
-import serviceRegistryTestSource from '../../../../../packages/plugin_kit/test/service_registry_test.dart?raw';
-import runtimeTestSource from '../../../../../packages/plugin_kit/test/runtime_test.dart?raw';
 
-Plugins are plain Dart classes, so most of what you do to test them is what you would do for any Dart class: construct, poke, assert. The parts that are specific to Plugin Kit are how to set up a registry, a bus, a context, or a whole runtime without spinning up your actual application.
+Plugins are plain Dart classes, so most plugin testing is just Dart testing. The framework-specific question is: when does a test need a stub context, and when does it need a full `PluginRuntime`? Three questions cover almost every case.
 
-Three common levels of test, from cheapest to most integrated.
+## What we test, what we don't
 
-This page is the verification pass for the guide path: after a feature is a
-plugin, its behavior should be testable at the same level you expect it to
-work.
+- Fake at your boundaries: repositories, IO clients, external APIs. Don't fake the framework primitives (bus, registry, context, runtime); use them.
+- Use the blessed factories. `PluginContext.stub()`, `SessionPluginContext.stub()`, and `GlobalPluginContext.stub()` already give you a real registry and bus wired together. If you find yourself hand-constructing a context, there's a helper.
+- Each test owns its setup. Don't share a context, a registry, or a bus across tests.
+- `StatefulPluginService.attach` only runs inside the runtime. A stub bypasses `_runAttach`, so the service's `context` getter throws when accessed. Drive stateful services through a real `PluginRuntime`, or test their pure methods in isolation.
 
-## Level 1: Test a service in isolation
+## Does this service compute correctly?
 
-A `PluginService` is a class with a `config` getter. For unit tests, construct it and feed it settings directly.
+Construct the service, inject settings if it reads any, call the method, assert. No framework primitives needed.
 
 <Code code={extractRegion(testingSnippets, 'testing-level-1-service')} lang="dart" />
 
-For `StatefulPluginService`, the same approach works until you need `attach`. At that point, step up to Level 2.
+This is the cheapest tier and where the most plugin tests should land: config readers, formatters, query builders, anything whose behavior is a pure function of its inputs.
 
 <Aside type="note" title="`pluginId` is not set until resolution">
-`PluginService.pluginId` and `serviceId` are stamped by the registry on resolve. If your test needs those values populated, construct the service through a `ServiceRegistry` instead of calling the constructor directly.
+`PluginService.pluginId` and `serviceId` are stamped by the registry on resolve. If your test reads those values, resolve the service through a registry instead of calling the constructor directly.
 </Aside>
 
-## Level 2: Real registry, real bus, real context
+## Does it interact correctly with the bus and registry?
 
-When your target depends on `ServiceRegistry`, `EventBus`, or a `PluginContext`, wire them up directly in the test.
+When the test cares about event subscriptions, request handlers, or how the service composes with peers in the registry, use a `.stub()` context. It gives you a real registry and bus without spinning up a runtime.
 
-<Code code={extractRegion(serviceRegistryTestSource, 'service-registry-test-registry')} lang="dart" />
+### Inject a fake for a peer service
 
-To exercise `attach` and event behavior, pair the registry with a bus and a context.
+The named-arg form of `registerSingleton` carries a priority, so a fake registered at `Priority.system` outranks anything the system under test contributes.
+
+<Code code={extractRegion(testingSnippets, 'testing-stub-inject-fake')} lang="dart" />
+
+### Drive a plugin's attach handlers
+
+For plugins whose reactive logic lives in `Plugin.attach` (using the inherited `on` / `onRequest` helpers), wire the plugin against a stub context and emit on the stub bus.
 
 <Code code={extractRegion(testingSnippets, 'testing-level-2-plugin')} lang="dart" />
 
-This is the sweet spot for most plugin tests. Fast, no runtime setup, and it exercises real registry and bus behavior.
+`Plugin.attach` is what the test calls directly, so handlers registered inside it land on the stub bus. Plugins that delegate reactive work to a `StatefulPluginService` cannot be exercised this way; jump to the next section.
 
-## Level 3: Through the runtime
+### Assert on cascade behavior
 
-When your test cares about runtime concerns (enablement precedence, settings reconciliation, session lifecycle), reach for `PluginRuntime`.
+`emit` returns the post-cascade envelope. Inspect `event` for mutations applied by handlers, `stopped` for halts.
 
-<Code code={extractRegion(runtimeTestSource, 'runtime-test-runtime')} lang="dart" />
+<Code code={extractRegion(testingSnippets, 'testing-assert-cascade')} lang="dart" />
 
-### Lifecycle tracking
+For request/response: `bus.maybeRequest` returns null on no-handler-or-all-conceded; `bus.request` throws a `NoRequestAnswerException` subtype (`RequestNotWiredException` or `AllConcededException`). Use `maybeRequest` to assert the absence path; reach for `request` only when at least one handler is guaranteed to claim.
 
-A tiny subclass with a list of strings is enough to assert lifecycle order.
+## Does the whole plugin work end-to-end?
+
+When the test depends on `StatefulPluginService.attach`, lifecycle order, settings reconciliation, or exception aggregation, use a real `PluginRuntime`. This is the default tier for "does my plugin work?", not an escape hatch.
+
+### Lifecycle order
+
+A small helper plugin that records lifecycle calls is enough to assert order.
 
 <Code code={extractRegion(testingSnippets, 'testing-tracking-plugin')} lang="dart" />
 
-### Settings reconciliation
-
-Pass `initialSettings` on init, or call `updateSettings` later.
-
 <Code code={extractRegion(testingSnippets, 'testing-update-settings-disable')} lang="dart" />
 
-Toggling a plugin off runs its `detach`. Toggling back on runs `register` and `attach` again, same as global. Your assertions can rely on that.
+Toggling a plugin off runs its `detach`. Toggling back on runs `register` and `attach` again.
 
-## Testing `StatefulPluginService` directly
+### Stateful services
 
-For stateful services, attach them against a real context, exercise whatever the service reacts to, then detach to verify cleanup.
+For stateful services, attach them through the runtime, exercise whatever the service reacts to, then detach to verify cleanup.
 
 <Code code={extractRegion(testingSnippets, 'testing-stateful-service')} lang="dart" />
 
-The important bit: resolve the service through the registry once before calling `attach`. That is what stamps `pluginId` and `serviceId` onto the instance.
+Resolve the service through the registry once before exercising it. That is what stamps `pluginId` and `serviceId` onto the instance.
 
-## Stubbing the event bus
+### Where failures surface
 
-If your test target uses a real bus but you do not want to also test the bus, use a real `EventBus` as a stub. Nothing prevents you from emitting events "from outside" to drive whatever handler you are testing.
-
-You rarely need to mock the bus itself. It is simple, fast, and well-exercised. Testing against a real `EventBus()` usually gives better signal than a mock would.
-
-## Where failures surface
-
-When a lifecycle phase produces errors, the runtime aggregates them into `PluginLifecycleException` and throws after the phase finishes. Assertions are straightforward.
+The runtime aggregates lifecycle errors into `PluginLifecycleException` and throws after the phase finishes. The exception carries a `phase` string (`'attachGlobal'`, `'attachSession'`, `'detachSession'`, `'updateSessionSettings'`, etc.) and a list of `(pluginId, error, stackTrace)` tuples.
 
 <Code code={extractRegion(testingSnippets, 'testing-throws-lifecycle-exception')} lang="dart" />
-
-The exception carries a `phase` string (`'attachGlobal'`, `'attachSession'`, `'detachSession'`, `'updateSessionSettings'`, etc.) and a list of `(pluginId, error, stackTrace)` tuples, which is usually what you want to assert against.
 
 <Code code={extractRegion(testingSnippets, 'testing-lifecycle-exception')} lang="dart" />
 
 ## Patterns that age well
 
-- Prefer Level 2 (registry + bus + context) for most plugin tests. Fast, no runtime setup, and it catches real behavior.
-- Use Level 3 for anything that involves settings reconciliation, enablement precedence, or multiple sessions.
-- Keep a small `TrackingPlugin` helper in your test file for lifecycle assertions. You will reuse it.
-- If a plugin depends on another plugin's service, register both in the test. Do not mock the service. The registry was designed for exactly this kind of swap.
+| Pattern | Severity | Why |
+|---|---|---|
+| Don't fake the bus, registry, or context. | High | They are framework primitives. Use `.stub()` if you want a real one with sane defaults. |
+| Don't hand-construct a `SessionPluginContext` from `ServiceRegistry()` and `EventBus()`. | High | `SessionPluginContext.stub()` already does this with sane defaults. |
+| Don't drive a `StatefulPluginService.attach` directly. | High | Its context binding only happens in the runtime's `_runAttach`. Calling `attach()` outside a runtime leaves the service's `context` getter throwing. |
+| Don't share a registry, bus, or context across tests. | Medium | Fresh state per test prevents handler leaks and priority surprises. |
+| Don't mock the framework primitives. | Medium | The bus is small, fast, and well-exercised. A real bus gives better signal than a mock. |
+| Don't assert on private state when an emitted event covers the same behavior. | Low | The event is your test contract; private state is implementation. |
 
 ## Related reading
 
 <CardGrid>
   <LinkCard title="Adding a Plugin" description="The workflow this page helps you verify." href="/guides/adding-a-plugin/" />
-  <LinkCard title="Plugin Services" description="Subscription tracking is what makes Level 2 tests tidy." href="/concepts/plugin-services/" />
+  <LinkCard title="Plugin Services" description="Subscription tracking is what makes stub-tier tests tidy." href="/concepts/plugin-services/" />
   <LinkCard title="Logging" description="What PluginLifecycleException looks like at runtime." href="/guides/logging/" />
 </CardGrid>

@@ -245,9 +245,6 @@ class RuntimeSettings {
   /// Creates runtime settings with optional plugin and service maps.
   const RuntimeSettings({this.plugins = const {}, this.services = const {}});
 
-  /// Creates empty runtime settings.
-  const RuntimeSettings.empty() : plugins = const {}, services = const {};
-
   /// Creates runtime settings from a JSON map.
   factory RuntimeSettings.fromJson(Map<String, dynamic> json) {
     return RuntimeSettings(
@@ -273,12 +270,10 @@ class RuntimeSettings {
   /// Converts these runtime settings to JSON.
   Map<String, dynamic> toJson() => <String, dynamic>{
     'plugins': {
-      for (final entry in plugins.entries)
-        entry.key: entry.value.toJson(),
+      for (final entry in plugins.entries) entry.key: entry.value.toJson(),
     },
     'services': {
-      for (final entry in services.entries)
-        entry.key: entry.value.toJson(),
+      for (final entry in services.entries) entry.key: entry.value.toJson(),
     },
   };
 
@@ -288,10 +283,9 @@ class RuntimeSettings {
   /// [plugins], otherwise `true`. This is the settings-intent answer:
   /// it does NOT consult feature flags, the experimental-aware default,
   /// or dependency-cascade results. For the fully-resolved enablement
-  /// decision (locked plugins, experimental fallback,
-  /// `defaultEnabledPluginIds`, dependency cascade), use
-  /// [PluginRuntime.isPluginEnabled]. For "is this plugin currently
-  /// attached at runtime" use [PluginRuntime.isPluginAttached].
+  /// decision (locked plugins, experimental fallback, dependency
+  /// cascade), use [PluginRuntime.isPluginEnabled]. For "is this plugin
+  /// currently attached at runtime" use [PluginRuntime.isPluginAttached].
   bool isPluginEnabled(PluginId pluginId) {
     final config = plugins[pluginId];
     if (config != null) {

@@ -3,15 +3,13 @@ title: The model_embassy tour
 description: Six scenarios that teach model provider routing through agents, passports, and the visa office. Priority cascades, event mutation, settings injection, and capability competition for the LLM use case.
 ---
 
-import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
-import { Code } from '@astrojs/starlight/components';
-import { extractRegion } from '../../../utils/excerpt.mjs';
+
+import {CardGrid, Code, LinkCard} from '@astrojs/starlight/components';
+import {extractRegion} from '../../../utils/excerpt.mjs';
 import runtimeSettings from '../../../../snippets/lib/runtime_settings.dart?raw';
 import passportsAndVisas from '../../../../../example/model_embassy/bin/01_passports_and_visas.dart?raw';
 
 `example/model_embassy/` teaches Plugin Kit through a model-routing metaphor. An agent presents a `ModelPassport` (model family, requirements). The embassy registers one `VisaOffice` per provider. The first office that can honour the passport issues a `ModelVisa` carrying a ready-to-use client. Offices that cannot serve the request return `null` so the next candidate gets a turn.
-
-If [the villain_lair examples](/examples/villain-lair/) cover the runtime concept by concept, this one is a focused study of a single shape: priority-based provider routing for an LLM-style application.
 
 ## Run the scenarios
 
@@ -29,7 +27,7 @@ Replace the filename to run any other scenario. Each file is self-contained: eve
 
 The smallest version of the metaphor. One agent presents an Anthropic passport, one visa office is registered, the office issues a visa, and the agent uses the returned client.
 
-<Code code={extractRegion(passportsAndVisas, 'passports-and-visas-flow')} lang="dart" />
+<Code code={extractRegion(passportsAndVisas, 'passports-and-visas-flow')} lang="dart"/>
 
 Concepts: [Service Registry](/concepts/service-registry/), [Event Bus](/concepts/event-bus/#request-and-response).
 
@@ -65,7 +63,7 @@ Concepts: [Event Patterns](/concepts/events/#the-pre-commit-interception-pattern
 
 `ServiceSettings` plus `ConfigNode` inject per-session configuration into a `StatefulPluginService`. Three sessions share one runtime and one registered visa office, but each reads different `api_key`, `base_url`, and `default_model` values from the settings it was created with.
 
-<Code code={extractRegion(runtimeSettings, 'runtime-settings-priority')} lang="dart" />
+<Code code={extractRegion(runtimeSettings, 'runtime-settings-priority')} lang="dart"/>
 
 Concepts: [Configuration](/concepts/configuration/), [Settings & Overrides](/guides/settings/).
 
@@ -77,36 +75,27 @@ If you are wiring multi-provider LLM routing in your own app, this scenario is t
 
 Concepts: every concept page that touches priority, request/response, or settings injection.
 
-## Reading paths
-
-| If you are... | Read |
-|---|---|
-| New to provider-routing | 01, 03 |
-| Designing a `StatefulPluginService` for routing | 02, 04 |
-| Building a multi-tenant runtime | 05 |
-| Looking for the working template | 06 |
-
 ## Where to next
 
 <CardGrid>
-  <LinkCard
-    title="The villain_lair examples"
-    description="Broader walk through every concept in fifteen scenarios. Read this if you want depth across the whole runtime."
-    href="/examples/villain-lair/"
-  />
-  <LinkCard
-    title="Service Registry"
-    description="The model behind priority cascades and `resolveAfter` fallbacks."
-    href="/concepts/service-registry/"
-  />
-  <LinkCard
-    title="Plugin Services"
-    description="The `StatefulPluginService` lifecycle that visa offices ride."
-    href="/concepts/plugin-services/"
-  />
-  <LinkCard
-    title="Read the runnable code"
-    description="Every scenario above is at example/model_embassy/bin/. Each file is roughly 100 to 200 lines of runnable Dart."
-    href="https://github.com/SaadArdati/plugin_kit/tree/main/example/model_embassy"
-  />
+    <LinkCard
+        title="The villain_lair examples"
+        description="Broader walk through every concept in fifteen scenarios. Read this if you want depth across the whole runtime."
+        href="/examples/villain-lair/"
+    />
+    <LinkCard
+        title="Service Registry"
+        description="The model behind priority cascades and `resolveAfter` fallbacks."
+        href="/concepts/service-registry/"
+    />
+    <LinkCard
+        title="Plugin Services"
+        description="The `StatefulPluginService` lifecycle that visa offices ride."
+        href="/concepts/plugin-services/"
+    />
+    <LinkCard
+        title="Read the runnable code"
+        description="Every scenario above is at example/model_embassy/bin/. Each file is roughly 100 to 200 lines of runnable Dart."
+        href="https://github.com/SaadArdati/plugin_kit/tree/main/example/model_embassy"
+    />
 </CardGrid>

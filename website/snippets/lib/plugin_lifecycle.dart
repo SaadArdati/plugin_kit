@@ -160,19 +160,6 @@ class GreeterPlugin extends SessionPlugin {
 }
 // #enddocregion session-plugin-attach
 
-// #docregion runtime-init-default-enabled
-void initWithDefaults(PluginRuntime runtime, RuntimeSettings savedSettings) {
-  runtime.init(
-    settings: savedSettings,
-    defaultEnabledPluginIds: const {
-      PluginId('core'),
-      PluginId('search'),
-      PluginId('telemetry'),
-    },
-  );
-}
-// #enddocregion runtime-init-default-enabled
-
 // #docregion runtime-update-settings
 Future<void> disableAnalytics(PluginRuntime runtime) async {
   final next = runtime.settings.copyWith(
@@ -338,7 +325,7 @@ Future<void> snapshotThenReconcile(
 Future<void> constructAndSession() async {
   final runtime = PluginRuntime(plugins: [CasualPlugin(), FormalPlugin()]);
 
-  runtime.init(settings: const RuntimeSettings.empty());
+  runtime.init(settings: const RuntimeSettings());
 
   final session = await runtime.createSession();
   print('session registry keys: ${session.registry.listAllServiceIds()}');
@@ -384,3 +371,127 @@ Future<void> broadcastInvalidateCache(GlobalPluginContext context) async {
 }
 
 // #enddocregion sessions-broadcast-invalidate-cache
+
+// #docregion system-prompt-taste
+/// Stand-in user type for the system-prompt example.
+class User {
+  /// Display name shown in the prompt.
+  final String name;
+
+  /// Short summary of the user's recent activity.
+  final String recentActivity;
+
+  /// Creates a stand-in [User].
+  const User({required this.name, required this.recentActivity});
+
+  @override
+  String toString() => name;
+}
+
+/// Contract a chat plugin asks the registry for. Multiple plugins can
+/// register their own implementation; the highest priority wins.
+abstract class SystemPrompt {
+  /// Builds the prompt for [user].
+  String build({required User user});
+}
+
+/// Boring default: ships with the chat plugin.
+class DefaultSystemPrompt implements SystemPrompt {
+  @override
+  String build({required User user}) =>
+      'You are a helpful assistant. The user is $user.';
+}
+
+/// Experimental variant: injects the user's recent activity.
+class ActivityAwareSystemPrompt implements SystemPrompt {
+  @override
+  String build({required User user}) =>
+      'You are a helpful assistant. The user is ${user.name}. '
+      'Recent activity: ${user.recentActivity}.';
+}
+
+/// The chat plugin: ships the original system prompt at default priority.
+class ChatPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('chat');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<SystemPrompt>(
+      const ServiceId('system_prompt'),
+      () => DefaultSystemPrompt(),
+    );
+  }
+}
+
+/// A teammate's experimental plugin. Higher priority wins resolution.
+/// Flagged experimental so it ships disabled by default; users opt in.
+class ActivityAwarePlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('activity_aware');
+
+  @override
+  List<FeatureFlag> get featureFlags => const [FeatureFlag.experimental];
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<SystemPrompt>(
+      const ServiceId('system_prompt'),
+      () => ActivityAwareSystemPrompt(),
+      priority: Priority.elevated, // wins (beats Priority.normal default)
+    );
+  }
+}
+
+Future<void> runSystemPromptExample() async {
+  final runtime = PluginRuntime(plugins: [ChatPlugin(), ActivityAwarePlugin()])
+    ..init(
+      settings: const RuntimeSettings(
+        // Experimental plugins ship disabled; opt in here.
+        plugins: {PluginId('activity_aware'): PluginConfig(enabled: true)},
+      ),
+    );
+  final session = await runtime.createSession();
+
+  final prompt = session.resolve<SystemPrompt>(
+    const ServiceId('system_prompt'),
+  );
+  const user = User(
+    name: 'Ada',
+    recentActivity: 'Opened 3 PRs, reviewed 2 designs',
+  );
+  print(prompt.build(user: user));
+  // → "You are a helpful assistant. The user is Ada. Recent activity: ..."
+
+  await runtime.dispose();
+}
+// #enddocregion system-prompt-taste
+
+// #docregion system-prompt-disable
+/// Same two plugins, but the user has flipped the experiment off via the
+/// settings UI. The runtime detaches the experimental plugin; the chat
+/// plugin's original prompt becomes the winner again. No code changes.
+Future<void> runSystemPromptDisableExample() async {
+  final runtime = PluginRuntime(plugins: [ChatPlugin(), ActivityAwarePlugin()])
+    ..init();
+  final session = await runtime.createSession();
+
+  // User decides they prefer the original. Same build, same code path,
+  // different runtime answer.
+  await runtime.updateSettings(
+    const RuntimeSettings(
+      plugins: {PluginId('activity_aware'): PluginConfig(enabled: false)},
+    ),
+  );
+
+  final prompt = session.resolve<SystemPrompt>(
+    const ServiceId('system_prompt'),
+  );
+  const user = User(name: 'Ada', recentActivity: 'irrelevant now');
+  print(prompt.build(user: user));
+  // → "You are a helpful assistant. The user is Ada."
+
+  await runtime.dispose();
+}
+
+// #enddocregion system-prompt-disable

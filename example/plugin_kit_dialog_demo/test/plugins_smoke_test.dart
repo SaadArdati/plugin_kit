@@ -3,7 +3,7 @@ import 'package:plugin_kit/plugin_kit.dart';
 import 'package:plugin_kit_dialog_demo/plugins/all.dart';
 
 PluginRuntime _buildRuntime({
-  RuntimeSettings settings = const RuntimeSettings.empty(),
+  RuntimeSettings settings = const RuntimeSettings(),
 }) {
   final runtime = PluginRuntime();
   runtime.addPlugins(demoPlugins());
@@ -26,7 +26,7 @@ void main() {
     expect(core.featureFlags.contains(FeatureFlag.locked), isTrue);
 
     runtime.addPlugins(plugins);
-    runtime.init(settings: RuntimeSettings.empty());
+    runtime.init(settings: RuntimeSettings());
   });
 
   test('agent.model has many competing registrations sorted by priority', () {

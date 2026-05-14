@@ -25,12 +25,12 @@ void main() {
     'ServiceFieldSection renders one row per ConfigField and respects resolver',
     (tester) async {
       final runtime = PluginRuntime();
-      runtime.init(settings: RuntimeSettings.empty());
+      runtime.init(settings: RuntimeSettings());
       addTearDown(runtime.dispose);
 
       final controller = PluginKitDialogController(
         runtime: runtime,
-        initialSettings: RuntimeSettings.empty(),
+        initialSettings: RuntimeSettings(),
       );
 
       const cap = UiConfigurableCapability(
@@ -70,12 +70,12 @@ void main() {
     tester,
   ) async {
     final runtime = PluginRuntime();
-    runtime.init(settings: RuntimeSettings.empty());
+    runtime.init(settings: RuntimeSettings());
     addTearDown(runtime.dispose);
 
     final controller = PluginKitDialogController(
       runtime: runtime,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     const cap = UiConfigurableCapability(
@@ -133,12 +133,12 @@ void main() {
     tester,
   ) async {
     final runtime = PluginRuntime();
-    runtime.init(settings: RuntimeSettings.empty());
+    runtime.init(settings: RuntimeSettings());
     addTearDown(runtime.dispose);
 
     final controller = PluginKitDialogController(
       runtime: runtime,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     const cap = UiConfigurableCapability(
@@ -188,12 +188,12 @@ void main() {
     tester,
   ) async {
     final runtime = PluginRuntime();
-    runtime.init(settings: RuntimeSettings.empty());
+    runtime.init(settings: RuntimeSettings());
     addTearDown(runtime.dispose);
 
     final controller = PluginKitDialogController(
       runtime: runtime,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     controller.setServiceField(
@@ -260,12 +260,12 @@ void main() {
     tester,
   ) async {
     final runtime = PluginRuntime();
-    runtime.init(settings: RuntimeSettings.empty());
+    runtime.init(settings: RuntimeSettings());
     addTearDown(runtime.dispose);
 
     final controller = PluginKitDialogController(
       runtime: runtime,
-      initialSettings: RuntimeSettings.empty(),
+      initialSettings: RuntimeSettings(),
     );
 
     const cap = UiConfigurableCapability(
