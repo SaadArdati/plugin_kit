@@ -25,7 +25,7 @@ you writing a settings screen per plugin set.
 
 ![Plugin Kit Dialog Advanced tab showing the service registry inspector with namespaces, competing registrations, priority badges, and the current winner picked out](https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/example/plugin_kit_dialog_demo/test/goldens/advanced_tab_dark.png)
 
-The dialog is built from `plugin_kit` plugins itself. Every tab, header action, and field renderer is a real plugin you can shadow or replace from your host app.
+The dialog runtime is built from `plugin_kit` plugins internally. Tabs and field renderers come from fixed built-in dialog plugins, while header actions are built-in widget callbacks.
 
 ## Quick start
 
@@ -153,7 +153,7 @@ const extensionField = ExtensionConfigField(
 );
 ```
 
-Register a Flutter-side renderer for that key from your host app:
+The default `showPluginKitDialog` and `PluginKitDialogBody` entry points use a private dialog runtime with fixed built-in plugins, so host-runtime renderer registrations are not used:
 
 ```dart
 /// A custom field renderer for color values (Flutter-side).
@@ -253,12 +253,12 @@ PluginKitDialogController(...);      // ChangeNotifier-backed draft
 
 // Visuals
 PluginKitVisualsPlugin({pluginVisuals, namespaceVisuals, serviceVisuals});
-PluginKitVisual(label, description, icon, color);
+PluginKitVisual({label, description, icon, color});
 
 // Field renderers (custom widgets via ExtensionConfigField)
 FieldRenderersPlugin;                // namespace under which renderers register
 ConfigFieldRenderer<F extends ConfigField>;
-FieldRenderResolver;                 // (rendererKey) -> ConfigFieldRenderer?
+FieldRenderResolver;                 // (ConfigField field) -> ConfigFieldRenderer
 
 // Theme
 buildPluginKitDialogDarkTheme();
@@ -271,7 +271,7 @@ Declarative types come from `plugin_kit`:
 ```dart
 import 'package:plugin_kit/plugin_kit.dart';
 
-UiConfigurableCapability(label, fields, description);
+UiConfigurableCapability({label, fields, description});
 TextConfigField, MultilineConfigField, PasswordConfigField,
 NumberConfigField (NumberFieldStyle, isInteger),
 DropdownConfigField<T>, DropdownOption<T>,

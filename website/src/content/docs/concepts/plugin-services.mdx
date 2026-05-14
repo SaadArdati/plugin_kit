@@ -16,9 +16,9 @@ There are three tiers, escalating by which plugin_kit features the behavior actu
 |---|---|
 | Plain Dart class (no plugin_kit base class) | the behavior does not need settings injection, lifecycle, or event subscriptions |
 | `PluginService` | the service should read injected `RuntimeSettings.services` config and have registry-stamped identity |
-| `StatefulPluginService<Ctx>` | the service needs `attach()` / `detach()`, a bound session context, auto-tracked subscriptions, and a place for session-bound state |
+| `StatefulPluginService<Ctx>` | the service needs `attach()` / `detach()`, a bound plugin context, auto-tracked subscriptions, and a place for context-bound state |
 
-If your plugin class is getting fat, that is almost always a hint that the work belongs in one of these three tiers, not on the plugin. Plain classes register as factories (fresh instance per `context.resolve<T>()`) or as singletons when sharing the instance is safe. `PluginService` and `StatefulPluginService` register as singletons or lazy singletons; the stateful variant rejects factories because the runtime needs an instance to track.
+If your plugin class is getting fat, that is almost always a hint that the work belongs in one of these three tiers, not on the plugin. Plain classes register as factories (fresh instance per `context.resolve<T>()`) or as singletons when sharing the instance is safe. `PluginService` supports factory, singleton, and lazy-singleton registration. `StatefulPluginService` rejects factories and must register as a singleton or lazy singleton so the runtime can track lifecycle.
 
 The plugin class stays focused on wiring, services carry settings, state, and long-lived behavior.
 
@@ -43,7 +43,7 @@ accessed via the constructor.
 
 ## Stateful Plugin Service
 
-`StatefulPluginService` extends `PluginService` with session lifecycle. It adds `attach(context)`, `detach()`, a bound `context`, and automatic subscription tracking.
+`StatefulPluginService` extends `PluginService` with plugin lifecycle. It adds `attach()`, `detach()`, a bound `context`, and automatic subscription tracking. Use `SessionStatefulPluginService` or `GlobalStatefulPluginService` for the common scope aliases.
 
 <Code code={extractRegion(pluginServicesSnippets, 'stateful-plugin-service-basic')} lang="dart" />
 
@@ -84,7 +84,7 @@ have to go through `context` for the normal cases.
 
 <Code code={extractRegion(pluginServicesSnippets, 'stateful-plugin-service-resolve-emit')} lang="dart" />
 
-The service-level helpers are thin wrappers over the session context:
+The service-level helpers are thin wrappers over the bound plugin context:
 
 - `resolve(...)`
 - `maybeResolve(...)`
@@ -127,8 +127,8 @@ That makes stateful services the natural home for anything with long-lived state
 
 - long-lived bus subscriptions
 - timers
-- session-bound caches
-- mutable session state
+- context-bound caches
+- mutable context state
 
 If you find yourself writing `final _subs = <EventSubscription>[];` on a `SessionPlugin`, that is usually the signal to promote the state to a stateful service.
 
@@ -148,7 +148,7 @@ A clean default structure:
 
 - Plugin class: wiring, ids, registration.
 - `PluginService`: configurable services.
-- `StatefulPluginService`: session-bound behavior and subscriptions.
+- `StatefulPluginService`: context-bound behavior and subscriptions.
 
 That keeps the plugin class small and makes lifecycle obvious.
 
@@ -176,4 +176,3 @@ That keeps the plugin class small and makes lifecycle obvious.
     href="/guides/settings/"
   />
 </CardGrid>
-

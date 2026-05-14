@@ -234,7 +234,7 @@ Inside `ServiceSettings.config`, dotted keys write to nested maps automatically.
 
 <Code code={extractRegion(namingSnippets, 'naming-service-settings')} lang="dart" />
 
-The runtime stores this as a nested `Map<String, dynamic>`. `ConfigNode` reads back through the flat `getString('provider.api_key')` form.
+The runtime stores this as a nested `Map<String, dynamic>`. `ConfigNode` does flat `_node[key]` lookups, so `getString('provider.api_key')` only works when that literal dotted key exists.
 
 ### Examples
 

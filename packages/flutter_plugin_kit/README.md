@@ -9,14 +9,14 @@
 
 Skip the boilerplate of plumbing [`plugin_kit`](https://pub.dev/packages/plugin_kit) through your widget tree. `flutter_plugin_kit` adds scope widgets that carry the runtime and session, a `State` mixin that auto-cancels event subscriptions, a `ChangeNotifier` adapter, and `BuildContext` extensions for reading the latest event of any type.
 
-The exposed types implement standard Flutter `ChangeNotifier` / `ValueListenable` / `Stream` interfaces, so they drop into `provider`, `flutter_bloc`, `riverpod`, signals, and others as ordinary values. Use only the adapters your app already needs, or skip a state library entirely and use the bus directly.
+The exposed types implement standard Flutter `ChangeNotifier` / `ValueListenable` interfaces, so they drop into `provider`, `flutter_bloc`, `riverpod`, signals, and others as ordinary values. Use only the adapters your app already needs, or skip a state library entirely and use the bus directly.
 
 Pulls in only `flutter` and `plugin_kit`.
 
 ## What's in the box
 
-- `PluginRuntimeScope`: `InheritedWidget` carrying a `PluginRuntime`. Either pass an externally-owned runtime via `.value`, or pass a list of plugins and let the scope construct, init, and dispose one for you.
-- `PluginSessionScope`: `InheritedWidget` carrying a `PluginSession`. Three modes: explicit session, runtime + auto-create session, or derive both from an ambient `PluginRuntimeScope`. Async session creation is handled with optional `loading` and `error` builders.
+- `PluginRuntimeScope`: `StatefulWidget` that provides an inherited scope carrying a `PluginRuntime`. Either pass an externally-owned runtime via `.value`, or pass a list of plugins and let the scope construct, init, and dispose one for you.
+- `PluginSessionScope`: `StatefulWidget` that provides an inherited scope carrying a `PluginSession`. Three modes: explicit session, runtime + auto-create session, or derive both from an ambient `PluginRuntimeScope`. Async session creation is handled with optional `loading` and `error` builders.
 - `PluginSessionStateListener<W>`: mixin on `State<W>`. `listen<E>(handler)` and `rebuildOn<E>([when])` register subscriptions that auto-cancel on dispose and re-attach automatically across session swaps. Both are callable from `initState` (and any later lifecycle callback). By default the mixin reads the active session from the ambient `PluginSessionScope`; override `PluginSession? get session` only when the session lives elsewhere (typically `=> widget.session`).
 - `PluginEventNotifier<E>`: `ChangeNotifier` / `ValueListenable<E?>`. Subscribes to a session and exposes the latest event of type `E` as `.value`. Drops directly into `ChangeNotifierProvider`, `ValueListenableProvider`, `ValueListenableBuilder`, or any other foundation-listenable consumer.
 - `BuildContext.watchEvent<E>()` / `readEvent<E>()`: convenience extensions. `watchEvent` subscribes the calling element to rebuilds on the next `E`; `readEvent` returns the latest without subscribing.
@@ -123,7 +123,7 @@ class PluginEventCubit<E> {
 }
 ```
 
-Wrap with `BlocProvider` and read with `context.watch<PluginEventCubit<ChatMessageReceived>>().state`. The full recipe (with value-equality state classes) lives in [`example/state_garden/lib/src/integrations/bloc_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/bloc_chat.dart).
+Use `context.watch<PluginEventCubit<ChatMessageReceived>>().value` with this adapter shape. For a real `Cubit` with `.state`, see the full recipe (with value-equality state classes) in [`example/state_garden/lib/src/integrations/bloc_chat.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/integrations/bloc_chat.dart).
 
 ### riverpod / signals / mobx
 

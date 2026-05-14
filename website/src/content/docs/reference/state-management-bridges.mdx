@@ -19,7 +19,7 @@ import mobxChatSource from '../../../../../example/state_garden/lib/src/integrat
 Plugin Kit is library-agnostic about state management, but the bus, registry, and session lifecycle overlap with what most state libraries do. You can wire it through whatever your app already uses, or lean on the bus directly when an extra layer would only forward events. This page shows the wire-up between a `PluginSession` and seven common state holders, with the same chat protocol used in every example so you can read the differences side by side and pick the cost you actually want to pay.
 
 <Aside type="tip" title="Source of citation">
-Every recipe on this page is implemented in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden). Sixteen tests in that package compile, run, and assert the recipes against a real `PluginRuntime`, including the two `flutter_plugin_kit` variants shown inline below. If a recipe here drifts from what actually works, the test in that package fails on the next commit.
+Every recipe on this page is implemented in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden). Seventeen tests in that package compile, run, and assert the recipes against a real `PluginRuntime`, including the two `flutter_plugin_kit` variants shown inline below. If a recipe here drifts from what actually works, the test in that package fails on the next commit.
 </Aside>
 
 <Aside type="note" title="The flutter_plugin_kit variant">
@@ -34,7 +34,7 @@ A state holder bridge has the same three duties no matter which library you pick
 2. Translate UI intents into bus events with `session.emit(SomeIntent(...))`.
 3. Cancel the subscription in whatever disposal hook the library provides: `Cubit.close`, `ChangeNotifier.dispose`, `ref.onDispose`, `State.dispose`, etc.
 
-The bridge does NOT cache resolved services and does NOT subscribe inside `build`. Both decisions matter and are explained below.
+The bridge does NOT cache resolved services. Most recipes also avoid subscribing inside `build`, and the Riverpod `AsyncNotifier` recipe is the explicit exception because it re-attaches when `build` re-runs. Both decisions matter and are explained below.
 
 ## Subscription ownership
 

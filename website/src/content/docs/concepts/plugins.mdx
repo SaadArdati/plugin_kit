@@ -27,7 +27,7 @@ Every plugin extends one of these two base classes.
 | Session | `SessionPlugin<S>` | one session | documents, tabs, chats, workspaces, sandboxes |
 
 The choice is architectural, not cosmetic. A global plugin is instantiated once per runtime and outlives every session.
-A session plugin is instantiated fresh on every session and disposed with it.
+A session plugin instance is shared across sessions; its `register` and `attach` lifecycle runs per session, and `detach` runs when that session ends.
 
 Rule of thumb: if there should be exactly one of this thing for the whole process, make it global. 
 If there should be one per document, chat, tab, tenant, or sandbox, make it a session plugin.
@@ -38,12 +38,12 @@ common and valid choice, and it leaves the door open to adding more sessions lat
 1. Your app becomes portable/modular. A "preview" screen inside your app can be its own session.
 2. You get a clean slate for testing. Each test can open a new session with just the plugins it needs in parallel under
 the same Plugin runtime. Several runtimes can be created in parallel of course, but that is more expensive.
-3. If you ever need to benchmark your app, you can spam sessions without recreating a fresh registry from scratch every time.
+3. If you ever need to benchmark your app, you can create many sessions under one runtime while each session still gets a fresh registry.
 4. The mental model is simpler. Every plugin has the same lifecycle and the same relationship to the runtime and to each other.
 You do not have to reason about global vs session interactions, just plugin vs plugin interactions.
 
-Go for sessions unless you really know you need globals. The library does not force you to choose: you can have 
-both, and they can depend on each other. The runtime handles the lifecycle and the dependency graph either way.
+Go for sessions unless you really know you need globals. The library does not force you to choose, you can have 
+both. Session plugins can depend on enabled global plugins, but global plugins cannot depend on session plugins. The runtime handles the lifecycle and the dependency graph either way.
 
 ## What a plugin looks like
 
@@ -79,7 +79,7 @@ That stricture pays off in three ways.
 
 - **Hot-swappable features.** A higher-priority plugin can take over a slot live; if your service does nothing until called, the swap is invisible to callers.
 - **Safe dependency declarations.** A plugin auto-disables when its dependency is missing. As long as your plugin does no work until called, it can be disabled without leaving zombies.
-- **Lazy initialization.** Work runs only when something asks for it. Toggling a plugin off and on does not re-run startup code; it just removes and re-adds its services.
+- **Lazy initialization.** Work runs only when something asks for it. Toggling a plugin off and on re-runs `register` and `attach`, so startup work in those hooks runs again.
 
 `Plugin.attach`, `Plugin.detach`, and `PluginService.onSettingsInjected` are pure user hooks. The framework orchestrates around them; never call super. See [Plugin Services](/concepts/plugin-services/).
 
@@ -110,11 +110,11 @@ for its services during my attach phase." That is not guaranteed, and you should
 
 Two flags ship with the library: `FeatureFlag.experimental` (off by default; settings must explicitly enable it) and `FeatureFlag.locked` (always on; settings cannot disable it). Both let plugin authors carry behavioral intent without the host app inventing a separate flagging system.
 
-The interesting consequence is that `experimental` is a *default*, not a *block*. The precedence the runtime applies, highest to lowest, is `locked`, then explicit `RuntimeSettings.plugins` entries, then a caller-supplied default-enabled set, then the experimental heuristic. Settings can still enable an experimental plugin; it just will not be on unless someone opts in. See [Plugins & Lifecycle](/reference/plugins-and-lifecycle/) for the full mechanics and signature.
+The interesting consequence is that `experimental` is a default, not a block. The precedence the runtime applies, highest to lowest, is `locked`, then explicit `RuntimeSettings.plugins` entries, then the experimental heuristic. Settings can still enable an experimental plugin; it just will not be on unless someone opts in. See [Plugins & Lifecycle](/reference/plugins-and-lifecycle/) for the full mechanics and signature.
 
 ## Identity and uniqueness
 
-Two plugin instances are considered equal only if `pluginId` matches.
+Two plugin instances are considered equal only if both `runtimeType` and `pluginId` match.
 Runtime registration's `PluginRuntime.addPlugin(...)` rejects any duplicate `pluginId`, regardless of scope. In practice,
 treat `pluginId` as unique across the whole runtime, not just within its scope.
 

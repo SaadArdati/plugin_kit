@@ -13,7 +13,7 @@ import flutterIntegrationSource from '../../../../snippets/lib/flutter_integrati
 
 `flutter_plugin_kit` is the optional Flutter companion to [`plugin_kit`](https://github.com/SaadArdati/plugin_kit/tree/main/packages/plugin_kit). It packages the patterns a Flutter shell uses around a `PluginRuntime` (carrying it through the tree, subscribing to session events from a `State`, exposing the latest event to a state-management library) into a small set of types you opt into where they pay for themselves.
 
-It pulls in only `flutter` and `plugin_kit`. Everything it exposes implements standard Flutter shapes (`InheritedWidget`, `ChangeNotifier`, `ValueListenable`, `Stream`), so it drops into `provider`, `flutter_bloc`, `riverpod`, signals, MobX, etc. as ordinary values. It does not replace your state library.
+It pulls in only `flutter` and `plugin_kit`. Everything it exposes uses standard Flutter shapes (`InheritedWidget`, `ChangeNotifier`, `ValueListenable`), so it drops into `provider`, `flutter_bloc`, `riverpod`, signals, MobX, etc. as ordinary values. It does not replace your state library.
 
 <Aside type="tip" title="When to use it vs the raw runtime">
 The raw `plugin_kit` setup ([Flutter Integration](/guides/flutter-integration/)) is what you reach for when the shell already owns its own `PluginRuntime` field, its own `_createSession` flow, and its own `setState` triggers. `flutter_plugin_kit` is what you reach for when that boilerplate is paying no rent: you want a scope widget that constructs and disposes the runtime for you, a mixin that handles bus subscriptions, and one `BuildContext.watchEvent<T>()` line where the manual subscription used to be.
@@ -31,8 +31,8 @@ dependencies:
 
 ## What's in the box
 
-- **`PluginRuntimeScope`**: `InheritedWidget` carrying a `PluginRuntime`. Either pass an externally-owned runtime via `.value`, or pass a list of plugins and let the scope construct, init, and dispose one for you.
-- **`PluginSessionScope`**: `InheritedWidget` carrying a `PluginSession`. Three modes: explicit session, runtime + auto-create session, or derive both from an ambient `PluginRuntimeScope`. Async session creation is handled with optional `loading` and `error` builders.
+- **`PluginRuntimeScope`**: `StatefulWidget` that installs an internal inherited scope carrying a `PluginRuntime`. Either pass an externally-owned runtime via `.value`, or pass a list of plugins and let the scope construct, init, and dispose one for you.
+- **`PluginSessionScope`**: `StatefulWidget` that installs an internal inherited scope carrying a `PluginSession`. Three modes: explicit session, runtime + auto-create session, or derive both from an ambient `PluginRuntimeScope`. Async session creation is handled with optional `loading` and `error` builders.
 - **`PluginSessionStateListener<W>`**: mixin on `State<W>`. `listen<E>(handler)` and `rebuildOn<E>([when])` register subscriptions that auto-cancel on dispose and re-attach automatically across session swaps. Both are callable from `initState`.
 - **`PluginEventNotifier<E>`**: `ChangeNotifier` / `ValueListenable<E?>`. Subscribes to a session and exposes the latest event of type `E` as `.value`. Drops into `ChangeNotifierProvider`, `ValueListenableProvider`, `ValueListenableBuilder`, and any other foundation-listenable consumer.
 - **`BuildContext.watchEvent<E>()` / `readEvent<E>()`**: extensions on `BuildContext`. `watchEvent` subscribes the calling element to rebuilds on the next `E`; `readEvent` returns the latest without subscribing.
@@ -49,7 +49,7 @@ The `Builder`-only variant skips the `State` class entirely:
 
 <Code code={extractRegion(flutterIntegrationSource, 'flutter-builder-watch-event')} lang="dart" />
 
-`watchEvent<E>` reads the ambient session from `PluginSessionScope` and subscribes the calling element to the next `E`. The element rebuilds whenever a new `E` lands, and the subscription is cleaned up when the element is unmounted.
+`watchEvent<E>` reads the ambient session from `PluginSessionScope` and subscribes the calling element to rebuilds when new `E` events land. The shared event-bus subscription is owned per event type by `PluginSessionEvents`, then canceled when that scope is disposed or when the session changes.
 
 ## Scope widgets
 
@@ -119,8 +119,8 @@ The scope reacts correctly when you swap arguments mid-tree: switching from auto
 
 A mixin on `State<W>`. Two methods:
 
-- `listen<E>(void Function(EventEnvelope<E> envelope) handler)`: register a handler for events of type `E`. Returns nothing; cancellation is automatic on `dispose`. The handler receives the full envelope so `envelope.sourcePluginId` / `envelope.timestamp` stay reachable; read the payload via `envelope.event`.
-- `rebuildOn<E>([bool Function(EventEnvelope<E> envelope)? when])`: register a setState-trigger handler for events of type `E`, optionally filtered by `when`. The predicate receives the envelope too, so filtering can gate on metadata.
+- `listen<E>(void Function(EventEnvelope<E> envelope) handler)`: register a handler for events of type `E`. Returns nothing; cancellation is automatic on `dispose`. The handler receives the envelope, so `envelope.identifier`, `envelope.event`, and `envelope.stopped` stay reachable.
+- `rebuildOn<E>([bool Function(EventEnvelope<E> envelope)? when])`: register a setState-trigger handler for events of type `E`, optionally filtered by `when`. The predicate receives the envelope too, so filtering can gate on `identifier`, payload, or stop state.
 
 Both are callable from `initState` (and any later lifecycle callback). Behind the scenes the mixin records each `listen` / `rebuildOn` call as a descriptor and attaches descriptors against the active session as soon as one becomes available, typically the next `didChangeDependencies` after `initState`. There is no `_wired` flag, no "subscribe in `didChangeDependencies` instead" caveat.
 
@@ -138,9 +138,9 @@ The mixin re-attaches descriptors automatically when the session changes (a `Plu
 
 <Code code={extractRegion(flutterIntegrationSource, 'flutter-plugin-kit-watch-read-event')} lang="dart" />
 
-`watchEvent<E>` reads the ambient `PluginSessionScope`, subscribes the calling element to events of type `E`, and rebuilds the element when one arrives. Returns the latest `E?` (initially `null`). The subscription is cleaned up when the element is unmounted, with no manual cancel needed.
+`watchEvent<E>` reads the ambient `PluginSessionScope`, subscribes the calling element to events of type `E`, and rebuilds the element when one arrives. Returns the latest `E?` (initially `null`). The event-bus subscription is tracked per event type on the surrounding `PluginSessionEvents` scope and is canceled when that scope is disposed or switches to a different session.
 
-`readEvent<E>` reads the latest `E?` without subscribing. Useful inside event handlers, button callbacks, and other one-shot reads where you don't want a rebuild.
+`readEvent<E>` reads the latest `E?` without subscribing the calling element to rebuilds. It still ensures a scope-level subscription for `E` exists. Useful inside event handlers, button callbacks, and other one-shot reads where you don't want a rebuild.
 
 ## PluginEventNotifier
 

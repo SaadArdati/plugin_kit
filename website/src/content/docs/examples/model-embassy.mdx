@@ -61,7 +61,7 @@ Concepts: [Event Patterns](/concepts/events/#the-pre-commit-interception-pattern
 
 ### 05. Embassy configuration ([`bin/05_embassy_configuration.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/model_embassy/bin/05_embassy_configuration.dart))
 
-`ServiceSettings` plus `ConfigNode` inject per-session configuration into a `StatefulPluginService`. Three sessions share one runtime and one registered visa office, but each reads different `api_key`, `base_url`, and `default_model` values from the settings it was created with.
+`ServiceSettings` plus `ConfigNode` inject per-session configuration into a `StatefulPluginService`. Three sessions share one runtime, and each session gets its own registered visa office instance that reads different `api_key`, `base_url`, and `default_model` values from the settings it was created with.
 
 <Code code={extractRegion(runtimeSettings, 'runtime-settings-priority')} lang="dart"/>
 

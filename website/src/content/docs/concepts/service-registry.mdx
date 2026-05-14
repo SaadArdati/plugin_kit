@@ -34,7 +34,7 @@ A slot is not a class. It is a contract the registry recognizes, and multiple im
 |-------------------------|-------------------------------------------|---------------------------------------------|
 | `registerFactory`       | creates a fresh instance on every resolve | service is cheap and stateless              |
 | `registerLazySingleton` | creates on first resolve, then caches     | setup is expensive but shared state is fine |
-| `registerSingleton`     | stores a prebuilt instance                | you already have it, or want eager creation |
+| `registerSingleton`     | runs the factory immediately, then caches | you want eager creation and shared state     |
 
 <Code code={extractRegion(serviceRegistrySnippets, 'service-registry-register-all-three')} lang="dart"/>
 
@@ -43,7 +43,7 @@ A slot is not a class. It is a contract the registry recognizes, and multiple im
     rejected outright because the runtime cannot manage the lifecycle of instances it never gets to see again.
 </Aside>
 
-If the same plugin registers the same slot twice, the second call replaces the first. That is not duplication, it is overwrite.
+If the same plugin registers the same slot twice, the second call replaces the first unless the existing registration is an attached `StatefulPluginService`, in which case registration throws `ArgumentError`.
 
 ## Resolution
 

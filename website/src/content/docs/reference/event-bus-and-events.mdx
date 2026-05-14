@@ -11,7 +11,7 @@ import eventBusSource from '../../../../../packages/plugin_kit/lib/src/event_bus
 
 This page is the lookup reference for the public event types in `plugin_kit`. It assumes you already understand the model from the concept pages and want to confirm a signature, a return type, or a default value.
 
-The bus is exported from the package barrel via `src/event_bus.dart`, alongside the convenience extensions in `src/extensions.dart`.
+The bus is exported from the package barrel via `src/event_bus.dart`, alongside the convenience extensions in `src/plugin/plugin.dart`.
 
 ## `EventBus`
 
@@ -96,7 +96,7 @@ The `internal` parameter on `emit` itself is rarely used directly; prefer `emitI
 
 The same bus also does typed RPC. The dispatch model mirrors `emit`: general handlers are merged with identifier-scoped handlers into one descending-priority sequence (higher first). Each handler is invoked in turn. The first handler to return a non-null `Response` wins; returning `null` concedes to the next handler.
 
-For non-nullable `Response`, the first handler that runs wins by definition (it cannot return null). The cascade behavior matters most when `Response` is nullable, which is the usual shape.
+`RequestHandler<Request, Response>` always returns `Response?`, so handlers can concede with `null` even when `Response` is non-nullable. The cascade behavior applies in both cases.
 
 ### Async
 
@@ -173,7 +173,7 @@ Identifiers are how one bus multiplexes across logical targets (tools, agents, p
 
 ## Helpers on `Plugin`, `StatefulPluginService`, and `PluginSession`
 
-The bus is reachable directly on every context, but the convenience extensions in `src/extensions.dart` exist so plugin code never has to manage subscription fields by hand.
+The bus is reachable directly on every context, but the convenience extensions exported through `src/plugin/plugin.dart` exist so plugin code never has to manage subscription fields by hand.
 
 ### `PluginHelper` extension on `Plugin`
 

@@ -104,7 +104,7 @@ abstract class Plugin {
 Two scopes:
 
 - **`GlobalPlugin`**: registered once during `PluginRuntime.init`, shared across every session.
-- **`SessionPlugin`**: registered per session; constructor expressions evaluate fresh each time `register` runs, so each session gets its own state by default.
+- **`SessionPlugin`**: attached per session, but the same plugin instance is reused across sessions, so mutable plugin fields are shared unless state lives in services or context.
 
 Both default-context generics are inferred. Write `extends GlobalPlugin` / `extends SessionPlugin` without type arguments unless you need a [custom context subclass](https://plugin-kit-docs.saadodi44.workers.dev/concepts/custom-context/).
 
@@ -177,7 +177,7 @@ Build dotted/namespaced ids with `Namespace`:
 const agent = Namespace('agent');
 
 registry.registerSingleton<Model>(agent('model'), () => GptModel());
-registry.registerSingleton<Tools>(agent.namespace('mcp')('tools'), () => McpTools());
+registry.registerSingleton<Tools>(agent.child('mcp')('tools'), () => McpTools());
 
 context.resolve<Model>(agent('model'));
 ```
@@ -263,7 +263,7 @@ RuntimeSettings demonstrateSettingsWithPin() {
 }
 ```
 
-Hand the runtime a new `RuntimeSettings` and reconciliation runs serialized: newly-enabled plugins `register` then `attach`; staying-enabled plugins receive `onPluginSettingsChanged(oldContext, newContext)`; newly-disabled plugins `detach` and unregister. Plugin instances persist across reconciliation; service instances are recreated. Settings persist only after every reconcile succeeds.
+Hand the runtime a new `RuntimeSettings` and reconciliation runs serialized: newly-enabled plugins `register` then `attach`; staying-enabled plugins receive `onPluginSettingsChanged(oldContext, newContext)`; newly-disabled plugins `detach` and unregister. Plugin instances persist across reconciliation; singleton and lazy-singleton service instances are reused, while factory services are recreated on resolve. Settings persist only after every reconcile succeeds.
 
 ## Capabilities
 
@@ -294,7 +294,7 @@ State management libraries own presentation state. Plugin Kit owns participation
 
 | Package | Adds |
 |---|---|
-| [`flutter_plugin_kit`](https://pub.dev/packages/flutter_plugin_kit) | `PluginRuntimeScope` and `PluginSessionScope` `InheritedWidget`s, a `State` mixin that auto-cancels bus subscriptions across session swaps, a `ChangeNotifier` adapter, and `BuildContext.watchEvent<E>()` / `readEvent<E>()` extensions. |
+| [`flutter_plugin_kit`](https://pub.dev/packages/flutter_plugin_kit) | `PluginRuntimeScope` and `PluginSessionScope` scope `StatefulWidget`s that provide inherited runtime/session access, a `State` mixin that auto-cancels bus subscriptions across session swaps, a `ChangeNotifier` adapter, and `BuildContext.watchEvent<E>()` / `readEvent<E>()` extensions. |
 | [`plugin_kit_dialog`](https://pub.dev/packages/plugin_kit_dialog) | A drop-in three-tab Flutter UI for inspecting and editing any `PluginRuntime`: toggle plugins, edit configurable services, browse the registry. |
 
 Both are optional. The runtime works without them.

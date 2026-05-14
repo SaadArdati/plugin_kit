@@ -75,7 +75,7 @@ Three pairs, each with a flat and a namespaced variant. All registration methods
 
 | Method | Wrapper kind | When the instance is built |
 |---|---|---|
-| `registerSingleton` | `SingletonWrapper` | At call time, by the caller |
+| `registerSingleton` | `SingletonWrapper` | At registration time, by the registry via `create()` |
 | `registerLazySingleton` | `LazySingletonWrapper` | On first resolve |
 | `registerFactory` | `FactoryWrapper` | On every resolve |
 
@@ -83,7 +83,7 @@ Three pairs, each with a flat and a namespaced variant. All registration methods
 
 There are no `*Namespace` variants on the registry. Build a namespaced `ServiceId` via `Namespace.call(...)` (the call-shorthand `agent('model')`) or `Namespace.service(...)`, then pass the resulting `ServiceId` to the regular `register*` method. That keeps the registry surface narrow: the registry stores `ServiceId` keys; the `Namespace` helper only composes them.
 
-If the same `pluginId` registers the same `serviceId` twice, the second call replaces the first. That is overwrite, not duplication. After insertion the candidate list is re-sorted by priority descending.
+If the same `pluginId` registers the same `serviceId` twice, the second call replaces the first unless the existing registration is an attached `StatefulPluginService`, in which case registration throws `ArgumentError`. After insertion the candidate list is re-sorted by priority descending.
 
 <Aside type="caution" title="Stateful services reject factory registration">
 `registerFactory` checks at runtime that `T` is not a subtype of `StatefulPluginService` and throws `ArgumentError` if it is. Stateful services need lifecycle management; the runtime cannot manage instances it never sees again.
@@ -111,13 +111,13 @@ It locates the registration owned by `pluginId`, walks past it, and returns the 
 
 ### Listing and inspection
 
-These methods walk the registry without committing to a winner. None of them throw when nothing matches; they return empty collections or `null`.
+These methods walk the registry without mutating it. Most return empty collections or `null` when nothing matches. `listAllServices()` calls `resolve()` for each id, so it can throw `StateError` when a slot has only disabled registrations.
 
 | Method | Returns |
 |---|---|
 | `listAllServiceIds([PluginId? pluginId])` | Every registered `ServiceId`, optionally filtered to one plugin's registrations. |
-| `listAllServices()` | `Map<ServiceId, Object>` of every slot to its resolved winning instance. Calls `resolve` for each id, so factories run. |
-| `resolveRaw<T>(ServiceId)` / `maybeResolveRaw<T>(ServiceId)` | The winning [`RegistrationWrapper`](#registrationwrapper) for one slot, no instantiation. Iterate `listAllServiceIds()` if you need every winner. |
+| `listAllServices()` | `Map<ServiceId, Object>` of every slot to its resolved winning instance. Calls `resolve` for each id, so factories run, and throws `StateError` if a slot has only disabled registrations. |
+| `resolveRaw<T>(ServiceId)` / `maybeResolveRaw<T>(ServiceId)` | The winning [`RegistrationWrapper`](#registration-wrappers) for one slot, no instantiation. Iterate `listAllServiceIds()` if you need every winner. |
 | `listCapabilitiesOfNamespace(Namespace)` | Union of every `Capability` on every wrapper in `namespace.*`. |
 | `getRegistrations(ServiceId)` | All wrappers for `serviceId` in priority order, or `null` if none registered. |
 | `getRegistrationsOfType<T>(ServiceId)` | Same, filtered to wrappers whose payload is `T`. |
@@ -166,7 +166,7 @@ class ScopedServiceRegistry {
 }
 ```
 
-The two big differences from the raw registry are positional arguments for the plain `register*` methods, and a `ServiceId` handle in place of a string id.
+The two big differences from the raw registry are positional arguments for the plain `register*` methods, and automatic `pluginId` scoping.
 
 ### Positional registration
 
@@ -277,7 +277,7 @@ void onSettingsInjected() {}
 
 ## `StatefulPluginService`
 
-`PluginService` plus session lifecycle and automatic subscription cleanup.
+`PluginService` plus plugin lifecycle hooks and automatic subscription cleanup.
 
 <Code code={extractRegion(pluginServicesSource, 'stateful-plugin-service-basic')} lang="dart" />
 
@@ -287,7 +287,7 @@ The type parameter is the [`PluginContext`](/concepts/sessions/) subclass the se
 
 `attach()` and `detach()` are pure user hooks. The framework binds `context` before calling `attach()`, then calls `detach()` and unbinds the context, cancelling every subscription opened via the tracked helpers below; you do not call `super.attach()` or `super.detach()`. Both base implementations are no-ops.
 
-Inside `attach()`, read the bound session via `this.context` (or just `context`). The helpers `on`, `onRequest`, `bind`, `emit`, `resolve`, and `maybeResolve` read `this.context` implicitly, so no parameter is needed.
+Inside `attach()`, read the bound context via `this.context` (or just `context`). The helpers `on`, `onRequest`, `bind`, `emit`, `resolve`, and `maybeResolve` read `this.context` implicitly, so no parameter is needed.
 
 Reading `context` outside the `attach`/`detach` window throws `StateError`. Use `hasContext` to guard if the timing might overlap.
 

@@ -7,7 +7,7 @@ seven different state-holder blooms.
 This package is the source of citation for
 [`docs/research/2026-05-04-flutter-state-management-integration.md`](../../docs/research/2026-05-04-flutter-state-management-integration.md)
 and for the
-[State Management Integrations](../../website/src/content/docs/guides/state-management-integrations.mdx)
+[State Management Bridges](../../website/src/content/docs/reference/state-management-bridges.mdx)
 guide. Every recipe described in those documents is implemented here,
 executed under `flutter test`, and kept clean by `flutter analyze`. If a
 future plugin_kit change quietly breaks one of the recipes, a test in this
@@ -15,11 +15,13 @@ package fails.
 
 ## What grows here
 
-Nine integration recipes plus an `integration_launcher.dart` menu screen, all under [`lib/src/integrations/`](lib/src/integrations/):
+Ten integration recipes plus an `integration_launcher.dart` menu screen, all under [`lib/src/integrations/`](lib/src/integrations/):
 
 - `setState` (no library)
 - `flutter_plugin_kit` `PluginSessionStateListener` (the State-mixin
   variant of `setState` with subscription bookkeeping abstracted away)
+- `plugin_kit` `PluginSessionListener` (the same mixin pattern wired
+  directly from `plugin_kit` instead of `flutter_plugin_kit`)
 - `ChangeNotifier` + `provider`
 - `flutter_plugin_kit` `PluginEventNotifier` (a foundation
   `ChangeNotifier` / `ValueListenable` for "the latest event of type T",
@@ -32,7 +34,7 @@ Nine integration recipes plus an `integration_launcher.dart` menu screen, all un
 - GetIt as a session locator
 
 Each integration owns one bridge class (or one screen, for the
-no-bridge variants) plus a screen widget. The nine screens render through
+no-bridge variants) plus a screen widget. The ten screens render through
 a shared [`ChatView`](lib/src/widgets/chat_view.dart) so the test harness
 can type into the same key, tap the same key, and assert against the same
 `MessageList` regardless of which bridge is under test.
@@ -54,10 +56,10 @@ written against pure plugin_kit APIs with no widgets:
 - Hot-swap: a higher-priority registrant wins resolution; disabling it
   via settings reconciliation flips the winner without touching the
   session.
-- Toggle race: two `updateSessionSettings` calls fired concurrently with
-  `Future.wait` produce incoherent state; tail-chained serialization
-  converges on the latest intent. Empirical proof of the hazard called
-  out in the research note.
+- Toggle guard: two `updateSessionSettings` calls fired concurrently with
+  `Future.wait` throw `StateError`; tail-chained serialization converges
+  on the latest intent. Empirical proof of the runtime guard and
+  serialization pattern called out in the research note.
 
 ## How to read the code
 

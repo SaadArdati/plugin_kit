@@ -40,14 +40,14 @@ abstract class Plugin {
 
   void register(ScopedServiceRegistry registry) {}
 
-  void attach(covariant PluginContext context);
+  void attach(covariant PluginContext context) {}
 
-  Future<void> detach(covariant PluginContext context);
+  Future<void> detach(covariant PluginContext context) async {}
 
   Future<void> onPluginSettingsChanged(
     covariant PluginContext oldContext,
     covariant PluginContext newContext,
-  );
+  ) async {}
 }
 ```
 
@@ -59,9 +59,9 @@ abstract class Plugin {
 | `register` | Contributes services to the registry. Called once per scope on every enabled plugin before any `attach` runs. |
 | `attach` | Called after every plugin in the scope has registered. Subscribe to events here, not in `register`. Pure user hook with a no-op base implementation; do not call `super.attach`. The runtime attaches owned `StatefulPluginService`s before your hook runs, so the plugin's `attach(context)` can resolve and use its own services. |
 | `detach` | Mirror of attach. Pure user hook with a no-op base implementation; do not call `super.detach`. After your hook returns, the runtime detaches owned services and cancels every subscription and binding registered via `PluginHelper.on(context, ...)` / `bind(context, ...)`. |
-| `onPluginSettingsChanged` | Called for plugins that remain enabled across a settings update. Newly enabled or disabled plugins go through full attach/detach instead. |
+| `onPluginSettingsChanged` | Called for each plugin that ends a settings update enabled, including newly enabled plugins. Newly enabled plugins still run full register/attach, and newly disabled plugins detach. |
 
-Equality is on `(runtimeType, pluginId)`. A `GlobalPlugin('x')` and a `SessionPlugin('x')` are distinct instances and do not collide.
+Equality is on `(runtimeType, pluginId)`. A `GlobalPlugin` and a `SessionPlugin` with the same `pluginId` are distinct instances, but runtime registration still rejects the duplicate `pluginId`.
 
 ## `StatefulPluginService<PKC>`
 
@@ -220,7 +220,7 @@ Order of operations:
 4. Call `updateGlobalSettings` or `updateSessionSettings` to reconcile a settings change. The runtime diffs old against new, runs detach for newly disabled plugins, register/attach for newly enabled, and `onPluginSettingsChanged` for survivors.
 5. Call `dispose` once at shutdown. The runtime detaches global plugins, disposes every session, and disposes the global bus.
 
-Plugin enablement falls back through three rules: an explicit `RuntimeSettings.plugins` entry wins, then `FeatureFlag.locked` plugins are always on, then `FeatureFlag.experimental` plugins default off while all other plugins default on. Build a `RuntimeSettings` listing the subset you want enabled and pass it to `init` (or to `updateSettings` later).
+Plugin enablement falls back through three rules: `FeatureFlag.locked` plugins are always on, then an explicit `RuntimeSettings.plugins` entry wins, then `FeatureFlag.experimental` plugins default off while all other plugins default on. Use explicit `RuntimeSettings.plugins` entries to disable stable plugins or enable experimental ones, then pass settings to `init` (or to `updateSettings` later). Locked plugins stay enabled regardless of explicit settings.
 
 `globalContextFactory` is required when `G` is a custom subtype of `GlobalPluginContext`. The default factory builds a base `GlobalPluginContext`, which cannot be cast to a tighter type. Same rule for `contextFactory` on `createSession` when `S` is custom.
 

@@ -96,11 +96,11 @@ The registry stores registrations in a sorted list keyed by `serviceId`. The sor
 
 | Operation | Behavior |
 |---|---|
-| Insert | Registrations slot into the list by priority. Ties preserve insertion order. |
+| Insert | Registrations slot into the list by priority. For equal priorities, no extra tiebreaker is defined. |
 | Resolve | Return the first entry (highest priority wins). |
 | Resolve after | Walk past any registration from the caller's `pluginId`, return the next one. |
 
-Overrides from `RuntimeSettings` are applied at registration time. When settings hand a plugin an effective priority of 200, the wrapper is inserted into the sorted list at that priority, not at whatever the plugin's `register` call originally requested.
+Plugin-scoped overrides from `RuntimeSettings` are applied at registration time. Wildcard overrides are applied after registration, once the winning provider is known.
 
 ### Resolve flow
 

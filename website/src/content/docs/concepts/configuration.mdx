@@ -55,7 +55,7 @@ The flow is always the same:
 | `getDouble(key)` | double lookup with numeric and string coercion |
 | `getBool(key)` | bool lookup with string and numeric coercion |
 | `list<T>(key)` | typed list lookup |
-| `map(key)` | `Map<String, dynamic>` lookup, or `{}` when absent or invalid |
+| `map(key)` | `Map<String, dynamic>` lookup, or `null` when absent or invalid |
 | `has(key)` | `true` when the key exists and is non-null |
 | `raw(key)` | untyped raw value |
 
@@ -89,7 +89,7 @@ For structured settings, use `list<T>(...)` and `map(...)`.
 
 <Code code={extractRegion(runtimeSettingsSource, 'config-node-list-map')} lang="dart" />
 
-`map(...)` returns an empty map when the value is missing or cannot be cast. You never end up with a null reference exception from this API.
+`map(...)` returns `null` when the value is missing or cannot be cast. Use `??` with a fallback when you need a default map.
 
 <Aside type="note" title="ConfigNode is key-based, not path-based">
 There is no dot-notation traversal (`config.get('http.headers.x-api-key')`). If you want to walk into a nested structure, read the nested map and index into it yourself. Keep the surface small on purpose.
@@ -109,7 +109,7 @@ Treat `config` as the current effective settings snapshot for that service. Do n
 
 If your service needs to react to changed settings:
 
-- Override `injectSettings(...)` in the service for service-local reactions.
+- Override `onSettingsInjected()` in the service for service-local reactions.
 - Or use `Plugin.onPluginSettingsChanged(...)` at the plugin level for broader reactions.
 
 `ConfigNode` is the read model handed to the service by the registry. It is a window, not a container you fill in.

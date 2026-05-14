@@ -4,12 +4,12 @@
 /// slot has multiple entries, the highest priority wins.
 ///
 /// Covers:
-/// - `registerSingleton`: pre-built instance
+/// - `registerSingleton`: factory-built instance at registration time
 /// - `registerLazySingleton`: built on first resolve, cached after
 /// - `registerFactory`: fresh instance on every resolve
 /// - Priority-based resolution between competing entries
 /// - `resolveAfter`: skip the winner for a chain-of-responsibility fallback
-/// - `registerSingletonNamespace` / `resolveNamespace`: grouped slots
+/// - `Namespace(...)` + `registerSingleton`/`resolve`: grouped slots
 /// - `maybeResolve` and `listAllServiceIds` for safe lookup and listing
 library;
 

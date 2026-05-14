@@ -82,8 +82,8 @@ If a handler does not need to mutate or stop, it simply does not.
 
 You can subscribe directly from `SessionPlugin.attach(...)`. After importing `plugin_kit`, `Plugin` itself
 gains the same auto-tracking helpers stateful services use: `on<T>()`, `onRequest<Req, Res>()`,
-`onRequestSync<Req, Res>()`, and `bind()`. Subscriptions go into `activeSubscriptions` and bindings
-into `activeBindings`, all torn down automatically when the plugin detaches. `Plugin.attach` and
+`onRequestSync<Req, Res>()`, and `bind()`. Subscriptions and bindings are tracked per context and
+torn down automatically when the plugin detaches from that context. `Plugin.attach` and
 `Plugin.detach` are pure user hooks: no `super` call is needed. The framework runs orchestration
 (stateful service attach/detach, subscription cleanup) around your hook.
 

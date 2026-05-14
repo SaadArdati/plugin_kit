@@ -12,7 +12,7 @@ The four cards correspond to the four exposed reading paths:
 2. `CounterCard`: `PluginSessionScope.of(context).emit(...)` plus
    `context.watchEvent<CounterChanged>()`. User intents go in, plugin
    state comes back out.
-3. `HistoryCard`: `SessionListener` mixin on a `State` subclass with
+3. `HistoryCard`: `PluginSessionStateListener` mixin on a `State` subclass with
    `listen<TickEvent>`. Subscriptions are cancelled in `dispose`
    automatically; the example keeps a rolling window of recent ticks.
 4. `NotifierCard`: `PluginEventNotifier<TickEvent>` consumed through a

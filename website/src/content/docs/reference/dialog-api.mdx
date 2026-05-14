@@ -48,7 +48,7 @@ A service may attach multiple `UiConfigurableCapability` instances; each becomes
 
 <Code code={extractRegion(configFieldSource, 'config-field-config-field')} lang="dart" />
 
-Every field carries the same four slots. `key` is a dotted path under `ServiceSettings.config` (`'model'`, `'provider.name'`, `'limits.max_tokens'`); the dotted form writes to nested maps when the dialog saves. `defaultValue` is what the per-field reset button restores to and what `ConfigNode` returns when the value is absent. See [`ConfigNode`](/concepts/configuration/) for the read-side contract.
+Every field carries the same four slots. `key` is a dotted path under `ServiceSettings.config` (`'model'`, `'provider.name'`, `'limits.max_tokens'`); the dotted form writes to nested maps when the dialog saves. `defaultValue` is what the per-field reset button restores to. `ConfigNode` reads only stored settings values and returns `null` for absent keys. See [`ConfigNode`](/concepts/configuration/) for the read-side contract.
 
 The `sealed` modifier means the dialog's renderer dispatch is exhaustive; you cannot add new field types without declaring a new renderer for them through [`ExtensionConfigField`](#extensionconfigfield).
 
@@ -106,7 +106,7 @@ Switch input. Carries no extra state beyond the four base slots.
 
 <Code code={extractRegion(configFieldSource, 'config-field-group-config-field')} lang="dart" />
 
-Visual sub-section. Renders `label` as a sub-heading and indents `children` beneath it. `key` is a sub-section identifier, not a write target; nested fields keep their own dotted keys.
+Visual sub-section. Renders `label` as a sub-heading and indents `children` beneath it. `key` is the group's write target, and nested fields read and write their own dotted keys inside the map stored at that `key`.
 
 `GroupConfigField` does not accept `defaultValue` (`super.defaultValue` is omitted): groups have no value of their own.
 
@@ -142,7 +142,7 @@ The `Future` return is awaited end-to-end; throwing from `onSave` surfaces a Sna
 
 `theme` is a `PluginKitDialogTheme` (a `ThemeExtension`), not a `ThemeData`. The dialog merges it onto the host's existing theme extensions inside the `showDialog` builder so the dialog route picks it up even though it lives under the root navigator. Pass `null` to inherit the host's theme as-is.
 
-`barrierDismissible: true` is the default; while a save is in flight the dialog hardens against barrier-tap and system-back regardless of this flag.
+`barrierDismissible: true` is the default. Barrier taps still follow this flag while a save is in flight. System-back is blocked while saving.
 
 ### `PluginKitDialog`
 
@@ -154,7 +154,7 @@ The Material dialog shell with rounded corners, a `maxWidth` of 920, and a `maxH
 
 <Code code={extractRegion(pluginKitDialogBodySource, 'plugin-kit-dialog-body-plugin-kit-dialog-body')} lang="dart" />
 
-The header-plus-tab-content body without the surrounding `Dialog` chrome. Use this when you want a custom container: a side panel, a route, a dedicated page in a desktop layout. Pass the runtime explicitly here; this widget does not assume the controller's runtime is the one you want rendered.
+The header-plus-tab-content body without the surrounding `Dialog` chrome. Use this when you want a custom container: a side panel, a route, a dedicated page in a desktop layout. Pass the same runtime as `controller.runtime`; plugin metadata and no-op pruning defaults are sourced from the controller runtime.
 
 ### `PluginKitDialogController`
 
@@ -196,7 +196,7 @@ class PluginKitDialogController extends ChangeNotifier {
 
 `isSaving` is owned by the dialog body, which flips it around its `await onSave(...)` so the header can render an inline spinner and the body can dim the tab area. Treat the setter as read-only from app code; it is public only so the body can drive it.
 
-`showAllServices` is a UI-only flag for the Advanced tab to show services that match the default and would otherwise be pruned from view.
+`showAllServices` is a UI-only flag for the Advanced tab JSON preview to show defaults alongside overrides.
 
 The mutators are designed to be safe to call repeatedly. Setting a field to a value that matches the defaults plus baseline collapses the override to nothing (no-op deletion), so saving from a dirty-then-reset draft produces minimal `RuntimeSettings`.
 
@@ -254,7 +254,7 @@ class PluginKitVisual {
 }
 ```
 
-Same value object across all three axes. Every field is optional; the dialog falls back to a derived default for anything you leave null (raw `pluginId` or namespace name or service id, plugin's own `description`, theme primary color, no icon).
+Same value object across all three axes. Every field is optional; the dialog falls back to derived defaults for anything you leave null (raw `pluginId` or namespace name or service id, theme primary color, default namespace or service icon when visuals omit one).
 
 `icon` is a full `Widget`, wrapped by the dialog in an `IconTheme` keyed to the resolved accent so a plain `Icon(Icons.psychology)` inherits color and size automatically. The accent color follows a service-to-namespace-to-owning-plugin-to-theme cascade resolved per render.
 
@@ -313,7 +313,7 @@ Full Material 3 `ThemeData` builders that match the screenshots in the guide. Us
 
 ## Custom renderers (`ConfigFieldRenderer`)
 
-Custom field widgets register against the same registry that the dialog itself uses. The `ConfigFieldRenderer<F>` interface is the contract.
+Custom field widgets are resolved from the dialog runtime's internal registry, not from the host runtime you pass into `showPluginKitDialog`. The public dialog widgets build that internal runtime with a fixed plugin list, so renderer plugins registered only on your host runtime are not visible there. The `ConfigFieldRenderer<F>` interface is the contract.
 
 <Code code={extractRegion(defaultFieldRenderersPluginSource, 'default-field-renderers-plugin-config-field-renderer')} lang="dart" />
 

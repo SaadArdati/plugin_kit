@@ -14,7 +14,7 @@ import configFieldsSnippets from '../../../../../website/snippets/lib/config_fie
 
 Plugin Kit Dialog is a Flutter dialog that inspects and edits any [`PluginRuntime`](/concepts/runtime/) at runtime. Drop it in once and your users get a three-tab UI for toggling plugins, editing service config, and inspecting the registry. You write zero settings-screens-per-plugin code.
 
-The dialog is built from `plugin_kit` plugins itself. Every tab, header action, and field renderer is a real plugin you can shadow or replace from your host app.
+The dialog is built from internal `plugin_kit` plugins. Tabs and field renderers come from the dialog's internal runtime, so host app plugins cannot shadow or replace them. Header actions (Reset all, Cancel, Save) are built-in widgets.
 
 ## Install
 
@@ -46,15 +46,15 @@ Enable and disable plugins live. Stable plugins toggle freely; experimental plug
 
 ### Services tab
 
-Every service that ships a `UiConfigurableCapability` becomes an editable card. Text, numbers, dropdowns, switches, multiline, password, grouped, or custom fields are all supported.
+Each resolved winner in `runtime.sessions.lastOrNull?.registry ?? runtime.globalRegistry` that ships a `UiConfigurableCapability` becomes an editable card. Text, numbers, dropdowns, switches, multiline, password, grouped, or custom fields are all supported.
 
 ### Advanced tab
 
-A registry inspector with priority chains, winners, shadowed contenders, and a JSON view of the working draft. This is the "what is the runtime actually going to do" view.
+A registry inspector with priority chains, winners, shadowed contenders, and a JSON view of the working draft. It inspects `runtime.globalRegistry`, even when sessions are active.
 
 ![Plugin Kit Dialog Advanced tab showing the service registry inspector with namespaces, competing registrations, priority badges, and the current winner picked out](/images/dialog/advanced_tab_dark.png)
 
-*Each row is a slot. Chips on the right show registrations in priority order, with the current winner picked out and any meta entries (visuals contributions, wildcard fallbacks) marked. The JSON preview shows the diff against the baseline; overrides matching the baseline are pruned.*
+*Each row is a slot. Chips on the right show registrations in priority order, with the current winner picked out and any meta entries (visuals contributions, wildcard fallbacks) marked. The JSON preview shows the current working `RuntimeSettings` snapshot, not a baseline diff.*
 
 ## Declaring configurable services
 
@@ -89,7 +89,7 @@ Visuals are a Flutter-only concern, so the canonical attachment path is a single
 
 Because the visuals plugin lives in your host app (which has Flutter), Dart-only plugins still get icons, labels, and colors without importing Flutter. The decoration is keyed by `PluginId`, `Namespace`, or `ServiceId`, so the host owns the map and the plugin source code stays portable.
 
-The plugin registers at priority `100`, above the default registry priority of `50`, so host overrides beat anything a Flutter plugin self-attaches from its own `register()`. Unknown keys (a plugin or service that does not currently exist) are accepted silently; this lets you keep visuals for plugins that may be enabled later. When no visual is found, cards fall back to a generic gear icon and the theme's primary color.
+The plugin registers at priority `1000`, above the default registry priority of `500`, so host overrides beat anything a Flutter plugin self-attaches from its own `register()`. Unknown keys (a plugin or service that does not currently exist) are accepted silently; this lets you keep visuals for plugins that may be enabled later. When no visual is found, cards fall back to a generic gear icon and the theme's primary color.
 
 ## Custom field renderers
 
@@ -97,7 +97,7 @@ Need a color picker, file selector, or any other widget? Declare an `ExtensionCo
 
 <Code code={extractRegion(configFieldsSnippets, 'config-field-extension')} lang="dart" />
 
-Register a Flutter-side renderer for that key from your host app:
+The default `showPluginKitDialog` and `PluginKitDialogBody` entry points use a private dialog runtime with fixed built-in plugins, so host-runtime renderer registrations are not used.
 
 <Code code={extractRegion(dialogSnippets, 'dialog-color-picker-renderer')} lang="dart" />
 
@@ -145,7 +145,7 @@ Declarative types come from `plugin_kit`:
 ```dart
 import 'package:plugin_kit/plugin_kit.dart';
 
-UiConfigurableCapability(label, fields, description);
+UiConfigurableCapability({label, fields, description});
 TextConfigField, MultilineConfigField, PasswordConfigField,
 NumberConfigField (NumberFieldStyle, isInteger),
 DropdownConfigField<T>, DropdownOption<T>,

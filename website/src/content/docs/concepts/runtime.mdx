@@ -38,7 +38,7 @@ When you call `runtime.init(...)`, this happens in order:
 
 After that, the runtime is ready to spawn sessions. You can open one per user action, keep one long-lived session, or mix the two.
 
-Plugins not listed in `RuntimeSettings.plugins` default on, unless they carry `FeatureFlag.experimental`, which defaults off. To narrow the enabled set, build a `RuntimeSettings` listing the plugin ids you want and pass it to `init` (or, later, to `updateSettings`).
+Plugins not listed in `RuntimeSettings.plugins` default on, unless they carry `FeatureFlag.experimental`, which defaults off. Listing only some plugin ids does not narrow the enabled set by itself. To narrow it, add explicit `enabled: false` entries for plugins you want off, then pass those settings to `init` (or, later, to `updateSettings`).
 
 ## Settings reconciliation
 

@@ -13,7 +13,7 @@ abstract final class ServiceSlots {
   /// Namespace for `PanelWidgetFactory` registrations. Panel plugins
   /// register their factory under this namespace with their own service
   /// id (e.g. `'console'`, `'minimap'`). The shell resolves via
-  /// `maybeResolveNamespace<PanelWidgetFactory>(ServiceSlots.panel, id)`.
+  /// `maybeResolve<PanelWidgetFactory>(ServiceSlots.panel(id))`.
   static const Namespace panel = Namespace('panel');
 }
 

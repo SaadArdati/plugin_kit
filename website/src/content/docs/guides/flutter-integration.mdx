@@ -106,18 +106,18 @@ When a user enables or disables a plugin mid-session, the shell calls `updateSes
 <Code code={extractRegion(sessionsSnippets, 'session-update-settings')} lang="dart" />
 
 <Aside type="caution" title="Serialize back-to-back toggles">
-`updateSessionSettings` is async. If the user toggles two plugins in quick succession, both handlers can start before the first finishes, and the second one will compute its `next` settings off a snapshot of `session.settings` that has not yet applied the first change. The second toggle silently drops.
+`updateSessionSettings` is async. If the user toggles two plugins in quick succession, a second reconciliation can start before the first finishes, and `PluginRuntime.updateSessionSettings` throws `StateError`.
 
 The `code_editor` example serializes with a tail-chained `Future`:
 
 <Code code={extractRegion(flutterIntegrationSnippets, 'flutter-toggle-pending-serialize')} lang="dart" />
 
-If you expose toggles to the user, do this or equivalent.
+If you expose toggles to the user, serialize updates like this (or equivalent).
 </Aside>
 
 ## Lifecycle gotchas
 
-**Dispose the runtime, not individual sessions.** `PluginRuntime.dispose()` iterates active sessions and disposes them. Calling `session.dispose()` and `runtime.dispose()` separately races on stateful service detach and can throw `ConcurrentModificationError`. One call. The runtime.
+Dispose each session exactly once. `PluginRuntime.dispose()` iterates the active sessions it still owns and disposes them. If you plan to call `runtime.dispose()`, do not also call `session.dispose()` for those same sessions.
 
 **`register` and `attach` do not re-run on hot reload.** Plugins are constructed once, and hot reload does not re-run `main` or re-execute `initState`. If you change code inside a plugin's `register` or `attach`, use hot restart. Pure widget code inside factories still hot-reloads fine, because that code runs on rebuild.
 

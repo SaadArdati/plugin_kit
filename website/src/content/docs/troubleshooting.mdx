@@ -49,11 +49,11 @@ StateError: contextFactory is required when using a custom session context type 
 
 See [Custom Context](/concepts/custom-context/) for the full pattern, including how to keep your plugins typed against the custom context.
 
-### Two back-to-back plugin toggles silently lose the second one
+### Two back-to-back plugin toggles throw `StateError`
 
-**Cause.** `updateSessionSettings` is async. If a UI handler kicks off two toggles in quick succession, the second one starts before the first completes. It computes its `oldSettings` argument against a snapshot that has not yet absorbed the first toggle, so its diff misses the change and the runtime has no work to do for the second one. The toggle "happens" in the UI state, but no plugin lifecycle runs.
+**Cause.** `updateSessionSettings` rejects concurrent reconciliations. If a second toggle starts while the first one is still reconciling, the runtime throws `StateError` from `PluginRuntime._enterReconcile(...)`.
 
-**Fix.** Serialize the toggles. The standard pattern is a tail-chained `Future`:
+**Fix.** Serialize the toggles so only one reconciliation runs at a time. The standard pattern is a tail-chained `Future`:
 
 <Code code={extractRegion(flutterIntegrationSource, 'flutter-toggle-pending-serialize')} lang="dart" />
 
@@ -88,11 +88,11 @@ If you wanted reconciliation and got silence, you almost certainly called the sn
 
 ### My plugin compiled but never attached
 
-The most common cause is forgetting to enable it. `RuntimeSettings` controls plugin enablement, and a plugin not listed in the active settings is not attached. Plugins with `FeatureFlag.experimental` are disabled by default and require explicit opt-in. Plugins with `FeatureFlag.locked` are always enabled and cannot be turned off.
+The most common cause is settings enablement. `RuntimeSettings` controls plugin enablement, but plugins without a `RuntimeSettings.plugins` entry are enabled by default unless they carry `FeatureFlag.experimental`. Plugins with `FeatureFlag.experimental` are disabled by default and require explicit opt-in. Plugins with `FeatureFlag.locked` are always enabled and cannot be turned off.
 
-Build a `RuntimeSettings` that lists your plugins and pass it to `runtime.init`.
+Build a `RuntimeSettings` with explicit entries for any stable plugin you want disabled and any experimental plugin you want enabled, then pass it to `runtime.init`.
 
-The next most common cause is a dependency that is not enabled. The runtime auto-disables a plugin whose declared `dependencies` are missing, and logs a warning. Look for a `WARNING` log entry mentioning your plugin id and the unmet dependency.
+The next most common cause is a dependency that is not enabled. The runtime auto-disables a plugin whose declared `dependencies` are missing, and logs an info entry. Look for an `INFO` entry mentioning your plugin id and the unmet dependency. Locked plugins are not auto-disabled, those dependency failures log at `SEVERE`.
 
 Once the plugin is enabled and its dependencies are satisfied, check the lifecycle: did your `attach` handler actually run, and did you pass `context` to the `Plugin` helpers? See the first entry on this page.
 
@@ -167,7 +167,7 @@ The bus does not aggregate errors the way `PluginLifecycleException` does; that 
 
 ### `request<Req, Res>` throws when no handler answers; I want null
 
-**Cause.** `request` is the strict variant. It throws if no handlers are registered for the `(Request, Response)` type pair, and it throws if every registered handler returned `null` while `Response` is non-nullable. The error text is `No handler claimed request of type Req → Res: every registered handler returned null but Response is non-nullable.`
+**Cause.** `request` is the strict variant. It throws if no handlers are registered for the `(Request, Response)` type pair, and it throws if every registered handler returned `null` while `Response` is non-nullable. The thrown text starts with `AllConcededException: <Request> -> <Response> ... every registered handler conceded with null but Response is non-nullable.`
 
 **Fix.** If "no handler" is a valid state in your domain, use `maybeRequest` (returns `Future<Response?>`) or `maybeRequestSync` (synchronous, also returns nullable). Or declare the response type as nullable so the null cascade is permitted:
 

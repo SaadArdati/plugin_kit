@@ -55,9 +55,10 @@ JSON-round-trippable, value-equal.
 
 Both key types are typed handles, not raw `String`s. A `Map<String, PluginConfig>` or `Map<String, ServiceSettings>` literal will not type-check against the corresponding field.
 
-Both constructors are `const`. The default constructor's parameters default
-to `const {}`. `RuntimeSettings()` is the canonical "no overrides"
-starting point; prefer it over passing two empty maps explicitly.
+The default constructor is `const`; `RuntimeSettings.fromJson(...)` is a
+non-const factory. The default constructor's parameters default to
+`const {}`. `RuntimeSettings()` is the canonical "no overrides" starting
+point; prefer it over passing two empty maps explicitly.
 
 <Code code={extractRegion(runtimeSettingsSource, 'runtime-settings-empty')} lang="dart" />
 
@@ -79,8 +80,9 @@ Map<String, dynamic> getServiceConfig(Pin scopedKey);
 
 `isPluginEnabled` reads only the explicit `PluginConfig.enabled` value. It
 does not consult feature flags or experimental defaults. For the
-fully-resolved enablement decision (locked plugins, experimental fallback,
-dependency cascade), use `PluginRuntime.isPluginEnabled`. See [Plugins
+base runtime enablement decision (locked plugins, explicit config,
+experimental fallback), use `PluginRuntime.isPluginEnabled`. For the
+post-cascade runtime truth, use `PluginRuntime.isPluginAttached`. See [Plugins
 & Lifecycle](/reference/plugins-and-lifecycle/).
 
 ### `copyWith`
@@ -140,7 +142,7 @@ Plugin-level enablement plus an arbitrary plugin-wide map.
 
 | Field | Type | Default | Notes |
 |---|---|---|---|
-| `enabled` | `bool` | `true` | When `false`, `Plugin.register` is skipped and the plugin's services do not enter the session registry. |
+| `enabled` | `bool` | `true` | When `false`, `Plugin.register` is skipped and the plugin's services do not enter that scope's registry (global or session). |
 | `config` | `Map<String, dynamic>` | `const {}` | Plugin-wide values. Persisted in the settings model but **not** auto-injected into the plugin instance. |
 
 The asymmetry with `ServiceSettings.config` is deliberate. Service configs flow
@@ -254,11 +256,11 @@ payloads outside the runtime.
 | `getDouble(key)` | `double?` | Accepts `double`, any `num` (via `toDouble()`), and `String` (via `double.tryParse`). |
 | `getBool(key)` | `bool?` | Accepts `bool`, the strings `'true'` / `'false'` (case-insensitive), and `num` where `0` is `false` and any other value is `true`. |
 | `list<T>(key)` | `List<T>?` | Returns `value.cast<T>()` when the value is a `List` and the cast succeeds. Returns `null` on cast failure or non-list value. |
-| `map(key)` | `Map<String, dynamic>` | Non-nullable. Returns `const {}` when the key is missing, the value is not a map, or the cast fails. |
+| `map(key)` | `Map<String, dynamic>?` | Returns `value.cast<String, dynamic>()` when the value is a map and the cast succeeds. Returns `null` on cast failure or non-map value. |
 | `raw(key)` | `dynamic` | Untyped passthrough. The value as stored. |
 | `has(key)` | `bool` | `true` only when the key exists **and** the value is non-null. |
 
-There is no `getMap` returning a nullable map, and no path-style traversal.
+There is no separate `getMap` accessor, and no path-style traversal.
 The accessor is intentionally flat. To walk a nested map, read it with
 `map(key)` and index into the result.
 
@@ -271,10 +273,13 @@ default at the call site through `??`:
 
 <Code code={extractRegion(runtimeSettingsSource, 'config-node-defaults')} lang="dart" />
 
-`map(key)` is the only accessor that returns a non-null fallback. It returns
-`const {}` rather than null because the typical use is "read a sub-map and
-treat absence as empty," and the empty-map fallback removes a layer of
-nullability without taking ownership of defaults.
+`map(key)` follows the same null-on-miss contract as the other typed accessors.
+If you want "missing map means empty map," apply the fallback explicitly at the
+call site:
+
+```dart
+final headers = config.map('headers') ?? const <String, dynamic>{};
+```
 
 ### Coercion notes
 
