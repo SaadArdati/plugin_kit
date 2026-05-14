@@ -282,10 +282,10 @@ class RuntimeSettings {
   /// Returns the explicit [PluginConfig.enabled] value if one exists in
   /// [plugins], otherwise `true`. This is the settings-intent answer:
   /// it does NOT consult feature flags, the experimental-aware default,
-  /// or dependency-cascade results. For the fully-resolved enablement
-  /// decision (locked plugins, experimental fallback, dependency
-  /// cascade), use [PluginRuntime.isPluginEnabled]. For "is this plugin
-  /// currently attached at runtime" use [PluginRuntime.isPluginAttached].
+  /// or dependency-cascade results. For base runtime enablement
+  /// (locked plugins, explicit config, experimental fallback), use
+  /// [PluginRuntime.isPluginEnabled]. For the post-cascade runtime
+  /// truth, use [PluginRuntime.isPluginAttached].
   bool isPluginEnabled(PluginId pluginId) {
     final config = plugins[pluginId];
     if (config != null) {

@@ -61,9 +61,9 @@ mixin PluginSessionListener {
   /// parameters. Use this in the [subscriptions] getter to keep it concise.
   /// For advanced usage, use [EventBinding] directly.
   ///
-  /// The handler receives the full [EventEnvelope] so envelope metadata
-  /// (`sourcePluginId`, `timestamp`, `sequence`) stays reachable. Read
-  /// the payload via `envelope.event`.
+  /// The handler receives the full [EventEnvelope], including
+  /// `envelope.identifier`, `envelope.event`, and `envelope.stopped`.
+  /// Call `envelope.stop(...)` to halt propagation and set the result.
   EventBinding on<E>(
     void Function(EventEnvelope<E> envelope) handler, {
     int priority = 0,

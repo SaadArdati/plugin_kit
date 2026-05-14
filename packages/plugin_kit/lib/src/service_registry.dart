@@ -28,7 +28,7 @@ typedef CapabilitySet = Set<Capability>;
 ///
 /// Wrappers also carry [pluginId] (owner), [priority] (resolution order, with
 /// higher winning), and [capabilities] for discovery via custom [Capability]
-/// subclasses. Equality is based on [pluginId] and [priority].
+/// subclasses. Equality is based on [pluginId] and [basePriority].
 sealed class RegistrationWrapper<T extends Object> {
   /// The plugin that owns this registration.
   final PluginId pluginId;
@@ -332,10 +332,9 @@ class ServiceRegistry {
 
   /// Creates a shallow copy of this registry.
   ///
-  /// The registration lists are copied (not the wrappers themselves), and
-  /// overrides are copied by value. Used by [PluginContext.copyWith] to
-  /// snapshot the registry state.
-  /// Snapshot the current registry state.
+  /// The registration lists and wrappers are cloned, and overrides are
+  /// copied by value. Used by [PluginContext.copyWith] to snapshot the
+  /// registry state.
   ///
   /// Both the per-service lists AND the wrappers themselves are cloned,
   /// so `priority` mutations applied by [updateSettings] on the live
@@ -769,9 +768,11 @@ class ServiceRegistry {
   /// Register a factory service that creates a new instance on every resolve.
   ///
   /// If a registration from the same [pluginId] already exists for
-  /// [serviceId], it is replaced. The [priority] may be overridden by a
-  /// matching [LocalPluginOverride] in [overrides]. The registration list is
-  /// re-sorted after insertion.
+  /// [serviceId], it is replaced unless the existing registration is an
+  /// attached [StatefulPluginService], in which case this call throws
+  /// [ArgumentError]. The [priority] may be overridden by a matching
+  /// [LocalPluginOverride] in [overrides]. The registration list is re-sorted
+  /// after insertion.
   void registerFactory<T extends Object>({
     required PluginId pluginId,
     required ServiceId serviceId,
@@ -1158,7 +1159,7 @@ class LocalPluginOverride {
 /// void register(ScopedServiceRegistry registry) {
 ///   registry.registerSingleton<MyService>(
 ///     const ServiceId('my_service'),
-///     MyServiceImpl(),
+///     () => MyServiceImpl(),
 ///   );
 /// }
 /// ```

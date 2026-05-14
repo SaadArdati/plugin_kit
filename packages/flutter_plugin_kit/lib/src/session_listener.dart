@@ -86,9 +86,9 @@ mixin PluginSessionStateListener<W extends StatefulWidget> on State<W> {
   ///
   /// Callable from any lifecycle callback, including [State.initState].
   ///
-  /// The handler receives the full [EventEnvelope] so envelope metadata
-  /// (`sourcePluginId`, `timestamp`, `sequence`) stays reachable. Read
-  /// the payload via `envelope.event`.
+  /// The handler receives the full [EventEnvelope], so envelope context
+  /// like `identifier` and `stopped` stays reachable. Read the payload
+  /// via `envelope.event`.
   ///
   /// [priority] and [identifier] map directly to [EventBus.on]; see
   /// that method for the dispatch model.
@@ -115,8 +115,8 @@ mixin PluginSessionStateListener<W extends StatefulWidget> on State<W> {
   /// [dispose].
   ///
   /// The [when] predicate receives the full [EventEnvelope] so it can
-  /// gate the rebuild on envelope metadata (e.g. `sourcePluginId`) in
-  /// addition to the payload.
+  /// gate the rebuild on envelope context (for example `identifier` or
+  /// `stopped`) in addition to the payload.
   ///
   /// For unfiltered rebuild-on-event, prefer [BuildContext.watchEvent]
   /// directly. It uses InheritedWidget-style dependency attachment and

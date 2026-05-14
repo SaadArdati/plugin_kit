@@ -48,8 +48,8 @@ class PluginEventNotifier<E> extends ChangeNotifier
   late final EventSubscription _subscription;
   E? _value;
 
-  /// The most recent [E] envelope observed on the session, or `null` if
-  /// no event of type [E] has been received yet.
+  /// The most recent [E] event payload observed on the session, or `null`
+  /// if no event of type [E] has been received yet.
   @override
   E? get value => _value;
 

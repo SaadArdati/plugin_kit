@@ -23,7 +23,7 @@ class PluginKitDialogController extends ChangeNotifier {
 
   /// Indexed view onto [runtime.plugins] for cheap lookups during no-op
   /// pruning. The Plugins tab still iterates `runtime.plugins` directly via
-  /// [buildPluginChipsModels].
+  /// [PluginChipsBuilder.build].
   late final Map<PluginId, Plugin> _pluginsById;
 
   /// Whether working settings differ from the active baseline.

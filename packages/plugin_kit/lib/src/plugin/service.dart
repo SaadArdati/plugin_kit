@@ -8,14 +8,14 @@ part of 'plugin.dart';
 /// settings as a [ConfigNode] for typed access.
 ///
 /// Lifecycle: the plugin calls one of the registry's `register*` methods.
-/// `registerSingleton` takes a pre-built instance constructed inline at the
-/// call site; `registerLazySingleton` and `registerFactory` take a
-/// `Factory<T>` invoked on first / every resolve respectively. Whichever
+/// `registerSingleton` takes a `Factory<T>` and runs it once at registration
+/// time; `registerLazySingleton` and `registerFactory` take a `Factory<T>`
+/// invoked on first / every resolve respectively. Whichever
 /// path produces the instance, the registry stamps [pluginId] and
 /// [serviceId] on it before [injectSettings] runs. Subclasses do not pass
 /// those identity fields to `super()`.
 ///
-/// For services that also need session lifecycle hooks, use
+/// For services that also need plugin lifecycle hooks, use
 /// [StatefulPluginService].
 ///
 /// ```dart
@@ -86,12 +86,12 @@ abstract class PluginService {
   void onSettingsInjected() {}
 }
 
-/// A [PluginService] with session lifecycle and automatic subscription
+/// A [PluginService] with plugin lifecycle hooks and automatic subscription
 /// cleanup.
 ///
 /// Override [attach] for setup that should run when the owning plugin is
 /// attached, and [detach] for cleanup. Both are pure user hooks: the
-/// framework binds and unbinds the session context around them, so:
+/// framework binds and unbinds the plugin context around them, so:
 ///
 /// - In [attach], [context] is already bound and the helpers in
 ///   [StatefulPluginServiceHelper] (`on`, `onRequest`, `onRequestSync`,
@@ -133,7 +133,7 @@ abstract class StatefulPluginService<PKC extends PluginContext>
   /// Whether a context is currently bound (between [attach] and [detach]).
   bool get hasContext => _context != null;
 
-  /// The current session context. Throws [StateError] if accessed outside the
+  /// The current plugin context. Throws [StateError] if accessed outside the
   /// attach/detach window.
   PKC get context {
     final ctx = _context;
@@ -146,7 +146,7 @@ abstract class StatefulPluginService<PKC extends PluginContext>
   }
 
   /// Framework-only. Called by [Plugin._runAttach] before [attach] runs to
-  /// bind the session context. Library-private; user code never calls this.
+  /// bind the plugin context. Library-private; user code never calls this.
   void _bindContext(PKC context) {
     _context = context;
   }
@@ -240,13 +240,13 @@ abstract class StatefulPluginService<PKC extends PluginContext>
   }
 
   /// Setup hook. Override for subscriptions, timers, and other startup
-  /// logic. The session context is already bound when this runs; access via
+  /// logic. The plugin context is already bound when this runs; access via
   /// [context] or use the helpers on [StatefulPluginServiceHelper] which
   /// auto-track their subscriptions. No `super.attach()` call required.
   void attach() {}
 
   /// Cleanup hook. Override for cleanup logic that needs to run while the
-  /// session context is still bound. Tracked subscriptions and bindings are
+  /// plugin context is still bound. Tracked subscriptions and bindings are
   /// cancelled by the framework after this returns; no `super.detach()`
   /// call required.
   Future<void> detach() async {}

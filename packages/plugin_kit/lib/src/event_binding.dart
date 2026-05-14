@@ -21,9 +21,9 @@ abstract class EventBinding {
   /// Builds an [EventBinding] that delivers the full [EventEnvelope] of
   /// type [E] to [handler] on each emission of an [E]-typed event.
   ///
-  /// The handler receives the envelope (not the unwrapped event) so that
-  /// envelope metadata (`sourcePluginId`, `timestamp`, `sequence`) stays
-  /// reachable. Use `envelope.event` for the payload. The shape matches
+  /// The handler receives the envelope (not the unwrapped event) so
+  /// envelope context like `identifier` and `stopped` stays reachable.
+  /// Use `envelope.event` for the payload. The shape matches
   /// [EventBus.on] / [PluginSession.on], so callers can move between the
   /// declarative and imperative APIs without re-typing handlers.
   ///

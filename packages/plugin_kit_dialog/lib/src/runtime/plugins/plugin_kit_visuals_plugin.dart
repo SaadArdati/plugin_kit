@@ -27,7 +27,7 @@ import 'package:plugin_kit/plugin_kit.dart';
 ///   ..addPlugins(myPlugins())
 ///   ..addPlugin(PluginKitVisualsPlugin(
 ///     pluginVisuals: const {
-///       'main_agent': PluginKitVisual(
+///       PluginId('main_agent'): PluginKitVisual(
 ///         label: 'Main Agent',
 ///         icon: Icon(Icons.psychology),
 ///         color: Color(0xFF7C5CFF),
@@ -216,8 +216,8 @@ class PluginKitVisual {
 /// Resolved view-model for one plugin row.
 ///
 /// Layered: [PluginKitVisual] overrides win over derived defaults
-/// (`label = raw pluginId`, `description = Plugin.description`, no icon, no
-/// accent). Pure data; recompute per build.
+/// (`label = raw pluginId`, `description = null`, no icon, no accent).
+/// Pure data; recompute per build.
 class PluginChipModel {
   /// Stable runtime plugin identifier.
   final PluginId pluginId;
@@ -225,7 +225,7 @@ class PluginChipModel {
   /// Resolved label (override or raw `pluginId`).
   final String label;
 
-  /// Resolved description (override or plugin's own description).
+  /// Resolved description override, if any.
   final String? description;
 
   /// Override icon widget, if any. Wrapped in an [IconTheme] by the chip

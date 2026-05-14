@@ -138,7 +138,7 @@ class _PluginSessionEventsModel extends InheritedModel<Type> {
 /// type from the ambient [PluginSessionEvents] (installed by
 /// `PluginSessionScope`).
 extension PluginSessionEventsContextX on BuildContext {
-  /// Returns the most recent envelope of type [E] observed on the
+  /// Returns the most recent event payload of type [E] observed on the
   /// ambient session, or `null` if no event of that type has fired
   /// since the scope was mounted.
   ///
@@ -157,7 +157,7 @@ extension PluginSessionEventsContextX on BuildContext {
     return state.lastOf<E>();
   }
 
-  /// Returns the most recent envelope of type [E] observed on the
+  /// Returns the most recent event payload of type [E] observed on the
   /// ambient session, without subscribing this element to future
   /// rebuilds. Use from one-shot call sites such as button callbacks.
   ///

@@ -2,8 +2,8 @@
 ///
 /// Provides:
 ///
-/// - [PluginRuntimeScope] / [PluginSessionScope]: `InheritedWidget`s that
-///   carry a `PluginRuntime` / `PluginSession` through the tree.
+/// - [PluginRuntimeScope] / [PluginSessionScope]: `StatefulWidget`s that
+///   provide inherited scopes carrying a `PluginRuntime` / `PluginSession`.
 /// - [PluginSessionStateListener]: a `State` mixin that subscribes to
 ///   session bus events using portable [EventBinding] descriptors and
 ///   re-attaches automatically across session swaps.
@@ -19,9 +19,9 @@
 ///   the scopes; exposed for any custom widget whose `State.dispose` fires
 ///   off a similar async teardown.
 ///
-/// This package depends only on `flutter` and `plugin_kit`. It implements
-/// the standard Flutter `ChangeNotifier` / `ValueListenable` / `Stream`
-/// interfaces so it interoperates with `provider`, `flutter_bloc`,
+/// This package depends only on `flutter` and `plugin_kit`. It uses
+/// standard Flutter `ChangeNotifier` / `ValueListenable` interfaces and
+/// `InheritedModel`, so it interoperates with `provider`, `flutter_bloc`,
 /// `riverpod`, etc. without taking a direct dependency on any of them.
 library;
 

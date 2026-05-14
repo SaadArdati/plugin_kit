@@ -52,10 +52,10 @@ typedef SessionContextFactory<
 /// a subtype); [S] is the session context class (`SessionPluginContext` or a
 /// subtype).
 ///
-/// Plugin enablement falls back through three rules in order: explicit
-/// [RuntimeSettings.plugins] entry, [FeatureFlag.locked] (always on),
-/// [FeatureFlag.experimental] (default off). Non-experimental plugins
-/// with no explicit setting default to enabled.
+/// Plugin enablement falls back through three rules in order:
+/// [FeatureFlag.locked] (always on), explicit [RuntimeSettings.plugins]
+/// entry, [FeatureFlag.experimental] (default off). Non-experimental
+/// plugins with no explicit setting default to enabled.
 class PluginRuntime<
   G extends GlobalPluginContext,
   S extends SessionPluginContext

@@ -74,12 +74,12 @@ extension type const FeatureFlag(String value) {
 ///
 /// - [register] - register services into the registry; runs during
 ///   register-all phase before any plugin attaches.
-/// - [attach] - setup hook; the session context is already bound when this
+/// - [attach] - setup hook; the plugin context is already bound when this
 ///   runs. Use the helpers on [PluginHelper] (`on`, `onRequest`,
 ///   `onRequestSync`, `bind`, `emit`) for auto-tracked subscriptions. No
 ///   `super.attach()` call is required - the framework drives the underlying
 ///   plumbing around your hook.
-/// - [detach] - cleanup hook; the session context is still bound when this
+/// - [detach] - cleanup hook; the plugin context is still bound when this
 ///   runs. Tracked subscriptions and bindings are cancelled by the framework
 ///   after [detach] returns. No `super.detach()` call is required.
 ///
@@ -99,9 +99,8 @@ extension type const FeatureFlag(String value) {
 /// ```
 ///
 /// Plugins are identified by both [pluginId] and [runtimeType]; two
-/// instances are equal only if they share both. This means a
-/// `GlobalPlugin('x')` and a `SessionPlugin('x')` are distinct, preventing
-/// cross-scope collisions.
+/// instances are equal only if they share both. Runtime registration still
+/// enforces unique [pluginId] values across all plugin types in one runtime.
 abstract class Plugin {
   /// Unique identifier for this plugin.
   ///
@@ -186,7 +185,7 @@ abstract class Plugin {
   /// void register(ScopedServiceRegistry registry) {
   ///   registry.registerSingleton<MyService>(
   ///     const ServiceId('my_service'),
-  ///     MyServiceImpl(),
+  ///     () => MyServiceImpl(),
   ///     priority: 100,
   ///   );
   /// }
@@ -408,15 +407,16 @@ abstract class Plugin {
 ///   void register(ScopedServiceRegistry registry) {
 ///     registry.registerSingleton<AppConfig>(
 ///       const ServiceId('app_config'),
-///       AppConfig.load(),
+///       () => AppConfig.load(),
 ///       priority: 100,
 ///     );
 ///   }
 ///
 ///   @override
 ///   void attach(MyGlobalContext context) {
-///     on(context, (ConfigChangedEvent e) {
-///       // React to changes; context is typed as MyGlobalContext.
+///     on<ConfigChangedEvent>(context, (e) {
+///       // React to changes; e.event is ConfigChangedEvent.
+///       // Context is typed as MyGlobalContext.
 ///     });
 ///   }
 /// }
@@ -450,14 +450,14 @@ abstract class GlobalPlugin<G extends GlobalPluginContext> extends Plugin {
 ///   void register(ScopedServiceRegistry registry) {
 ///     registry.registerSingleton<GreeterService>(
 ///       const ServiceId('greeter_service'),
-///       GreeterService(),
+///       () => GreeterService(),
 ///       priority: 100,
 ///     );
 ///   }
 ///
 ///   @override
 ///   void attach(MySessionContext context) {
-///     on(context, (SessionStartedEvent e) {
+///     on<SessionStartedEvent>(context, (e) {
 ///       final greeter = context.resolve<GreeterService>(
 ///         const ServiceId('greeter_service'),
 ///       );
