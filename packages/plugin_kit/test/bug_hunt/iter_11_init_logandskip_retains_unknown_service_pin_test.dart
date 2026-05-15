@@ -1,6 +1,3 @@
-@Skip('ISSUE-20260515-1438-init-logandskip-retains-unknown-service-pin: failing reproducer kept as evidence; see PACKAGE_ISSUES.md')
-library;
-
 import 'package:plugin_kit/plugin_kit.dart';
 import 'package:test/test.dart';
 

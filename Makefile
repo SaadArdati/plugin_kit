@@ -11,6 +11,7 @@
         test-plugin-kit-dialog-demo \
         doc-audit doc-audit-resume doc-audit-dashboard \
         bug-hunt bug-hunt-resume bug-hunt-dashboard \
+        coverage coverage-resume \
         dashboard
 
 # Default target. Run the full CI pipeline AND golden tests.
@@ -171,6 +172,22 @@ bug-hunt-resume:
 		--resume "$$(cd scripts/bug-hunt-loop/runs/latest && pwd -P)" \
 		--max $(BUG_HUNT_MAX)
 
+# --- Coverage-completion autonomous loop ------------------------------------
+
+# Run the coverage loop: codex agents propose untested public-API behaviors,
+# write characterization tests under packages/*/test/coverage/, and gate each
+# test through GREEN (passes today) + mutation (fails when cited source is
+# corrupted) before landing. Default 15-iteration cap; override with
+# `make coverage COVERAGE_MAX=30`.
+COVERAGE_MAX ?= 15
+coverage:
+	bash scripts/coverage-loop/orchestrator.sh --max $(COVERAGE_MAX)
+
+coverage-resume:
+	bash scripts/coverage-loop/orchestrator.sh \
+		--resume "$$(cd scripts/coverage-loop/runs/latest && pwd -P)" \
+		--max $(COVERAGE_MAX)
+
 clean:
 	flutter clean
 	find packages example website -type d -name .dart_tool -prune -exec rm -rf {} +
@@ -191,6 +208,8 @@ help:
 	@echo "  make doc-audit-resume   Resume the most recent doc-audit run."
 	@echo "  make bug-hunt       Run the autonomous bug-hunt loop (TDD enforced)."
 	@echo "  make bug-hunt-resume   Resume the most recent bug-hunt run."
+	@echo "  make coverage       Run the autonomous coverage-completion loop (mutation-gated)."
+	@echo "  make coverage-resume   Resume the most recent coverage run."
 	@echo "  make dashboard      Start the live loop dashboard at :4322 (toggle loops in UI)."
 	@echo "  make doc-audit-dashboard   Alias: dashboard with #loop=doc-audit selected."
 	@echo "  make bug-hunt-dashboard    Alias: dashboard with #loop=bug-hunt selected."

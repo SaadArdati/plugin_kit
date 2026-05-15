@@ -76,13 +76,27 @@ mixin PluginSessionStateListener<W extends StatefulWidget> on State<W> {
     return PluginSessionScope.maybeOf(context);
   }
 
-  final List<EventBinding> _bindings = [];
+  /// Attach closures: each `listen` / `rebuildOn` call adds one. When a
+  /// session is available, each attach creates a fresh subscription, wraps
+  /// its handler with a generation guard, and returns the subscription so
+  /// the mixin can cancel it on swap/dispose.
+  final List<EventSubscription Function(PluginSession, int)> _attachers = [];
   final List<EventSubscription> _activeSubs = [];
   PluginSession? _currentSession;
 
+  /// Bumped on every session swap. A handler closure captures the value
+  /// AT ATTACH TIME and compares against the current value at invocation.
+  /// When they differ, the handler is being called by a stale dispatch
+  /// from the previous session (an emit that started before the swap and
+  /// completed after) and is dropped. Without this guard, an in-flight
+  /// emit on the old session would still deliver to the widget bound to
+  /// the new session and corrupt its state.
+  int _attachGeneration = 0;
+
   /// Subscribe to events of type [E] on the current session. The
   /// subscription is re-attached automatically across session swaps and
-  /// cancelled in [dispose].
+  /// cancelled in [dispose]. Late envelopes from a previous session are
+  /// dropped after a swap.
   ///
   /// Callable from any lifecycle callback, including [State.initState].
   ///
@@ -97,16 +111,24 @@ mixin PluginSessionStateListener<W extends StatefulWidget> on State<W> {
     int priority = 0,
     String? identifier,
   }) {
-    _addBinding(
-      EventBinding.on<E>(
+    EventSubscription attach(PluginSession session, int boundGen) {
+      final binding = EventBinding.on<E>(
         (envelope) {
           if (!mounted) return;
+          if (boundGen != _attachGeneration) return;
           handler(envelope);
         },
         priority: priority,
         identifier: identifier,
-      ),
-    );
+      );
+      return binding.attachTo(session);
+    }
+
+    _attachers.add(attach);
+    final current = _currentSession;
+    if (current != null) {
+      _activeSubs.add(attach(current, _attachGeneration));
+    }
   }
 
   /// Rebuild the state on every event of type [E] that satisfies [when]
@@ -123,34 +145,38 @@ mixin PluginSessionStateListener<W extends StatefulWidget> on State<W> {
   /// needs no State mixin. Use [rebuildOn] when you need a [when]
   /// predicate to gate the rebuild itself.
   void rebuildOn<E>([bool Function(EventEnvelope<E> envelope)? when]) {
-    _addBinding(
-      EventBinding.on<E>((envelope) {
+    EventSubscription attach(PluginSession session, int boundGen) {
+      final binding = EventBinding.on<E>((envelope) {
         if (!mounted) return;
+        if (boundGen != _attachGeneration) return;
         if (when != null && !when(envelope)) return;
         setState(() {});
-      }),
-    );
-  }
+      });
+      return binding.attachTo(session);
+    }
 
-  void _addBinding(EventBinding binding) {
-    _bindings.add(binding);
+    _attachers.add(attach);
     final current = _currentSession;
     if (current != null) {
-      _activeSubs.add(binding.attachTo(current));
+      _activeSubs.add(attach(current, _attachGeneration));
     }
   }
 
   void _swapSessionIfChanged() {
     final next = session;
     if (identical(next, _currentSession)) return;
+    // Bump BEFORE cancelling: any in-flight dispatch that completes after
+    // this point will see a stale boundGen and drop. Cancel afterwards to
+    // also stop NEW emissions from reaching us.
+    _attachGeneration++;
     for (final sub in _activeSubs) {
       sub.cancel();
     }
     _activeSubs.clear();
     _currentSession = next;
     if (next != null) {
-      for (final binding in _bindings) {
-        _activeSubs.add(binding.attachTo(next));
+      for (final attach in _attachers) {
+        _activeSubs.add(attach(next, _attachGeneration));
       }
     }
   }
@@ -169,11 +195,14 @@ mixin PluginSessionStateListener<W extends StatefulWidget> on State<W> {
 
   @override
   void dispose() {
+    // Bump so any in-flight handler sees a stale boundGen and drops out
+    // before touching this State's fields.
+    _attachGeneration++;
     for (final sub in _activeSubs) {
       sub.cancel();
     }
     _activeSubs.clear();
-    _bindings.clear();
+    _attachers.clear();
     super.dispose();
   }
 }

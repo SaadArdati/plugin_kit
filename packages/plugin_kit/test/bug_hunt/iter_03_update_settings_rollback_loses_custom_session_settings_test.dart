@@ -1,6 +1,3 @@
-@Skip('ISSUE-20260515-1438-update-settings-rollback-loses-custom-session-settings: failing reproducer kept as evidence; see PACKAGE_ISSUES.md')
-library;
-
 import 'package:plugin_kit/plugin_kit.dart';
 import 'package:test/test.dart';
 
@@ -29,7 +26,15 @@ void main() {
   group('bug-hunt iter 3: update-settings-rollback-loses-custom-session-settings', () {
     test('restores each session to its own pre-update settings after rollback', () async {
       final runtime = PluginRuntime(plugins: [_ExpA(), _ThrowDetachB()])..init();
-      addTearDown(() => runtime.dispose());
+      // Dispose will throw because `_ThrowDetachB.detach` is by-design
+      // throwing; that is orthogonal to what this test asserts (per-session
+      // rollback). Swallow the dispose throw in teardown so the test
+      // framework does not double-report.
+      addTearDown(() async {
+        try {
+          await runtime.dispose();
+        } catch (_) {}
+      });
 
       final sessionA = await runtime.createSession(
         settings: const RuntimeSettings(

@@ -1,6 +1,3 @@
-@Skip('ISSUE-runtime-dispose-aborts-after-first-throwing-session: failing reproducer kept as evidence; see PACKAGE_ISSUES.md')
-library;
-
 import 'package:plugin_kit/plugin_kit.dart';
 import 'package:test/test.dart';
 

@@ -84,6 +84,15 @@ class PluginRuntime<
   /// Unmodifiable view of active sessions.
   List<PluginSession<S>> get sessions => List.unmodifiable(_sessions);
 
+  /// Per-session settings as they currently stand in the runtime. Set when
+  /// a session is created (from the `settings` arg or the runtime's global
+  /// settings), and updated whenever an `_updateSessionSettingsInternal`
+  /// pass successfully commits. Used by [updateSettings] rollback to
+  /// restore each session to its OWN pre-update state rather than to the
+  /// global pre-update snapshot, which would discard any per-session
+  /// overrides the session was constructed with.
+  final Map<PluginSession<S>, RuntimeSettings> _sessionSettings = {};
+
   /// Context for global plugins.
   late final G globalContext;
 
@@ -97,6 +106,12 @@ class PluginRuntime<
   /// Whether [init] has been called. Used to guard [dispose] against
   /// accessing late-initialized fields before initialization.
   bool _initialized = false;
+
+  /// Whether [dispose] has run to completion. A disposed runtime is
+  /// terminal: subsequent calls to [init], [createSession], [updateSettings],
+  /// and the other mutating entry points all throw [StateError]. To run a
+  /// fresh runtime, construct a new [PluginRuntime] instance.
+  bool _disposed = false;
 
   /// How to react when [RuntimeSettings] entries reference an id the
   /// runtime does not know about (plugin ids in either map, service
@@ -220,6 +235,18 @@ class PluginRuntime<
     UnknownReferencePolicy unknownReferencePolicy =
         UnknownReferencePolicy.throwError,
   }) {
+    // A disposed runtime is terminal. The supported flow is
+    // construct -> init -> use -> dispose -> drop reference. Allowing a
+    // second init() on a disposed runtime would resurrect closed bus and
+    // settings-controller subscribers in a partly-undefined state; reject
+    // loudly instead.
+    if (_disposed) {
+      throw StateError(
+        'PluginRuntime.init() called on a disposed runtime. A runtime '
+        'cannot be reinitialized after dispose; construct a new '
+        'PluginRuntime instance instead.',
+      );
+    }
     // Defensive: if init() is called a second time without dispose() in
     // between, the previous controller is still alive and would leak when
     // we reassign the field below. Close it first. This is a programming
@@ -235,21 +262,17 @@ class PluginRuntime<
     );
     _runtimeLog.info('Initializing runtime');
 
-    if (settings != null) {
-      _settingsValue = settings;
-    }
-
     globalBus = EventBus();
 
-    final effectiveSettings = settings ?? RuntimeSettings();
-    _validateServiceSettingPluginIds(
+    // Pre-register normalization: defensive copy of caller maps, plus
+    // plugin-id filtering. The registry has no services yet so the
+    // service-id pass is deferred until after register-all completes.
+    var effectiveSettings = _normalizeSettings(
       entryPoint: 'init',
-      services: effectiveSettings.services,
+      raw: settings ?? const RuntimeSettings(),
+      scopePlugins: globalPlugins,
     );
-    _validatePluginConfigPluginIds(
-      entryPoint: 'init',
-      plugins: effectiveSettings.plugins,
-    );
+    _settingsValue = effectiveSettings;
 
     // Parse service settings into overrides for the global registry.
     final overrides = <LocalPluginOverride>[];
@@ -322,15 +345,40 @@ class PluginRuntime<
       );
       throw PluginLifecycleException('attachGlobal', registerErrors);
     }
-    // With every global plugin registered, the set of known service ids
-    // for each plugin is now stable. Validate that every plugin-scoped
-    // service pin targets a service the named plugin actually registered.
-    _validateServicePinServiceIds(
+    // Post-register normalization: with every global plugin registered,
+    // the set of known service ids per plugin is stable. Run the third
+    // pass to drop service pins whose service-id is unknown to its named
+    // plugin. If anything drops, rewrite `_settingsValue` and rebuild the
+    // registry's overrides so the dropped entries don't survive there.
+    final finalSettings = _normalizeSettings(
       entryPoint: 'init',
-      registry: globalRegistry,
-      services: effectiveSettings.services,
-      plugins: globalPlugins,
+      raw: effectiveSettings,
+      scopePlugins: globalPlugins,
+      registryForServiceIdCheck: globalRegistry,
     );
+    if (finalSettings.services.length != effectiveSettings.services.length) {
+      effectiveSettings = finalSettings;
+      _settingsValue = effectiveSettings;
+      final rebuiltOverrides = <LocalPluginOverride>[];
+      final rebuiltWildcards = <ServiceId, ServiceSettings>{};
+      _partitionServiceSettings(
+        services: effectiveSettings.services,
+        overrides: rebuiltOverrides,
+        pendingWildcards: rebuiltWildcards,
+        plugins: globalPlugins,
+      );
+      // Sync both the live registry AND the local lists. The downstream
+      // `_resolveAndApplyWildcards` / `globalRegistry.updateSettings` calls
+      // below operate on the local `overrides` / `pendingWildcards` so we
+      // must replace their contents, not just push to the registry.
+      globalRegistry.updateSettings(overrides: rebuiltOverrides);
+      overrides
+        ..clear()
+        ..addAll(rebuiltOverrides);
+      pendingWildcards
+        ..clear()
+        ..addAll(rebuiltWildcards);
+    }
     // Create global context
     if (globalContextFactory != null) {
       globalContext = globalContextFactory(
@@ -387,6 +435,35 @@ class PluginRuntime<
             st,
           );
           attachErrors.add((plugin.pluginId, e, st));
+          // Unwind the failed plugin's attach-time side effects. Without
+          // this, any StatefulPluginService.attach() that subscribed to the
+          // global bus before the user's plugin.attach() threw leaves its
+          // subscription live. init() is sync so we can't await detach
+          // here; instead, cancel each subscription's stream subscription
+          // synchronously (the cancel itself is async but does NOT need to
+          // be awaited for the handler to stop firing - the bus dispatcher
+          // checks subscription state on each emit).
+          final statefulServices = globalRegistry
+              .getPluginServices(plugin.pluginId, skipFactories: true)
+              .whereType<StatefulPluginService>();
+          for (final service in statefulServices) {
+            final subs = [...service.activeSubscriptions];
+            service.activeSubscriptions.clear();
+            for (final sub in subs) {
+              unawaited(sub.cancel().catchError((_, __) {}));
+            }
+            final bindings = [...service.activeBindings];
+            service.activeBindings.clear();
+            for (final cancel in bindings) {
+              try {
+                cancel();
+              } catch (_) {
+                // bindings are best-effort; ignore inverse-cancel throws
+              }
+            }
+            // Unbind the context so the service is observably not-attached.
+            service._context = null;
+          }
           _enabledGlobalPluginIds.remove(plugin.pluginId);
           final serviceIds = globalRegistry.listAllServiceIds(plugin.pluginId);
           for (final id in serviceIds) {
@@ -529,6 +606,7 @@ class PluginRuntime<
     // implicit forwarding between the two.
     session._onDispose = () {
       _sessions.remove(session);
+      _sessionSettings.remove(session);
     };
 
     // Track enabled plugins so `session.init()` knows which plugins to
@@ -567,6 +645,7 @@ class PluginRuntime<
     // Publish only after successful attach so `runtime.sessions` never
     // contains a session whose lifecycle failed.
     _sessions.add(session);
+    _sessionSettings[session] = settings;
 
     _runtimeLog.info(
       'Session created with ${enabledPluginIds.length} enabled plugins',
@@ -589,6 +668,23 @@ class PluginRuntime<
     PluginSession<S> session, {
     required RuntimeSettings newSettings,
   }) async {
+    if (!_initialized || _disposed) {
+      throw StateError(
+        'PluginRuntime.updateSessionSettings() called ${_disposed ? 'on a disposed runtime' : 'before init()'}. '
+        'Call init() first.',
+      );
+    }
+    // Reject sessions owned by another runtime. Without this guard the
+    // caller can corrupt a foreign runtime's session state because the
+    // reconcile path mutates `session._enabledPluginIds` and the
+    // session's registry overrides using THIS runtime's plugin set.
+    if (!_sessions.contains(session)) {
+      throw StateError(
+        'PluginRuntime.updateSessionSettings() called with a session not '
+        'owned by this runtime. Sessions can only be reconfigured by the '
+        'runtime that created them.',
+      );
+    }
     _enterReconcile('updateSessionSettings');
     try {
       _validateServiceSettingPluginIds(
@@ -600,6 +696,7 @@ class PluginRuntime<
         plugins: newSettings.plugins,
       );
       await _updateSessionSettingsInternal(session, newSettings: newSettings);
+      _sessionSettings[session] = newSettings;
     } finally {
       _reconciling = false;
     }
@@ -611,6 +708,10 @@ class PluginRuntime<
     PluginSession<S> session, {
     required RuntimeSettings newSettings,
   }) async {
+    // Snapshot the session's enabled set BEFORE any reconcile work so a
+    // throwing post-flip step (notify hook) can roll back to exactly the
+    // state the session had on entry.
+    final preUpdateEnabled = Set<PluginId>.from(session.enabledPluginIds);
     final oldContext = session.context.copyWith();
     // Strict runtimeType equality is intentionally over-constrained for now:
     // the bug we're guarding against only requires `oldContext` to be
@@ -685,16 +786,82 @@ class PluginRuntime<
       context: session.context,
     );
 
-    // Notify each plugin that settings have been updated
+    // Notify each plugin that settings have been updated. If any plugin's
+    // hook throws, roll back the session's enablement flip so the session
+    // ends up in the same state it started in. Without this rollback, a
+    // notify-hook throw leaves the session with the post-flip enabled set
+    // even though the entire update is supposed to be transactional.
     for (final pluginId in enabledPluginIds) {
       final plugin = _plugins.firstWhereOrNull((p) => p.pluginId == pluginId);
-      if (plugin != null) {
+      if (plugin == null) continue;
+      try {
         await plugin.onPluginSettingsChanged(oldContext, session.context);
+      } catch (e, st) {
+        if (_isFatalError(e)) rethrow;
+        await _revertSessionEnablement(
+          session: session,
+          targetEnabled: preUpdateEnabled,
+          currentEnabled: session.enabledPluginIds.toSet(),
+          context: session.context,
+        );
+        _runtimeLog.severe(
+          'Plugin "$pluginId" onPluginSettingsChanged threw; session '
+          'enablement reverted to pre-update state',
+          e,
+          st,
+        );
+        rethrow;
       }
     }
 
     if (serviceErrors.isNotEmpty) {
       throw PluginLifecycleException('updateSessionSettings', serviceErrors);
+    }
+  }
+
+  /// Reverts `session._enabledPluginIds` to [targetEnabled], running
+  /// detach for plugins that need to be disabled and attach for plugins
+  /// that need to be re-enabled. Used by [_updateSessionSettingsInternal]
+  /// when a post-flip step (notify hook) throws.
+  Future<void> _revertSessionEnablement({
+    required PluginSession<S> session,
+    required Set<PluginId> targetEnabled,
+    required Set<PluginId> currentEnabled,
+    required SessionPluginContext context,
+  }) async {
+    final toDisable = currentEnabled.difference(targetEnabled);
+    final toEnable = targetEnabled.difference(currentEnabled);
+
+    for (final pid in toDisable) {
+      final plugin = _plugins.firstWhereOrNull((p) => p.pluginId == pid);
+      if (plugin == null) continue;
+      try {
+        await plugin._runDetach(context);
+      } catch (e, st) {
+        if (_isFatalError(e)) rethrow;
+        _runtimeLog.severe(
+          'Revert: failed to detach plugin "$pid" during session enablement rollback',
+          e,
+          st,
+        );
+      }
+      session.markPluginDisabled(pid);
+    }
+
+    for (final pid in toEnable) {
+      final plugin = _plugins.firstWhereOrNull((p) => p.pluginId == pid);
+      if (plugin == null) continue;
+      try {
+        plugin._runAttach(context);
+        session.markPluginEnabled(pid);
+      } catch (e, st) {
+        if (_isFatalError(e)) rethrow;
+        _runtimeLog.severe(
+          'Revert: failed to re-attach plugin "$pid" during session enablement rollback',
+          e,
+          st,
+        );
+      }
     }
   }
 
@@ -847,6 +1014,125 @@ class PluginRuntime<
         // dropped ids.
         break;
     }
+  }
+
+  /// Normalizes incoming [RuntimeSettings] before storage or reconciliation.
+  ///
+  /// Three responsibilities, applied in sequence over fresh maps so that the
+  /// caller's original map is never aliased into runtime state:
+  ///
+  /// 1. Defensive deep-copy of `plugins` and `services`. Callers may pass
+  ///    mutable maps; after this returns the runtime owns the storage.
+  /// 2. Plugin-id filtering: drops entries in `plugins` whose key is unknown
+  ///    to this runtime, and entries in `services` whose pin references an
+  ///    unknown plugin id. Wildcard service pins are always kept.
+  /// 3. Service-id filtering (only when [registryForServiceIdCheck] is
+  ///    supplied): drops service pins whose plugin is in scope but never
+  ///    registered the named service id.
+  ///
+  /// Under [UnknownReferencePolicy.throwError] the offending entries are
+  /// kept in the output and the policy's throw fires. Under `logAndSkip` /
+  /// `ignore` they are dropped from the output silently or with a log.
+  ///
+  /// Pass [registryForServiceIdCheck] only AFTER the register-all phase
+  /// completes; before that the set of registered service ids is unknown
+  /// and the third pass is meaningless.
+  RuntimeSettings _normalizeSettings({
+    required String entryPoint,
+    required RuntimeSettings raw,
+    required Iterable<Plugin> scopePlugins,
+    ServiceRegistry? registryForServiceIdCheck,
+  }) {
+    final shouldFilter =
+        _unknownReferencePolicy != UnknownReferencePolicy.throwError;
+    final allKnownPluginIds = {for (final p in _plugins) p.pluginId};
+
+    // Pass 1: plugins map.
+    final pluginUnknowns = <String>[];
+    final outPlugins = <PluginId, PluginConfig>{};
+    for (final entry in raw.plugins.entries) {
+      final known = allKnownPluginIds.contains(entry.key);
+      if (known) {
+        outPlugins[entry.key] = entry.value;
+      } else {
+        pluginUnknowns.add(entry.key.toString());
+        // Under throwError, keep the entry so the throw context is accurate.
+        if (!shouldFilter) outPlugins[entry.key] = entry.value;
+      }
+    }
+    _applyUnknownReferencePolicy(
+      kind: 'plugin ids in plugins config',
+      entryPoint: entryPoint,
+      unknowns: pluginUnknowns,
+    );
+
+    // Pass 2: services map, plugin-id check.
+    final servicePluginUnknowns = <String>[];
+    final afterPass2 = <Pin, ServiceSettings>{};
+    for (final entry in raw.services.entries) {
+      if (entry.key.isWildcard) {
+        afterPass2[entry.key] = entry.value;
+        continue;
+      }
+      final known = allKnownPluginIds.contains(entry.key.pluginId);
+      if (known) {
+        afterPass2[entry.key] = entry.value;
+      } else {
+        servicePluginUnknowns.add(
+          '${entry.key} (unknown plugin "${entry.key.pluginId}")',
+        );
+        if (!shouldFilter) afterPass2[entry.key] = entry.value;
+      }
+    }
+    _applyUnknownReferencePolicy(
+      kind: 'plugin ids in services pin',
+      entryPoint: entryPoint,
+      unknowns: servicePluginUnknowns,
+    );
+
+    // Pass 3: services map, service-id check (post-register only).
+    if (registryForServiceIdCheck == null) {
+      return RuntimeSettings(plugins: outPlugins, services: afterPass2);
+    }
+
+    final scopedPluginIds = {for (final p in scopePlugins) p.pluginId};
+    final knownByPlugin = <PluginId, Set<ServiceId>>{};
+    Set<ServiceId> knownFor(PluginId pid) => knownByPlugin.putIfAbsent(
+      pid,
+      () => registryForServiceIdCheck.listAllServiceIds(pid),
+    );
+
+    final serviceIdUnknowns = <String>[];
+    final outServices = <Pin, ServiceSettings>{};
+    for (final entry in afterPass2.entries) {
+      if (entry.key.isWildcard) {
+        outServices[entry.key] = entry.value;
+        continue;
+      }
+      // Plugin ids outside this scope are not validated here; another scope
+      // either owns them or has already filtered them.
+      if (!scopedPluginIds.contains(entry.key.pluginId)) {
+        outServices[entry.key] = entry.value;
+        continue;
+      }
+      final hasServiceId =
+          knownFor(entry.key.pluginId).contains(entry.key.serviceId);
+      if (hasServiceId) {
+        outServices[entry.key] = entry.value;
+      } else {
+        serviceIdUnknowns.add(
+          '${entry.key} (plugin "${entry.key.pluginId}" did not register "${entry.key.serviceId}")',
+        );
+        if (!shouldFilter) outServices[entry.key] = entry.value;
+      }
+    }
+    _applyUnknownReferencePolicy(
+      kind: 'service ids in services pin',
+      entryPoint: entryPoint,
+      unknowns: serviceIdUnknowns,
+    );
+
+    return RuntimeSettings(plugins: outPlugins, services: outServices);
   }
 
   /// Validates that every plugin-scoped service override references a known
@@ -1525,9 +1811,31 @@ class PluginRuntime<
   /// failures during the revert pass log severe but never suppress the
   /// primary; fatal VM errors during revert supersede it.
   Future<void> updateSettings(RuntimeSettings newSettings) async {
+    if (!_initialized || _disposed) {
+      throw StateError(
+        'PluginRuntime.updateSettings() called ${_disposed ? 'on a disposed runtime' : 'before init()'}. '
+        'Call init() first.',
+      );
+    }
     _enterReconcile('updateSettings');
     try {
       final oldSettings = _settings;
+      // Snapshot per-session settings BEFORE any mutation so a failed
+      // reconcile can roll each session back to ITS OWN pre-update state.
+      // We can't trust live `_sessionSettings` during rollback because the
+      // success-path code below mutates it as each per-session pass commits.
+      final preUpdateSessionSettings =
+          Map<PluginSession<S>, RuntimeSettings>.from(_sessionSettings);
+      // Normalize at the boundary: defensive copy of caller maps + filter
+      // entries that reference unknown plugin/service ids under the active
+      // [UnknownReferencePolicy]. `globalRegistry` is already populated, so
+      // we can also run the service-id pass here.
+      final effectiveSettings = _normalizeSettings(
+        entryPoint: 'updateSettings',
+        raw: newSettings,
+        scopePlugins: globalPlugins,
+        registryForServiceIdCheck: globalRegistry,
+      );
       // Tracks units mid-reconcile so the catch can roll them back too.
       // A unit that throws partway still left fully-transitioned plugins
       // on the new state (per-plugin rollback only unwinds the thrower);
@@ -1541,19 +1849,20 @@ class PluginRuntime<
         globalStarted = true;
         await _updateGlobalSettingsInternal(
           oldSettings: oldSettings,
-          newSettings: newSettings,
+          newSettings: effectiveSettings,
         );
 
         for (final session in _sessions) {
           inFlightSession = session;
           await _updateSessionSettingsInternal(
             session,
-            newSettings: newSettings,
+            newSettings: effectiveSettings,
           );
+          _sessionSettings[session] = effectiveSettings;
           reconciledSessions.add(session);
           inFlightSession = null;
         }
-        _settingsValue = newSettings;
+        _settingsValue = effectiveSettings;
       } catch (e) {
         // Revert order: GLOBAL first, then in-flight session, then
         // completed sessions in reverse. Session enablement depends on
@@ -1581,10 +1890,16 @@ class PluginRuntime<
         }
         if (inFlightSession != null) {
           try {
+            // Restore from the pre-update snapshot, NOT the live
+            // `_sessionSettings` map (which the success path already
+            // partially mutated as earlier sessions committed).
             await _updateSessionSettingsInternal(
               inFlightSession,
-              newSettings: oldSettings,
+              newSettings: preUpdateSessionSettings[inFlightSession] ??
+                  oldSettings,
             );
+            _sessionSettings[inFlightSession] =
+                preUpdateSessionSettings[inFlightSession] ?? oldSettings;
           } catch (rollbackError, rollbackSt) {
             if (_isFatalError(rollbackError)) rethrow;
             _runtimeLog.severe(
@@ -1600,8 +1915,11 @@ class PluginRuntime<
           try {
             await _updateSessionSettingsInternal(
               session,
-              newSettings: oldSettings,
+              newSettings:
+                  preUpdateSessionSettings[session] ?? oldSettings,
             );
+            _sessionSettings[session] =
+                preUpdateSessionSettings[session] ?? oldSettings;
           } catch (rollbackError, rollbackSt) {
             if (_isFatalError(rollbackError)) rethrow;
             _runtimeLog.severe(
@@ -1846,9 +2164,41 @@ class PluginRuntime<
 
   /// Dispose runtime: detach all global plugins, dispose sessions.
   Future<void> dispose() async {
-    if (!_initialized) return;
+    if (_disposed) return;
+    if (!_initialized) {
+      _disposed = true;
+      return;
+    }
 
     final detachErrors = <(PluginId, Object, StackTrace)>[];
+
+    // Per-session dispose runs even when one session's detach throws. The
+    // previous behavior propagated the first session.dispose() throw and
+    // aborted the loop, leaving every later session attached forever.
+    for (final session in [..._sessions]) {
+      try {
+        await session.dispose();
+      } catch (e, st) {
+        if (_isFatalError(e)) rethrow;
+        if (e is PluginLifecycleException) {
+          // Already a structured aggregate; flatten into our combined list
+          // so the caller sees one PluginLifecycleException at the end with
+          // every per-plugin failure across both global and session scopes.
+          for (final inner in e.failures) {
+            detachErrors.add(inner);
+          }
+        } else {
+          _runtimeLog.severe(
+            'Failed to dispose session during runtime dispose',
+            e,
+            st,
+          );
+          // No PluginId to attribute this to; use a sentinel id.
+          detachErrors.add((const PluginId('<session>'), e, st));
+        }
+      }
+    }
+
     for (final plugin in globalPlugins) {
       if (_enabledGlobalPluginIds.contains(plugin.pluginId)) {
         try {
@@ -1864,13 +2214,11 @@ class PluginRuntime<
         }
       }
     }
-    for (final session in [..._sessions]) {
-      await session.dispose();
-    }
     globalBus.dispose();
     _enabledGlobalPluginIds.clear();
     await _settingsController.close();
     _initialized = false;
+    _disposed = true;
 
     if (detachErrors.isNotEmpty) {
       _runtimeLog.warning(
@@ -1879,145 +2227,5 @@ class PluginRuntime<
       throw PluginLifecycleException('detachGlobal', detachErrors);
     }
     _runtimeLog.info('Runtime disposed');
-  }
-}
-
-/// A scoped session with its own registry, event bus, and plugin attachments.
-///
-/// Represents a single session (a conversation, a playground instance) with
-/// fully isolated state: [registry] (session-scoped DI container with
-/// all enabled plugins' services), [bus] (session-scoped event bus), and
-/// [context] (the domain-specific context passed to plugin lifecycle hooks).
-///
-/// Sessions are lightweight and can be created or disposed as needed. The
-/// [PluginRuntime] tracks all active sessions for settings reconciliation.
-///
-/// Lifecycle: created by [PluginRuntime.createSession]; [init] calls
-/// [Plugin.attach] on all enabled session plugins; during the session events
-/// flow through [bus] and services resolve from [registry]; [dispose]
-/// calls [Plugin.detach] on all enabled session plugins and disposes the
-/// event bus.
-///
-/// The session tracks enabled plugin ids separately from the
-/// [ServiceRegistry] because some plugins only register tools (not services)
-/// and wouldn't be detectable via registry inspection alone.
-class PluginSession<K extends SessionPluginContext> {
-  /// Session-scoped service registry with all enabled plugins' services.
-  final ServiceRegistry registry;
-
-  /// Session-scoped event bus for inter-plugin communication.
-  final EventBus bus;
-
-  /// The domain-specific context for this session.
-  final K context;
-
-  /// All session plugins (for lifecycle management during init/dispose).
-  final List<Plugin> plugins;
-
-  /// The settings snapshot used to create this session.
-  final RuntimeSettings settings;
-
-  /// Tracks which plugins are currently enabled in this session.
-  final Set<PluginId> _enabledPluginIds = {};
-
-  /// Callback to remove this session from the runtime's session list.
-  /// Set by [PluginRuntime.createSession] and called during [dispose].
-  void Function()? _onDispose;
-
-  /// Returns true if the plugin is currently enabled in this session.
-  bool isPluginEnabled(PluginId pluginId) =>
-      _enabledPluginIds.contains(pluginId);
-
-  /// Plugin ids currently enabled in this session. At session scope the
-  /// post-cascade effective set IS the enabled set, so there is no
-  /// separate "attached" view: `_runAttach` has already run by the time
-  /// the session is observable, and any plugin that failed `_runAttach`
-  /// surfaces via [PluginLifecycleException] from [init], not here.
-  ///
-  /// The runtime-level distinction between
-  /// [PluginRuntime.enabledPlugins] (settings-intent) and
-  /// [PluginRuntime.attachedPlugins] (post-cascade) still applies for
-  /// global plugins and for "is this plugin running anywhere?" queries.
-  Set<PluginId> get enabledPluginIds => Set.unmodifiable(_enabledPluginIds);
-
-  /// Marks a plugin as enabled in this session.
-  void markPluginEnabled(PluginId pluginId) => _enabledPluginIds.add(pluginId);
-
-  /// Marks a plugin as disabled in this session.
-  void markPluginDisabled(PluginId pluginId) =>
-      _enabledPluginIds.remove(pluginId);
-
-  /// Creates a plugin session with scoped runtime services and settings.
-  PluginSession({
-    required this.registry,
-    required this.bus,
-    required this.context,
-    required this.plugins,
-    required this.settings,
-  });
-
-  /// Initialize the session by attaching all enabled plugins.
-  ///
-  /// Only plugins tracked as enabled via [markPluginEnabled] are attached.
-  /// Calls [Plugin.attach] on each enabled plugin, which automatically
-  /// attaches all [StatefulPluginService]s and lets plugins subscribe
-  /// to session events.
-  Future<void> init() async {
-    final attachErrors = <(PluginId, Object, StackTrace)>[];
-    for (final plugin in plugins) {
-      if (!_enabledPluginIds.contains(plugin.pluginId)) continue;
-      try {
-        plugin._runAttach(context);
-      } catch (e, st) {
-        if (_isFatalError(e)) rethrow;
-        _sessionLog.severe(
-          'Failed to attach session plugin "${plugin.pluginId}"',
-          e,
-          st,
-        );
-        attachErrors.add((plugin.pluginId, e, st));
-      }
-    }
-    if (attachErrors.isNotEmpty) {
-      _sessionLog.warning(
-        'Session initialized with ${attachErrors.length} plugin failure(s)',
-      );
-      throw PluginLifecycleException('attachSession', attachErrors);
-    }
-    _sessionLog.info('Session initialized');
-  }
-
-  /// Dispose this session and all its plugin attachments.
-  ///
-  /// Detaches all enabled plugins and then disposes the session event bus.
-  Future<void> dispose() async {
-    final detachErrors = <(PluginId, Object, StackTrace)>[];
-    for (final plugin in plugins) {
-      if (!_enabledPluginIds.contains(plugin.pluginId)) continue;
-      try {
-        await plugin._runDetach(context);
-      } catch (e, st) {
-        if (_isFatalError(e)) rethrow;
-        _sessionLog.severe(
-          'Failed to detach session plugin "${plugin.pluginId}"',
-          e,
-          st,
-        );
-        detachErrors.add((plugin.pluginId, e, st));
-      }
-    }
-
-    bus.dispose();
-
-    _onDispose?.call();
-    _onDispose = null;
-
-    if (detachErrors.isNotEmpty) {
-      _sessionLog.warning(
-        'Session disposed with ${detachErrors.length} plugin failure(s)',
-      );
-      throw PluginLifecycleException('detachSession', detachErrors);
-    }
-    _sessionLog.info('Session disposed');
   }
 }

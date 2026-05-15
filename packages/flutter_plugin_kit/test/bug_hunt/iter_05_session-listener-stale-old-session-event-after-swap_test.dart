@@ -1,6 +1,3 @@
-@Skip('ISSUE-20260515-1438-session-listener-stale-old-session-event-after-swap: failing reproducer kept as evidence; see PACKAGE_ISSUES.md')
-library;
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';

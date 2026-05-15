@@ -1,6 +1,3 @@
-@Skip('ISSUE-20260515-1438-update-session-settings-notify-throw-partial-state: failing reproducer kept as evidence; see PACKAGE_ISSUES.md')
-library;
-
 import 'package:plugin_kit/plugin_kit.dart';
 import 'package:test/test.dart';
 

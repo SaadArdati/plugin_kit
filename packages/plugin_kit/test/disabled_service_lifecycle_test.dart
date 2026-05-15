@@ -249,7 +249,7 @@ void main() {
     );
 
     test(
-      're-enable attach() failure unbinds the context and surfaces the error',
+      're-enable attach() failure surfaces the error AND restores session state',
       () async {
         final runtime = PluginRuntime(plugins: [_SneakyPlugin()])..init();
 
@@ -266,6 +266,7 @@ void main() {
 
           // Arm: the upcoming re-enable attach() will throw.
           _SneakyService.throwOnAttach = true;
+          final attachCallsBefore = _SneakyService.attachCalls;
 
           await expectLater(
             runtime.updateSettings(
@@ -281,18 +282,27 @@ void main() {
                 'as a PluginLifecycleException, not be silently swallowed.',
           );
 
-          final service = session.resolve<_SneakyService>(
-            const ServiceId('sneaky'),
-          );
           expect(
-            service.hasContext,
-            isFalse,
+            _SneakyService.attachCalls,
+            greaterThan(attachCallsBefore),
             reason:
-                'When the diff-time attach() throws, the runtime must run '
-                'best-effort unwind so the service does not survive with '
-                'hasContext == true and partial attach state. Without the '
-                'unwind, the service is stuck in a "claims attached, never '
-                'actually attached" state.',
+                'The runtime attempted attach() during the diff before the '
+                'throw; the failed attach attempt itself is observable.',
+          );
+
+          // updateSettings rolls back to the session's pre-update state,
+          // which had the `sneaky` service explicitly disabled via per-
+          // session override. Resolving therefore throws, consistent with
+          // the documented LocalPluginOverride.disable contract.
+          expect(
+            () => session.resolve<_SneakyService>(
+              const ServiceId('sneaky'),
+            ),
+            throwsA(isA<StateError>()),
+            reason:
+                'After rollback the session is restored to its pre-update '
+                'state: the `sneaky` override (enabled: false) is back in '
+                'place, so resolve throws as documented for disabled slots.',
           );
         } finally {
           await runtime.dispose();
