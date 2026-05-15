@@ -172,11 +172,14 @@ final class LazySingletonWrapper<T extends Object>
   LazySingletonWrapper<T> _clone() {
     final c = LazySingletonWrapper<T>(
       pluginId,
-      factory,
+      _initialized ? () => _instance : factory,
       priority: basePriority,
       capabilities: capabilities,
     );
     c._setEffectivePriority(_priority);
+    if (_initialized) {
+      c.provide();
+    }
     return c;
   }
 }
@@ -546,16 +549,22 @@ class ServiceRegistry {
       service.serviceId = serviceId;
 
       final override = _overrideForInjection(serviceId, wrapper);
-      if (override != null && override.settings.isNotEmpty) {
-        if (wrapper is SingletonWrapper || wrapper is LazySingletonWrapper) {
-          final oldHash = service.settingsHash;
+      if (wrapper is SingletonWrapper || wrapper is LazySingletonWrapper) {
+        final oldHash = service.settingsHash;
+        if (override != null && override.settings.isNotEmpty) {
           final newHash = ConfigNode.hashSettings(override.settings);
           if (oldHash != newHash) {
             service.injectSettings(override.settings, hash: newHash);
           }
-        } else {
-          service.injectSettings(override.settings);
+        } else if (oldHash != '-1') {
+          const emptySettings = <String, dynamic>{};
+          final emptyHash = ConfigNode.hashSettings(emptySettings);
+          if (oldHash != emptyHash) {
+            service.injectSettings(emptySettings, hash: emptyHash);
+          }
         }
+      } else if (override != null && override.settings.isNotEmpty) {
+        service.injectSettings(override.settings);
       }
     }
 

@@ -103,6 +103,14 @@ class ServiceSettings {
   };
 
   /// Returns a copy with any provided fields replaced.
+  ///
+  /// `copyWith(priority: null)` is a known Dart-language limitation: optional
+  /// parameters cannot distinguish "argument omitted" from "argument passed
+  /// as null", so passing `priority: null` here keeps the existing priority
+  /// rather than clearing it. To explicitly clear an `int?` field, use the
+  /// dedicated sister method [withClearedPriority]. Do NOT replace this with
+  /// a sentinel-based `Object? priority` overload, that pattern weakens the
+  /// public API's compile-time type safety in exchange for one rare case.
   // #docregion settings-copy-with
   ServiceSettings copyWith({
     bool? enabled,
@@ -116,6 +124,19 @@ class ServiceSettings {
     );
   }
   // #enddocregion settings-copy-with
+
+  /// Returns a copy with [priority] set to `null` (clearing any priority
+  /// override). Sister method to [copyWith]: the latter cannot clear a
+  /// nullable field via `copyWith(priority: null)` (Dart language
+  /// limitation, not a bug). Combine with [copyWith] when you need to clear
+  /// priority AND change other fields: `s.copyWith(enabled: false).withClearedPriority()`.
+  ServiceSettings withClearedPriority() {
+    return ServiceSettings(
+      enabled: enabled,
+      config: config,
+      priority: null,
+    );
+  }
 
   @override
   bool operator ==(Object other) {

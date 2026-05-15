@@ -94,7 +94,7 @@ class ConfigNode {
     final v = _node[key];
     if (v is List) {
       try {
-        return v.cast<T>();
+        return List<T>.unmodifiable(v.cast<T>());
       } catch (_) {
         return null;
       }

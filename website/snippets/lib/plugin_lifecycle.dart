@@ -4,19 +4,15 @@ library;
 
 import 'package:plugin_kit/plugin_kit.dart';
 
-/// A simple greeter abstraction used by the greeting plugins.
 abstract class Greeter {
-  /// Returns a greeting string for [name].
   String greet(String name);
 }
 
-/// Casual implementation of [Greeter].
 class CasualGreeter implements Greeter {
   @override
   String greet(String name) => 'Hello, $name.';
 }
 
-/// Formal implementation of [Greeter].
 class FormalGreeter implements Greeter {
   @override
   String greet(String name) => 'Good day, $name.';

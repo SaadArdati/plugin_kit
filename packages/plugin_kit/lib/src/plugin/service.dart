@@ -68,7 +68,7 @@ abstract class PluginService {
   @nonVirtual
   void injectSettings(Map<String, dynamic> settings, {String? hash}) {
     _settingsHash = hash ?? ConfigNode.hashSettings(settings);
-    _settings = settings;
+    _settings = {...settings};
     config = ConfigNode({...settings});
     onSettingsInjected();
   }

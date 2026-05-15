@@ -37,6 +37,7 @@ class PluginEventNotifier<E> extends ChangeNotifier
   }) {
     _subscription = session.on<E>(
       (envelope) {
+        if (_disposed) return;
         _value = envelope.event;
         notifyListeners();
       },
@@ -46,6 +47,7 @@ class PluginEventNotifier<E> extends ChangeNotifier
   }
 
   late final EventSubscription _subscription;
+  bool _disposed = false;
   E? _value;
 
   /// The most recent [E] event payload observed on the session, or `null`
@@ -55,6 +57,7 @@ class PluginEventNotifier<E> extends ChangeNotifier
 
   @override
   void dispose() {
+    _disposed = true;
     _subscription.cancel();
     super.dispose();
   }

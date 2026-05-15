@@ -126,9 +126,9 @@ class _PluginSessionScopeState extends State<PluginSessionScope> {
     // didChangeDependencies; we re-create the session from the new runtime.
     if (widget.session == null && widget.runtime == null) {
       final ambient = PluginRuntimeScope.maybeOf(context);
-      if (_activeRuntime != null &&
-          ambient != null &&
-          !identical(ambient, _activeRuntime)) {
+      if (ambient != null &&
+          ((_activeRuntime != null && !identical(ambient, _activeRuntime)) ||
+              (_activeRuntime == null && _error != null))) {
         _creationGen++;
         if (_ownsSession && _session != null) {
           disposeAndReport(
