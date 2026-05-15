@@ -62,6 +62,49 @@ body {
   font-size: 12px;
 }
 
+.topbar-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.loop-selector {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.loop-btn {
+  border: 0;
+  background: #f8fafb;
+  color: var(--text);
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+}
+
+.loop-btn:last-child {
+  border-right: 0;
+}
+
+.loop-btn:hover {
+  background: #eef3f6;
+}
+
+.loop-btn.active {
+  background: #e9f5ed;
+  color: #0a4017;
+  font-weight: 600;
+}
+
 .topbar-right {
   display: flex;
   align-items: center;

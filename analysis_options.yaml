@@ -19,9 +19,15 @@ linter:
     # Applies to files under lib/. Test files are excluded by default.
     - public_member_api_docs
 
-# analyzer:
-#   exclude:
-#     - path/to/excluded/files/**
+analyzer:
+  exclude:
+    # Bug-hunt and doc-audit loops snapshot test files and produce per-iter
+    # working dirs under scripts/*-loop/runs/. They are ephemeral and contain
+    # Dart files that import packages not declared on the workspace pubspec,
+    # which would otherwise drown the analyzer in spurious lints.
+    - scripts/*-loop/runs/**
+    - scripts/dashboard/dist/**
+    - scripts/dashboard/node_modules/**
 
 # For more information about the core and recommended set of lints, see
 # https://dart.dev/go/core-lints

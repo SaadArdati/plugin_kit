@@ -3,14 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>doc-audit-loop dashboard</title>
+    <title>codex loop dashboard</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <div id="app">
       <header class="panel topbar">
-        <div>
-          <h1>doc-audit-loop dashboard</h1>
+        <div class="topbar-left">
+          <div class="title-row">
+            <h1 id="loop-title">loop dashboard</h1>
+            <div id="loop-selector" class="loop-selector"></div>
+          </div>
           <p id="run-meta">Waiting for run data...</p>
         </div>
         <div class="topbar-right">
@@ -23,19 +26,7 @@
         <h2>Iterations</h2>
         <div class="table-wrap">
           <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Status</th>
-                <th>Findings</th>
-                <th>Confirmed</th>
-                <th>Dropped</th>
-                <th>Edits</th>
-                <th>Pass</th>
-                <th>Inline</th>
-                <th>Unfixable</th>
-              </tr>
-            </thead>
+            <thead><tr id="iters-head"></tr></thead>
             <tbody id="iters-body"></tbody>
           </table>
         </div>
@@ -45,12 +36,7 @@
         <div class="details-head">
           <h2 id="details-title">Iteration details</h2>
         </div>
-        <div id="details-tabs" class="tabs">
-          <button data-tab="audit" class="tab active">audit.md</button>
-          <button data-tab="validated" class="tab">validated.md</button>
-          <button data-tab="fixReport" class="tab">fix-report.md</button>
-          <button data-tab="review" class="tab">review.md</button>
-        </div>
+        <div id="details-tabs" class="tabs"></div>
         <pre id="details-content" class="mono">Select an iteration to view details.</pre>
       </aside>
 

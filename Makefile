@@ -9,7 +9,9 @@
         test-plugin-kit test-plugin-kit-dialog test-flutter-plugin-kit \
         test-snippets test-state-garden test-code-editor \
         test-plugin-kit-dialog-demo \
-        doc-audit doc-audit-resume doc-audit-dashboard
+        doc-audit doc-audit-resume doc-audit-dashboard \
+        bug-hunt bug-hunt-resume bug-hunt-dashboard \
+        dashboard
 
 # Default target. Run the full CI pipeline AND golden tests.
 all: ci test-goldens
@@ -131,12 +133,43 @@ doc-audit-resume:
 		--resume "$$(cd scripts/doc-audit-loop/runs/latest && pwd -P)" \
 		--max $(DOC_AUDIT_MAX)
 
-# Launch the live monitoring dashboard for the latest doc-audit run. Installs
-# Vite deps on first run, then starts the dev server on http://localhost:4322.
-doc-audit-dashboard:
-	cd scripts/doc-audit-loop/dashboard && \
+# Launch the generalized loop dashboard. One Vite dev server, two registered
+# loops (doc-audit, bug-hunt), select via the top-bar toggle or the URL hash
+# (e.g. http://localhost:4322/#loop=bug-hunt). Installs deps on first run.
+dashboard:
+	cd scripts/dashboard && \
 		[ -d node_modules ] || npm install && \
 		npm run dev
+
+# Backward-compatible aliases. Both jump straight into the dashboard with the
+# corresponding loop selected via URL hash.
+doc-audit-dashboard:
+	cd scripts/dashboard && \
+		[ -d node_modules ] || npm install && \
+		npm run dev -- --open '/#loop=doc-audit'
+
+bug-hunt-dashboard:
+	cd scripts/dashboard && \
+		[ -d node_modules ] || npm install && \
+		npm run dev -- --open '/#loop=bug-hunt'
+
+# --- Bug-hunt autonomous loop -----------------------------------------------
+
+# Run the autonomous bug-hunt loop: codex agents hypothesize bugs in
+# packages/*/lib, write failing tests under packages/*/test/bug_hunt/ (RED),
+# apply minimal fixes (GREEN), and gate every iteration on the full package
+# test suite. Strict TDD: production code never edited before a watched-fail
+# test exists. Never commits. Default 15-iteration cap; override with
+# `make bug-hunt BUG_HUNT_MAX=30`.
+BUG_HUNT_MAX ?= 15
+bug-hunt:
+	bash scripts/bug-hunt-loop/orchestrator.sh --max $(BUG_HUNT_MAX)
+
+# Resume the most recent bug-hunt run from where it left off.
+bug-hunt-resume:
+	bash scripts/bug-hunt-loop/orchestrator.sh \
+		--resume "$$(cd scripts/bug-hunt-loop/runs/latest && pwd -P)" \
+		--max $(BUG_HUNT_MAX)
 
 clean:
 	flutter clean
@@ -156,5 +189,9 @@ help:
 	@echo "  make website-build   Install website deps and build the static site."
 	@echo "  make doc-audit       Run the autonomous doc-audit loop (codex agents)."
 	@echo "  make doc-audit-resume   Resume the most recent doc-audit run."
-	@echo "  make doc-audit-dashboard   Start the live monitoring dashboard at :4322."
+	@echo "  make bug-hunt       Run the autonomous bug-hunt loop (TDD enforced)."
+	@echo "  make bug-hunt-resume   Resume the most recent bug-hunt run."
+	@echo "  make dashboard      Start the live loop dashboard at :4322 (toggle loops in UI)."
+	@echo "  make doc-audit-dashboard   Alias: dashboard with #loop=doc-audit selected."
+	@echo "  make bug-hunt-dashboard    Alias: dashboard with #loop=bug-hunt selected."
 	@echo "  make clean      Remove .dart_tool / build dirs."
