@@ -1,7 +1,18 @@
 name: plugin_kit
-description: A powerful plug'n'play plugin system for any Dart project.
+description: >-
+  A powerful plug'n'play plugin system for any Dart project. Lifecycle-aware
+  plugins, scoped services, an event bus, sessions, and runtime configuration.
 version: 0.1.0
-publish_to: none
+homepage: https://plugin-kit-docs.saadodi44.workers.dev
+repository: https://github.com/SaadArdati/plugin_kit
+issue_tracker: https://github.com/SaadArdati/plugin_kit/issues
+topics:
+  - plugins
+  - architecture
+  - event-bus
+  - dependency-injection
+  - lifecycle
+
 resolution: workspace
 
 environment:

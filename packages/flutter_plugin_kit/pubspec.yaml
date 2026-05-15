@@ -1,7 +1,18 @@
 name: flutter_plugin_kit
-description: Flutter ergonomics for plugin_kit — scope widgets, a State mixin, a ChangeNotifier adapter, and BuildContext.watchEvent / readEvent. Zero pubspec deps beyond flutter and plugin_kit.
+description: >-
+  Flutter ergonomics for plugin_kit: scope widgets, a State mixin, a
+  ChangeNotifier adapter, and BuildContext.watchEvent / readEvent helpers.
 version: 0.1.0
-publish_to: none
+homepage: https://plugin-kit-docs.saadodi44.workers.dev
+repository: https://github.com/SaadArdati/plugin_kit
+issue_tracker: https://github.com/SaadArdati/plugin_kit/issues
+topics:
+  - plugins
+  - flutter
+  - event-bus
+  - state-management
+  - lifecycle
+
 resolution: workspace
 
 environment:
