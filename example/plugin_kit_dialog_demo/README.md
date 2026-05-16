@@ -2,7 +2,7 @@
 
 A runnable Flutter showcase for [`plugin_kit_dialog`](../../packages/plugin_kit_dialog).
 
-**Live demo:** [plugin-kit-dialog-demo.pages.dev](https://plugin-kit-dialog-demo.pages.dev)
+**Live demo:** [plugin-kit.saad-ardati.dev/dialog](https://plugin-kit.saad-ardati.dev/dialog)
 
 The demo wires together 20 competing plugins (priority towers on `agent.model`,
 `agent.system_message`, `retry.policy`, and `search.provider`, plus locked and
@@ -36,8 +36,8 @@ flutter run --target example/plugin_kit_dialog_demo/lib/main.dart
 ## Companion documentation
 
 - [`plugin_kit_dialog` README](../../packages/plugin_kit_dialog/README.md)
-- [Plugin Kit Dialog guide](https://plugin-kit-docs.saadodi44.workers.dev/guides/plugin-kit-dialog/)
-- [Dialog API reference](https://plugin-kit-docs.saadodi44.workers.dev/reference/dialog-api/)
+- [Plugin Kit Dialog guide](https://plugin-kit.saad-ardati.dev/guides/plugin-kit-dialog/)
+- [Dialog API reference](https://plugin-kit.saad-ardati.dev/reference/dialog-api/)
 
 The screenshots that ship with the dialog docs are golden-tested against
 this demo, so what you see in the docs is exactly what `flutter run` here

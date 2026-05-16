@@ -5,7 +5,7 @@ import starlightPageActions from 'starlight-page-actions';
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://plugin-kit-docs.saadodi44.workers.dev',
+	site: 'https://plugin-kit.saad-ardati.dev',
 	integrations: [
 		starlight({
 			title: 'Plugin Kit',
@@ -46,7 +46,7 @@ export default defineConfig({
 			customCss: ['./src/styles/custom.css'],
 			plugins: [
 				starlightPageActions({
-					baseUrl: 'https://plugin-kit-docs.saadodi44.workers.dev',
+					baseUrl: 'https://plugin-kit.saad-ardati.dev',
 				}),
 			],
 			sidebar: [

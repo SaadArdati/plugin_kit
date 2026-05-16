@@ -106,7 +106,7 @@ Two scopes:
 - **`GlobalPlugin`**: registered once during `PluginRuntime.init`, shared across every session.
 - **`SessionPlugin`**: attached per session, but the same plugin instance is reused across sessions, so mutable plugin fields are shared unless state lives in services or context.
 
-Both default-context generics are inferred. Write `extends GlobalPlugin` / `extends SessionPlugin` without type arguments unless you need a [custom context subclass](https://plugin-kit-docs.saadodi44.workers.dev/concepts/custom-context/).
+Both default-context generics are inferred. Write `extends GlobalPlugin` / `extends SessionPlugin` without type arguments unless you need a [custom context subclass](https://plugin-kit.saad-ardati.dev/concepts/custom-context/).
 
 ## Services
 
@@ -348,9 +348,9 @@ ConfigField (sealed)           // Text, Multiline, Password, Number, Dropdown<T>
 
 ## Documentation
 
-- **Full docs**: [plugin-kit-docs.saadodi44.workers.dev](https://plugin-kit-docs.saadodi44.workers.dev). Concepts, guides, tutorials, reference.
+- **Full docs**: [plugin-kit.saad-ardati.dev](https://plugin-kit.saad-ardati.dev). Concepts, guides, tutorials, reference.
 - **Source**: [github.com/SaadArdati/plugin_kit](https://github.com/SaadArdati/plugin_kit)
-- **Examples**: [`example/`](https://github.com/SaadArdati/plugin_kit/tree/main/example) in the repo. `villain_lair/` is a numbered-bin tour through every primitive; `model_embassy/` walks competing providers, capabilities, and reconciliation; `state_garden/` shows the same chat pattern bridged to seven Flutter state-management libraries ([live demo](https://plugin-kit-state-garden.pages.dev)); `code_editor/` is a full Flutter capstone ([live demo](https://plugin-kit-code-editor.pages.dev)).
+- **Examples**: [`example/`](https://github.com/SaadArdati/plugin_kit/tree/main/example) in the repo. `villain_lair/` is a numbered-bin tour through every primitive; `model_embassy/` walks competing providers, capabilities, and reconciliation; `state_garden/` shows the same chat pattern bridged to seven Flutter state-management libraries ([live demo](https://plugin-kit.saad-ardati.dev/state-garden)); `code_editor/` is a full Flutter capstone ([live demo](https://plugin-kit.saad-ardati.dev/code-editor)).
 
 ## License
 

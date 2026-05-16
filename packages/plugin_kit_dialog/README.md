@@ -236,7 +236,7 @@ The dialog is **non-destructive**. Edits accumulate in a working draft; nothing 
 
 ## Example app
 
-Run [`example/plugin_kit_dialog_demo`](https://github.com/SaadArdati/plugin_kit/tree/main/example/plugin_kit_dialog_demo) — or open the [live web build](https://plugin-kit-dialog-demo.pages.dev) — to see priorities, tiers, and visuals in a full app: 20 competing plugins (priority towers on `agent.model`, `agent.system_message`, `retry.policy`, `search.provider`, plus locked and experimental tiers) plus a `PluginKitVisualsPlugin` decorating every plugin, namespace, and service.
+Run [`example/plugin_kit_dialog_demo`](https://github.com/SaadArdati/plugin_kit/tree/main/example/plugin_kit_dialog_demo) — or open the [live web build](https://plugin-kit.saad-ardati.dev/dialog) — to see priorities, tiers, and visuals in a full app: 20 competing plugins (priority towers on `agent.model`, `agent.system_message`, `retry.policy`, `search.provider`, plus locked and experimental tiers) plus a `PluginKitVisualsPlugin` decorating every plugin, namespace, and service.
 
 ## Public API
 
@@ -315,8 +315,8 @@ void registerWithNumberField(ScopedServiceRegistry registry) {
 
 ## Documentation
 
-- **Full guide**: [plugin-kit-docs.saadodi44.workers.dev/guides/plugin-kit-dialog/](https://plugin-kit-docs.saadodi44.workers.dev/guides/plugin-kit-dialog/).
-- **Dialog API reference**: [plugin-kit-docs.saadodi44.workers.dev/reference/dialog-api/](https://plugin-kit-docs.saadodi44.workers.dev/reference/dialog-api/) and [pub.dev dartdoc](https://pub.dev/documentation/plugin_kit_dialog/latest/).
+- **Full guide**: [plugin-kit.saad-ardati.dev/guides/plugin-kit-dialog/](https://plugin-kit.saad-ardati.dev/guides/plugin-kit-dialog/).
+- **Dialog API reference**: [plugin-kit.saad-ardati.dev/reference/dialog-api/](https://plugin-kit.saad-ardati.dev/reference/dialog-api/) and [pub.dev dartdoc](https://pub.dev/documentation/plugin_kit_dialog/latest/).
 - **Source and issues**: [github.com/SaadArdati/plugin_kit](https://github.com/SaadArdati/plugin_kit).
 
 ## License

@@ -1,4 +1,4 @@
-name: Deploy Examples
+name: Deploy Site
 
 on:
   push:
@@ -12,25 +12,9 @@ jobs:
     permissions:
       contents: read
       deployments: write
-    # Per-example concurrency. Each matrix leg gets its own group so the three
-    # projects don't serialize against each other, but back-to-back pushes to the
-    # same example queue rather than racing Cloudflare's project lock.
     concurrency:
-      group: deploy-${{ matrix.example.project }}-${{ github.ref }}
+      group: deploy-site-${{ github.ref }}
       cancel-in-progress: false
-    strategy:
-      fail-fast: false
-      matrix:
-        example:
-          - dir: example/code_editor
-            project: plugin-kit-code-editor
-            extra_build_args: --no-tree-shake-icons
-          - dir: example/plugin_kit_dialog_demo
-            project: plugin-kit-dialog-demo
-            extra_build_args: ""
-          - dir: example/state_garden
-            project: plugin-kit-state-garden
-            extra_build_args: ""
     steps:
       - uses: actions/checkout@v6
 
@@ -39,18 +23,49 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Resolve workspace
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+
+      - name: Install website deps
+        run: pnpm --filter ./website install --frozen-lockfile
+
+      - name: Resolve Flutter workspace
         run: flutter pub get
 
-      - name: Build web
-        working-directory: ${{ matrix.example.dir }}
-        run: flutter build web --release ${{ matrix.example.extra_build_args }}
+      # Each Flutter example is built with --base-href matching its eventual sub-path so
+      # asset URLs (main.dart.js, canvaskit, fonts) resolve at the right depth once the
+      # build/web folder is dropped into website/dist/<sub>/.
+      - name: Build code_editor
+        working-directory: example/code_editor
+        run: flutter build web --release --no-tree-shake-icons --base-href=/code-editor/
 
-      # Pages requires a project to already exist in the dashboard. Create the three
-      # projects manually once (see docs/deploy-examples.md), then this step deploys
-      # every push. PRs from this repo go to a preview branch URL; main goes to
-      # production. Fork PRs can't access secrets, so we skip deploy there - the
-      # build step above still runs and acts as a check.
+      - name: Build plugin_kit_dialog_demo
+        working-directory: example/plugin_kit_dialog_demo
+        run: flutter build web --release --base-href=/dialog/
+
+      - name: Build state_garden
+        working-directory: example/state_garden
+        run: flutter build web --release --base-href=/state-garden/
+
+      - name: Build website
+        run: pnpm --filter ./website build
+
+      - name: Combine into single dist
+        run: |
+          set -euo pipefail
+          mkdir -p website/dist/code-editor website/dist/dialog website/dist/state-garden
+          cp -R example/code_editor/build/web/. website/dist/code-editor/
+          cp -R example/plugin_kit_dialog_demo/build/web/. website/dist/dialog/
+          cp -R example/state_garden/build/web/. website/dist/state-garden/
+
+      # Fork PRs can't access secrets - the build above still runs as a check.
+      # Production deploys land on main; same-repo PRs get preview URLs at
+      # <hash>.plugin-kit.pages.dev.
       - name: Deploy to Cloudflare Pages
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: cloudflare/wrangler-action@v4
@@ -58,7 +73,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: >-
-            pages deploy ${{ matrix.example.dir }}/build/web
-            --project-name=${{ matrix.example.project }}
+            pages deploy website/dist
+            --project-name=plugin-kit
             --branch=${{ github.head_ref || github.ref_name }}
             --commit-hash=${{ github.sha }}

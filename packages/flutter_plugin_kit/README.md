@@ -23,7 +23,7 @@ Pulls in only `flutter` and `plugin_kit`.
 
 ## Quick tour
 
-`ChatPlugin`, `AssistantPlugin`, and `ChatMessageReceived` below are stand-ins for plugins and events you write in your own app. A complete runnable version of this pattern (plus six other state-library variants) lives in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden) — try it in your browser at [plugin-kit-state-garden.pages.dev](https://plugin-kit-state-garden.pages.dev).
+`ChatPlugin`, `AssistantPlugin`, and `ChatMessageReceived` below are stand-ins for plugins and events you write in your own app. A complete runnable version of this pattern (plus six other state-library variants) lives in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden) — try it in your browser at [plugin-kit.saad-ardati.dev/state-garden](https://plugin-kit.saad-ardati.dev/state-garden).
 
 ```dart
 void exampleAppRoot() {
@@ -142,7 +142,7 @@ The same pattern applies: subscribe in a notifier or store, expose the latest ev
 
 ## Documentation
 
-- **Full docs**: [plugin-kit-docs.saadodi44.workers.dev/guides/flutter-plugin-kit/](https://plugin-kit-docs.saadodi44.workers.dev/guides/flutter-plugin-kit/). The dedicated guide.
+- **Full docs**: [plugin-kit.saad-ardati.dev/guides/flutter-plugin-kit/](https://plugin-kit.saad-ardati.dev/guides/flutter-plugin-kit/). The dedicated guide.
 - **API reference**: [pub.dev dartdoc](https://pub.dev/documentation/flutter_plugin_kit/latest/).
 - **Source and issues**: [github.com/SaadArdati/plugin_kit](https://github.com/SaadArdati/plugin_kit).
 
