@@ -1,0 +1,64 @@
+name: Deploy Examples
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    # Per-example concurrency. Each matrix leg gets its own group so the three
+    # projects don't serialize against each other, but back-to-back pushes to the
+    # same example queue rather than racing Cloudflare's project lock.
+    concurrency:
+      group: deploy-${{ matrix.example.project }}-${{ github.ref }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - dir: example/code_editor
+            project: plugin-kit-code-editor
+            extra_build_args: --no-tree-shake-icons
+          - dir: example/plugin_kit_dialog_demo
+            project: plugin-kit-dialog-demo
+            extra_build_args: ""
+          - dir: example/state_garden
+            project: plugin-kit-state-garden
+            extra_build_args: ""
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve workspace
+        run: flutter pub get
+
+      - name: Build web
+        working-directory: ${{ matrix.example.dir }}
+        run: flutter build web --release ${{ matrix.example.extra_build_args }}
+
+      # Pages requires a project to already exist in the dashboard. Create the three
+      # projects manually once (see docs/deploy-examples.md), then this step deploys
+      # every push. PRs from this repo go to a preview branch URL; main goes to
+      # production. Fork PRs can't access secrets, so we skip deploy there - the
+      # build step above still runs and acts as a check.
+      - name: Deploy to Cloudflare Pages
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: >-
+            pages deploy ${{ matrix.example.dir }}/build/web
+            --project-name=${{ matrix.example.project }}
+            --branch=${{ github.head_ref || github.ref_name }}
+            --commit-hash=${{ github.sha }}
