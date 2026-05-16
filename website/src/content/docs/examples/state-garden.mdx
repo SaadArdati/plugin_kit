@@ -1,0 +1,91 @@
+---
+title: The state_garden workshop
+description: One chat protocol bridged to ten Flutter state-management approaches side by side. setState, ChangeNotifier+Provider, Bloc, Riverpod, signals, MobX, GetIt, and the two flutter_plugin_kit shapes, with six lifecycle proofs run against a real PluginRuntime.
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+`example/state_garden/` is a workshop. The same plugin_kit chat protocol (a `ChatService`, two events, two plugins) is bridged to ten Flutter state-management approaches side by side, with the exact same `ChatView` rendering every variant. You read across to see what each library costs and which bookkeeping it abstracts away.
+
+This is the canonical source of truth for [State Management Bridges](/reference/state-management-bridges/). Every recipe on that reference page is implemented here, executed under `flutter test`, and kept clean by `flutter analyze`. If a future plugin_kit change quietly breaks one of the recipes, a test in this package fails.
+
+## Run it
+
+Try the live web build at [plugin-kit.saad-ardati.dev/state-garden](https://plugin-kit.saad-ardati.dev/state-garden), or run locally from the workspace root:
+
+```bash
+flutter pub get
+flutter run --target example/state_garden/lib/main.dart
+```
+
+The app boots a runtime, wires the locators each integration expects, and renders an integration launcher. Pick any tile to swap in that library's `ChatScreen`. Type a message; the bot replies `echo: <your text>`. The same protocol runs underneath all ten.
+
+## The ten integrations
+
+All under [`lib/src/integrations/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden/lib/src/integrations):
+
+- **setState** (no library). The baseline against which every other recipe is compared.
+- **`flutter_plugin_kit` `PluginSessionStateListener`**. The State-mixin variant of setState with subscription bookkeeping abstracted away.
+- **`plugin_kit` `PluginSessionListener`**. The same mixin pattern wired directly from `plugin_kit`, no Flutter-side dependency.
+- **`ChangeNotifier` + `provider`**. The "classic" Flutter shape.
+- **`flutter_plugin_kit` `PluginEventNotifier`**. A foundation `ChangeNotifier` / `ValueListenable` for "the latest event of type T", with no custom subclass to write.
+- **`flutter_bloc` Cubit**. With a value-equality `ChatBlocState` so `BlocBuilder` skips identical snapshots.
+- **Riverpod `AsyncNotifier`**. A `Provider<PluginSession>` overridden at app boot.
+- **`signals_flutter`**. Reactive primitives consumed via `Watch((context) => ...)`.
+- **MobX**. No code generation; explicit `Observer` widgets.
+- **GetIt as a session locator**. Service locator for the session, plain `setState` for UI.
+
+Each integration owns one bridge class (or one screen, for the no-bridge variants) plus a screen widget. The ten screens render through a shared [`ChatView`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/widgets/chat_view.dart) so the test harness can type into the same key, tap the same key, and assert against the same `MessageList` regardless of which bridge is under test.
+
+## Six lifecycle proofs
+
+Beyond the integrations, [`test/lifecycle_proofs_test.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/test/lifecycle_proofs_test.dart) holds six pure-plugin_kit tests with no widgets. They are written against the same `ChatService` the integrations resolve, so the proofs and the recipes can never drift.
+
+1. **Settings reconcile.** Disabling a plugin via `updateSessionSettings` removes its event handlers but does not dispose the session bus or registry instances.
+2. **Session swap.** Each session constructs its own service instances; an old session's service is frozen after `session.dispose`.
+3. **Two live sessions stay isolated.** Messages emitted on one session never reach the other session's resolved `ChatService`.
+4. **Canonical dispose.** `runtime.dispose()` alone tears down session buses and drains the sessions list, with no need to call `session.dispose()` separately.
+5. **Hot-swap.** A higher-priority registrant wins resolution; disabling it via settings reconciliation flips the winner without touching the session.
+6. **Toggle guard.** Two `updateSessionSettings` calls fired concurrently with `Future.wait` throw `StateError`; tail-chained serialization converges on the latest intent. Empirical proof of the runtime guard and serialization pattern called out in the state management research note.
+
+## How to read the code
+
+Start at [`lib/state_garden.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/state_garden.dart) for the public API surface. Then:
+
+- [`lib/src/chat/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden/lib/src/chat) holds the chat protocol: `ChatMessage`, two events, `ChatService` and `AltChatService`, and the two plugins that register them.
+- [`lib/src/widgets/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden/lib/src/widgets) holds the shared UI: `MessageList`, `MessageInput`, and `ChatView` that composes them. No widget-returning helper methods anywhere.
+- [`lib/src/integrations/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden/lib/src/integrations) holds one file per library, each documenting why the bridge is shaped that way.
+- [`lib/src/runtime_holder.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/src/runtime_holder.dart) is the test fixture and example boot path.
+- [`lib/main.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/state_garden/lib/main.dart) boots the runtime, wires the locators each integration expects, and renders the launcher.
+
+## Architecture rules applied
+
+- `ChatMessage` and `ChatBlocState` support value equality so observers do not rebuild on identical snapshots.
+- Every async continuation that touches widget or holder state guards with `mounted`, `isClosed`, or a local `_disposed` flag.
+- Every visual chunk is a real `StatelessWidget` or `StatefulWidget` class. No widget-returning helper methods.
+- Bridges depend on the abstract `PluginSession` type; nothing reaches past it into concrete plugin internals.
+
+## Where to next
+
+<CardGrid>
+  <LinkCard
+    title="State Management Bridges"
+    description="The reference catalog. Every recipe in this example, shown side by side with prose explaining the cost of each shape."
+    href="/reference/state-management-bridges/"
+  />
+  <LinkCard
+    title="flutter_plugin_kit guide"
+    description="The package that supplies the State mixin and the ChangeNotifier adapter used by two of the recipes here."
+    href="/guides/flutter-plugin-kit/"
+  />
+  <LinkCard
+    title="Try the live demo"
+    description="The full web build at plugin-kit.saad-ardati.dev/state-garden."
+    href="https://plugin-kit.saad-ardati.dev/state-garden"
+  />
+  <LinkCard
+    title="Read the runnable code"
+    description="example/state_garden/. Run with flutter run --target example/state_garden/lib/main.dart."
+    href="https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden"
+  />
+</CardGrid>

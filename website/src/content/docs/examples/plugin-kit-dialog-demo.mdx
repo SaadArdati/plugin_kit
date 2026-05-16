@@ -1,0 +1,73 @@
+---
+title: The plugin_kit_dialog_demo showcase
+description: A synthetic 21-plugin runtime exercising priority towers, locked and experimental tiers, capability fields, and the PluginKitVisualsPlugin. Open the three-tab dialog against a runtime built specifically to surface every behavior at once.
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+`example/plugin_kit_dialog_demo/` is the runnable showcase for the [`plugin_kit_dialog`](/guides/plugin-kit-dialog/) package. It boots a synthetic runtime sized to stress every behavior the dialog renders in one place: priority towers, locked tiers, experimental tiers, capability fields, and the visuals plugin decorating plugins, namespaces, and services. The screenshots that ship with the dialog docs are golden-tested against this demo, so what the docs show is exactly what `flutter run` here renders.
+
+## Run it
+
+Try the live web build at [plugin-kit.saad-ardati.dev/dialog](https://plugin-kit.saad-ardati.dev/dialog), or run locally from the workspace root:
+
+```bash
+flutter pub get
+flutter run --target example/plugin_kit_dialog_demo/lib/main.dart
+```
+
+The app opens with a single button that calls `showPluginKitDialog(...)` on the synthetic runtime. The merged `RuntimeSettings` returned by the dialog is surfaced back into the host scaffold so you can see what would be persisted.
+
+## What the runtime exercises
+
+20 competing plugins plus one `PluginKitVisualsPlugin` decorating every plugin, namespace, and service (21 plugins total). The towers are arranged so the dialog's three tabs each have non-trivial content to render:
+
+- **Priority towers.** Multiple plugins claim the same service slot at staggered priorities, so the **Advanced** tab can show a real winner-and-shadowed-contenders cascade. The four towers are on `agent.model`, `agent.system_message`, `retry.policy`, and `search.provider`.
+- **Locked tier.** Plugins flagged as required surface as un-toggleable on the **Plugins** tab. The host cannot disable them through the UI.
+- **Experimental tier.** Plugins flagged as experimental surface with a warning chip on the **Plugins** tab. Toggling them off does not affect the locked baseline.
+- **Capabilities.** Several services attach `UiConfigurableCapability` with mixed field shapes (text, number, dropdown, bool, multiline, group, extension) so the **Services** tab populates with the full field renderer matrix.
+
+## The three tabs the demo exercises
+
+**Plugins.** A grid of every registered plugin with per-plugin icon, color, label, and tier badge. Toggling a tile fires the runtime's reconciliation; locked tiles are inert; experimental tiles show their warning. The visuals plugin supplies all the per-tile metadata.
+
+**Services.** Every service that attached a `UiConfigurableCapability` becomes an editable card grouped by namespace. Drag, type, dropdown-pick; the dialog tracks edits in a working draft and never reaches the runtime until **Save**. The four priority towers each have their winner card exposed here.
+
+**Advanced.** The registry inspector. Each namespace expands to show the registrations it has accumulated, sorted by priority. The current winner is picked out; shadowed contenders are listed below. A JSON view of the working `RuntimeSettings` draft sits alongside, useful for understanding what `onSave` will receive.
+
+## What's in the code
+
+- [`lib/main.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/plugin_kit_dialog_demo/lib/main.dart) boots the runtime, mounts a `Scaffold` that opens `showPluginKitDialog`, and surfaces the merged `RuntimeSettings` returned by the dialog.
+- [`lib/plugins/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/plugin_kit_dialog_demo/lib/plugins) holds the 20 demo plugins, grouped by namespace and tier. Each plugin file declares its own priorities, capabilities, and tier flags inline so you can read one file at a time without chasing references.
+- [`lib/plugin_visuals.dart`](https://github.com/SaadArdati/plugin_kit/blob/main/example/plugin_kit_dialog_demo/lib/plugin_visuals.dart) is the `PluginKitVisualsPlugin` decorating each axis (plugin, namespace, service).
+
+## What to take from it
+
+- **The visuals plugin is one place, not per-plugin metadata.** Three maps (plugin, namespace, service) carry all the labels, icons, and colors the dialog renders. Plugins themselves stay free of UI metadata.
+- **Capability fields are declarative, not bespoke widgets.** Every Services tab card is generated from a `UiConfigurableCapability` attached at registration time. The host app does not write a settings screen per plugin.
+- **Tiers are policy, not rendering.** `locked` and `experimental` are flags the dialog reads; the runtime treats them uniformly.
+
+## Where to next
+
+<CardGrid>
+  <LinkCard
+    title="Plugin Kit Dialog guide"
+    description="The how-to that pairs with this showcase: mounting the dialog, persisting settings, wiring custom field renderers."
+    href="/guides/plugin-kit-dialog/"
+  />
+  <LinkCard
+    title="Dialog API reference"
+    description="The public surface of plugin_kit_dialog: showPluginKitDialog, PluginKitDialog, PluginKitDialogController, and the visuals/field types."
+    href="/reference/dialog-api/"
+  />
+  <LinkCard
+    title="Try the live demo"
+    description="The full web build at plugin-kit.saad-ardati.dev/dialog."
+    href="https://plugin-kit.saad-ardati.dev/dialog"
+  />
+  <LinkCard
+    title="Read the runnable code"
+    description="example/plugin_kit_dialog_demo/. Run with flutter run --target example/plugin_kit_dialog_demo/lib/main.dart."
+    href="https://github.com/SaadArdati/plugin_kit/tree/main/example/plugin_kit_dialog_demo"
+  />
+</CardGrid>

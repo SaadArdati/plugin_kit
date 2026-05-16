@@ -127,7 +127,7 @@ Use `context.watch<PluginEventCubit<ChatMessageReceived>>().value` with this ada
 
 ### riverpod / signals / mobx
 
-The same pattern applies: subscribe in a notifier or store, expose the latest event, dispose cancels. Each library's recipe lives in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden).
+The same pattern applies: subscribe in a notifier or store, expose the latest event, dispose cancels. Each library's recipe lives in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden) ([live demo](https://plugin-kit.saad-ardati.dev/state-garden)).
 
 ## Lifecycle notes
 

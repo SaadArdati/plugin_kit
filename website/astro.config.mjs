@@ -94,7 +94,9 @@ export default defineConfig({
 						{ label: 'Examples Map', slug: 'examples' },
 						{ label: 'The villain_lair scenarios', slug: 'examples/villain-lair' },
 						{ label: 'The model_embassy tour', slug: 'examples/model-embassy' },
+						{ label: 'The state_garden workshop', slug: 'examples/state-garden' },
 						{ label: 'The code_editor architecture tour', slug: 'examples/code-editor' },
+						{ label: 'The plugin_kit_dialog_demo showcase', slug: 'examples/plugin-kit-dialog-demo' },
 					],
 				},
 				{

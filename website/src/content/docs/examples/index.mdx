@@ -5,20 +5,25 @@ description: Annotated tours of the runnable example projects. Each page maps a 
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Each page on this section maps a runnable project in [`example/`](https://github.com/SaadArdati/plugin_kit/tree/main/example) to the concepts it demonstrates. The example directory is the source of truth; the page is the map. Read the page, run the code, swap things around.
+Each page on this section maps a runnable project in [`example/`](https://github.com/SaadArdati/plugin_kit/tree/main/example) to the concepts it demonstrates. The example directory is the source of truth; the page is the map. Read the page, run the code, swap things around. The three Flutter examples also ship as live web builds you can open without installing anything.
 
 ## Available examples
 
 <CardGrid>
   <LinkCard
     title="The villain_lair examples"
-    description="Index of fifteen runnable Dart scenarios in `example/villain_lair/`, each isolating one piece of the runtime. Use it to pick the file that matches what you are trying to learn."
+    description="Index of fifteen runnable Dart scenarios in example/villain_lair/, each isolating one piece of the runtime. Use it to pick the file that matches what you are trying to learn."
     href="/examples/villain-lair/"
   />
   <LinkCard
     title="The model_embassy tour"
-    description="Six scenarios focused on one shape: priority-based provider routing for an LLM-style application. Passports, visa offices, and the priority cascade that picks one."
+    description="Six Dart scenarios focused on one shape: priority-based provider routing for an LLM-style application. Passports, visa offices, and the priority cascade that picks one."
     href="/examples/model-embassy/"
+  />
+  <LinkCard
+    title="The state_garden workshop"
+    description="One chat protocol bridged to ten Flutter state-management approaches side by side. setState, ChangeNotifier+Provider, Bloc, Riverpod, signals, MobX, GetIt, and the two flutter_plugin_kit shapes. Live demo at plugin-kit.saad-ardati.dev/state-garden."
+    href="/examples/state-garden/"
   />
   <LinkCard
     title="The code_editor architecture tour"
@@ -26,13 +31,8 @@ Each page on this section maps a runnable project in [`example/`](https://github
     href="/examples/code-editor/"
   />
   <LinkCard
-    title="state_garden (live demo)"
-    description="The same plugin_kit chat protocol bridged to ten Flutter state-management approaches side by side. setState, ChangeNotifier+Provider, Bloc, Riverpod, signals, MobX, GetIt, and the two flutter_plugin_kit shapes."
-    href="https://plugin-kit.saad-ardati.dev/state-garden"
-  />
-  <LinkCard
-    title="plugin_kit_dialog_demo (live demo)"
-    description="The drop-in settings dialog mounted on a synthetic 21-plugin runtime. Toggle plugins, edit configurable services, browse the registry against priority towers and capability chips."
-    href="https://plugin-kit.saad-ardati.dev/dialog"
+    title="The plugin_kit_dialog_demo showcase"
+    description="A synthetic 21-plugin runtime exercising priority towers, locked and experimental tiers, capability fields, and the visuals plugin. Live demo at plugin-kit.saad-ardati.dev/dialog."
+    href="/examples/plugin-kit-dialog-demo/"
   />
 </CardGrid>
