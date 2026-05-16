@@ -79,10 +79,10 @@ function api(path) {
 
 function classifyStatus(value) {
   const v = String(value || '').toUpperCase();
-  if (v === 'GREEN' || v === 'PASS' || v === 'CONVERGED') return 'green';
+  if (v === 'GREEN' || v === 'PASS' || v === 'CONVERGED' || v === 'LANDED' || v === 'FIXED') return 'green';
   if (v === 'RED' || v === 'FAIL' || v === 'FILED') return 'red';
   if (v === 'RUNNING') return 'gray';
-  if (v === 'DROPPED') return 'gray';
+  if (v === 'DROPPED' || v === 'CLEAN') return 'gray';
   return 'gray';
 }
 

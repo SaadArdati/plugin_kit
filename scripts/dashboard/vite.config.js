@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 
 import { parseIntSafe, parseStartedAtFromFirstLine } from './src/loops/_helpers.js';
 import bugHuntDriver from './src/loops/bug-hunt.js';
+import coverageDriver from './src/loops/coverage.js';
 import docAuditDriver from './src/loops/doc-audit.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,6 +17,7 @@ const projectRoot = path.resolve(__dirname, '..', '..');
 const drivers = new Map([
   [docAuditDriver.id, docAuditDriver],
   [bugHuntDriver.id, bugHuntDriver],
+  [coverageDriver.id, coverageDriver],
 ]);
 
 async function safeReadText(filePath) {
