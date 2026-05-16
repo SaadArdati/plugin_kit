@@ -350,7 +350,7 @@ ConfigField (sealed)           // Text, Multiline, Password, Number, Dropdown<T>
 
 - **Full docs**: [plugin-kit-docs.saadodi44.workers.dev](https://plugin-kit-docs.saadodi44.workers.dev). Concepts, guides, tutorials, reference.
 - **Source**: [github.com/SaadArdati/plugin_kit](https://github.com/SaadArdati/plugin_kit)
-- **Examples**: [`example/`](https://github.com/SaadArdati/plugin_kit/tree/main/example) in the repo. `villain_lair/` is a numbered-bin tour through every primitive; `model_embassy/` walks competing providers, capabilities, and reconciliation; `state_garden/` shows the same chat pattern bridged to seven Flutter state-management libraries; `code_editor/` is a full Flutter capstone.
+- **Examples**: [`example/`](https://github.com/SaadArdati/plugin_kit/tree/main/example) in the repo. `villain_lair/` is a numbered-bin tour through every primitive; `model_embassy/` walks competing providers, capabilities, and reconciliation; `state_garden/` shows the same chat pattern bridged to seven Flutter state-management libraries ([live demo](https://plugin-kit-state-garden.pages.dev)); `code_editor/` is a full Flutter capstone ([live demo](https://plugin-kit-code-editor.pages.dev)).
 
 ## License
 

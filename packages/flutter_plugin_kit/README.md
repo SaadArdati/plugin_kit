@@ -23,7 +23,7 @@ Pulls in only `flutter` and `plugin_kit`.
 
 ## Quick tour
 
-`ChatPlugin`, `AssistantPlugin`, and `ChatMessageReceived` below are stand-ins for plugins and events you write in your own app. A complete runnable version of this pattern (plus six other state-library variants) lives in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden).
+`ChatPlugin`, `AssistantPlugin`, and `ChatMessageReceived` below are stand-ins for plugins and events you write in your own app. A complete runnable version of this pattern (plus six other state-library variants) lives in [`example/state_garden/`](https://github.com/SaadArdati/plugin_kit/tree/main/example/state_garden) — try it in your browser at [plugin-kit-state-garden.pages.dev](https://plugin-kit-state-garden.pages.dev).
 
 ```dart
 void exampleAppRoot() {

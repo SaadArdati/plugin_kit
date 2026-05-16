@@ -4,6 +4,8 @@ A workshop where the same plugin_kit chat protocol is bridged to seven
 Flutter state management libraries side by side. Same plugin_kit soil,
 seven different state-holder blooms.
 
+**Live demo:** [plugin-kit-state-garden.pages.dev](https://plugin-kit-state-garden.pages.dev)
+
 This package is the source of citation for
 [`docs/research/2026-05-04-flutter-state-management-integration.md`](../../docs/research/2026-05-04-flutter-state-management-integration.md)
 and for the

@@ -123,7 +123,7 @@ Without a listener configured, severe-level messages (failed plugin attach, dete
 ## Documentation
 
 - **Full docs**: [plugin-kit-docs.saadodi44.workers.dev](https://plugin-kit-docs.saadodi44.workers.dev). Concepts, guides, tutorials, reference.
-- **Examples**: [`example/`](example). `villain_lair/` is a numbered-bin tour through every primitive; `model_embassy/` walks competing providers, capabilities, and reconciliation; `state_garden/` shows the same chat pattern bridged to seven Flutter state-management libraries; `code_editor/` is a full Flutter capstone; `plugin_kit_dialog_demo/` runs the dialog over a 21-plugin runtime.
+- **Examples**: [`example/`](example). `villain_lair/` is a numbered-bin tour through every primitive; `model_embassy/` walks competing providers, capabilities, and reconciliation; `state_garden/` shows the same chat pattern bridged to seven Flutter state-management libraries ([live demo](https://plugin-kit-state-garden.pages.dev)); `code_editor/` is a full Flutter capstone ([live demo](https://plugin-kit-code-editor.pages.dev)); `plugin_kit_dialog_demo/` runs the dialog over a 21-plugin runtime ([live demo](https://plugin-kit-dialog-demo.pages.dev)).
 - **Source**: this repo. Issues and discussions on [GitHub](https://github.com/SaadArdati/plugin_kit).
 
 ## License

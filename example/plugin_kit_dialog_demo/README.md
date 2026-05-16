@@ -2,6 +2,8 @@
 
 A runnable Flutter showcase for [`plugin_kit_dialog`](../../packages/plugin_kit_dialog).
 
+**Live demo:** [plugin-kit-dialog-demo.pages.dev](https://plugin-kit-dialog-demo.pages.dev)
+
 The demo wires together 20 competing plugins (priority towers on `agent.model`,
 `agent.system_message`, `retry.policy`, and `search.provider`, plus locked and
 experimental tiers) and one `PluginKitVisualsPlugin` decorating every plugin,
