@@ -1,11 +1,11 @@
 ---
 title: The code_editor architecture tour
-description: A real Flutter app where every UI element beyond the text area is contributed by plugins. Tour of the shell, the plugin contribution model, and the priority-cascade formatter pipeline.
+description: A real Flutter app where plugins contribute extension surfaces while the shell owns core chrome. Tour of the shell, the plugin contribution model, and the priority-cascade formatter pipeline.
 ---
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-`example/code_editor/` is a Flutter capstone: a modular code editor where every UI element beyond the text area and tab bar is contributed by plugins. The shell knows zero specific plugins. It emits collection events, reads the descriptors plugins append, resolves widget factories from the registry, and renders.
+`example/code_editor/` is a Flutter capstone: a modular code editor where plugins contribute extension surfaces like side panels and toolbar actions. The shell still owns core chrome such as the chip bar, toolbar, tabs, and status bar. It emits collection events, reads the descriptors plugins append, resolves widget factories from the registry, and renders.
 
 This is the longest-running example in the repo and the most architecturally complete. If [the villain_lair examples](/examples/villain-lair/) teach the runtime concept-by-concept, code_editor teaches what those concepts look like assembled into a working app.
 
@@ -19,7 +19,7 @@ flutter pub get
 flutter run
 ```
 
-The app opens with a SQL document, a left panel for git, a bottom panel for the terminal and runner, and an AI assist panel on the right. Every one of those is a separate plugin.
+The app opens with a SQL document, a right panel for git, a bottom panel for the terminal and runner, and an AI assist panel on the right. Every one of those is a separate plugin.
 
 ## The architecture in one sentence
 
@@ -59,7 +59,7 @@ Take the terminal plugin (`lib/app/plugins/terminal_plugin.dart`):
    ```dart
    registry.registerSingleton<PanelWidgetFactory>(
      ServiceSlots.panel('terminal'),     // ServiceId('panel.terminal')
-     TerminalPanelFactory(),
+     () => TerminalPanelFactory(),
    );
    ```
 3. **The factory implements `PanelWidgetFactory.build(BuildContext)`** and returns the actual terminal widget.
@@ -75,7 +75,7 @@ The five shell plugins all follow the descriptor-plus-factory pattern. They live
 | Plugin | Contributes |
 |---|---|
 | `ai_assist_plugin` | A right-side AI panel with a fake chat surface. |
-| `git_plugin` | A left-side panel showing branch state and changed files. |
+| `git_plugin` | A right-side panel showing branch state and changed files. |
 | `minimap_plugin` | A right-edge mini-map of the document. |
 | `runner_plugin` | A toolbar action that runs the active document. |
 | `terminal_plugin` | A bottom panel with a terminal interface. |
@@ -90,20 +90,15 @@ The most architecturally interesting one is `formatter_pipeline`. It is split in
 
 **Base pipeline** (`formatter_pipeline.dart`) registers low-level hooks on `FormatDocumentEvent` at priority 0 (whitespace trimming, indent normalization). It is the foundation everything else builds on.
 
-**Language-specific plugins** (`dart_language`, `sql_language`) declare `formatter_pipeline` as a `dependencies` entry. They register additional hooks at higher priorities (10, 20, 50) for their language's idiomatic formatting. The runtime guarantees that if `formatter_pipeline` is disabled, both language plugins disable too, transitively.
+**Language-specific plugins** (`PluginId('dart_formatter')`, `PluginId('sql_formatter')`) declare `PluginId('formatter_pipeline')` as a dependency. They register additional `FormatDocumentEvent` hooks at priorities 3 and 5, while the base pipeline already runs priorities 0 and 10. The runtime guarantees that if `PluginId('formatter_pipeline')` is disabled, both formatter plugins disable too, transitively.
 
-Toggle the SQL plugin off in the dialog and:
+`PluginId('sql_formatter')` and `PluginId('formatter_pipeline')` are behavior plugins in `_behaviorPlugins()`. In this demo they are always on, and the chip bar only toggles the shell plugins in `_pluginLabels` (`PluginId('runner')`, `PluginId('git')`, `PluginId('terminal')`, `PluginId('ai_assist')`, `PluginId('minimap')`).
 
-1. The shell's `updateSessionSettings` runs.
-2. The runtime detects that `sql_language` is now disabled.
-3. `sql_language.detach` runs, cancelling its formatter hooks.
-4. The shell re-renders. The SQL panel still works (text is still there), but invoking format leaves the SQL-specific transforms unapplied.
+To observe the formatter dependency cascade, disable `PluginId('formatter_pipeline')` in session settings. The runtime then disables `PluginId('dart_formatter')` and `PluginId('sql_formatter')` transitively.
 
-Toggle `formatter_pipeline` itself off and dependency cascade kicks in: both `dart_language` and `sql_language` get disabled too. The shell's chip list reflects all three becoming inactive.
+## Live settings toggles
 
-## Settings dialog wired in
-
-The shell mounts [Plugin Kit Dialog](/guides/plugin-kit-dialog/) as the customization UI. The user opens it, toggles a plugin, and saves. The shell's `onSave` callback calls `runtime.updateSettings(...)` against the dialog's returned `RuntimeSettings`. The runtime reconciles. The shell re-emits collection events. The UI converges on the new state without a restart.
+The shell uses a built-in chip bar as its customization UI. Each toggle rebuilds `RuntimeSettings` from the chip state and calls `_runtime.updateSessionSettings(...)` immediately. The runtime reconciles, the shell re-emits collection events, and the UI converges on the new state without a restart.
 
 The example uses Plugin Kit on itself: every primitive the docs describe is visible in this one app, working end to end.
 
@@ -130,7 +125,7 @@ Three patterns that scale to non-editor apps:
   />
   <LinkCard
     title="Plugin Kit Dialog"
-    description="The customization UI the shell wires in for live reconciliation."
+    description="An optional reusable customization UI from the guide."
     href="/guides/plugin-kit-dialog/"
   />
   <LinkCard

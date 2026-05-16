@@ -6,6 +6,9 @@
     "copy-goldens": "bash scripts/copy-goldens.sh",
     "build-favicons": "node scripts/build-favicons.mjs",
     "build-package-logos": "node scripts/build-package-logos.mjs",
+    "build-social-banner": "node scripts/build-social-banner.mjs",
+    "build-package-banners": "node scripts/build-package-banners.mjs",
+    "build-example-favicons": "node scripts/build-example-favicons.mjs",
     "predev": "npm run copy-goldens",
     "prestart": "npm run copy-goldens",
     "prebuild": "npm run copy-goldens",
@@ -16,6 +19,7 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/sitemap": "^3.7.2",
     "@astrojs/starlight": "^0.39.2",
     "astro": "^6.3.1",
     "sharp": "^0.34.2",

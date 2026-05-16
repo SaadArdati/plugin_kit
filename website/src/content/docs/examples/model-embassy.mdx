@@ -61,7 +61,9 @@ Concepts: [Event Patterns](/concepts/events/#the-pre-commit-interception-pattern
 
 ### 05. Embassy configuration ([`bin/05_embassy_configuration.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/model_embassy/bin/05_embassy_configuration.dart))
 
-`ServiceSettings` plus `ConfigNode` inject per-session configuration into a `StatefulPluginService`. Three sessions share one runtime, and each session gets its own registered visa office instance that reads different `api_key`, `base_url`, and `default_model` values from the settings it was created with.
+`ServiceSettings` plus `ConfigNode` inject per-session configuration into a `StatefulPluginService`. Three sessions share one runtime, and each session gets its own registered visa office instance with different `api_key`, `base_url`, and `default_model` values set in `bin/05_embassy_configuration.dart`.
+
+The snippet below shows the `RuntimeSettings` and `Pin` shape for per-session service overrides.
 
 <Code code={extractRegion(runtimeSettings, 'runtime-settings-priority')} lang="dart"/>
 
@@ -69,7 +71,7 @@ Concepts: [Configuration](/concepts/configuration/), [Settings & Overrides](/gui
 
 ### 06. Full boarding process ([`bin/06_the_full_boarding_process.dart`](https://github.com/SaadArdati/plugin_kit/tree/main/example/model_embassy/bin/06_the_full_boarding_process.dart))
 
-The capstone. All three provider plugins register in one runtime. Three agents with distinct capability requirements each present a passport; the priority cascade (Anthropic 100, OpenAI 80, Ollama 50) routes each to the first office that can serve it. The returned visa carries a ready-to-use client.
+The capstone. All three provider plugins register in one runtime. Three agents with distinct capability requirements each present a passport; the priority cascade (Anthropic 100, OpenAI 80, Ollama 50) routes each to the first office that can serve it, and unmatched passports are rejected. A successful visa carries a ready-to-use client.
 
 If you are wiring multi-provider LLM routing in your own app, this scenario is the closest thing the docs have to a working template.
 

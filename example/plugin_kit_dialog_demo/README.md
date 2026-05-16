@@ -29,7 +29,7 @@ flutter run --target example/plugin_kit_dialog_demo/lib/main.dart
 - `lib/main.dart`: boots the runtime, mounts a `Scaffold` that opens
   `showPluginKitDialog`, and surfaces the merged `RuntimeSettings`
   returned by the dialog.
-- `lib/plugins/`: the 21 demo plugins, grouped by namespace and tier.
+- `lib/plugins/`: the 20 demo runtime plugins, grouped by namespace and tier.
 - `lib/plugin_visuals.dart`: the `PluginKitVisualsPlugin` decorating each
   axis (plugin, namespace, service).
 

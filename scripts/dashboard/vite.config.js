@@ -6,6 +6,7 @@ import { defineConfig } from 'vite';
 import { parseIntSafe, parseStartedAtFromFirstLine } from './src/loops/_helpers.js';
 import bugHuntDriver from './src/loops/bug-hunt.js';
 import coverageDriver from './src/loops/coverage.js';
+import decompDriver from './src/loops/decomp.js';
 import docAuditDriver from './src/loops/doc-audit.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,6 +19,7 @@ const drivers = new Map([
   [docAuditDriver.id, docAuditDriver],
   [bugHuntDriver.id, bugHuntDriver],
   [coverageDriver.id, coverageDriver],
+  [decompDriver.id, decompDriver],
 ]);
 
 async function safeReadText(filePath) {
@@ -84,10 +86,14 @@ async function readIterFiles(driver, iterDir) {
 
 async function buildIterSummaries(driver) {
   const runDir = getRunDir(driver);
-  const itersRoot = path.join(runDir, 'iters');
+  // Drivers can override the iter root subdir (e.g., decomp uses `steps/`)
+  // and the iter-dir naming regex (e.g., decomp uses `step-NN`).
+  const itersSubdir = driver.itersSubdir || 'iters';
+  const iterDirRegex = driver.iterDirRegex || /^iter-\d+$/;
+  const itersRoot = path.join(runDir, itersSubdir);
   const entries = await safeReaddir(itersRoot);
   const iterDirs = entries.filter(
-    (entry) => entry.isDirectory() && /^iter-\d+$/.test(entry.name),
+    (entry) => entry.isDirectory() && iterDirRegex.test(entry.name),
   );
 
   const [orchestratorLogText, stoplistText] = await Promise.all([
@@ -99,7 +105,11 @@ async function buildIterSummaries(driver) {
   const summaries = await Promise.all(
     iterDirs.map(async (entry) => {
       const id = entry.name;
-      const number = parseIntSafe(id.replace('iter-', ''), 0);
+      // Strip prefix (`iter-` or `step-`) and parse the trailing number.
+      // Suffixes like `0a` -> number=0 (sort by base index), driver column
+      // surfaces the human-readable id via files like `step.txt`.
+      const numberMatch = id.match(/(\d+)/);
+      const number = numberMatch ? parseIntSafe(numberMatch[1], 0) : 0;
       const iterDir = path.join(itersRoot, id);
       const files = await readIterFiles(driver, iterDir);
       const row = driver.computeRow(files, { ...ctx, iterNumber: number });
@@ -161,11 +171,13 @@ async function handleIters(driver, res) {
 }
 
 async function handleIterDetail(driver, id, res) {
-  if (!/^iter-\d+$/.test(id)) {
+  const iterDirRegex = driver.iterDirRegex || /^iter-\d+$/;
+  if (!iterDirRegex.test(id)) {
     sendJson(res, { error: 'invalid iter id' }, 400);
     return;
   }
-  const iterDir = path.join(getRunDir(driver), 'iters', id);
+  const itersSubdir = driver.itersSubdir || 'iters';
+  const iterDir = path.join(getRunDir(driver), itersSubdir, id);
   const files = await readIterFiles(driver, iterDir);
   sendJson(res, { id, ...files });
 }

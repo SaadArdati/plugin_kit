@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo-256.png" width="160" alt="Plugin Kit logo" />
+  <img src="assets/social-banner-1500x750-tagline.png" alt="Plugin Kit. plugin_kit, flutter_plugin_kit, and plugin_kit_dialog logos on a warm dark backdrop. A plugin runtime for Dart." />
 </p>
 
 # Plugin Kit
@@ -15,7 +15,7 @@ The difference is composition. DI wires up a fixed graph at startup. A plugin ru
 
 ![Plugin Kit Dialog showing the Plugins tab with toggleable enable/disable controls for each registered plugin](https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/example/plugin_kit_dialog_demo/test/goldens/plugins_tab_dark.png)
 
-*The `plugin_kit_dialog` companion package mounted on a real runtime. Toggling a tile runs the full lifecycle.*
+The `plugin_kit_dialog` companion package mounted on a real runtime. Toggling a tile updates the dialog draft, and saving runs your `onSave` callback; lifecycle changes happen when that callback updates the runtime.
 
 ## Most apps don't need this
 
@@ -90,7 +90,7 @@ No conditional, no flag, no branch. Drop the formal plugin, lower its priority, 
 
 Plugin Kit makes a class of bugs structurally impossible rather than situationally avoidable.
 
-- `attach` and `detach` are framework-enforced. Subscriptions opened during `attach` on a `StatefulPluginService` are tracked and cancelled after `detach` returns. "I forgot to cancel that subscription" stops being a bug class.
+- `attach` and `detach` are framework-enforced. Subscriptions opened during `attach` through `StatefulPluginServiceHelper` methods (`on`, `onRequest`, `onRequestSync`, `bind`) are tracked and cancelled after `detach` returns. Direct `context.bus.on(...)` calls are caller-managed.
 - Lifecycle failures aggregate. `PluginLifecycleException` carries the named phase (`attachGlobal`, `attachSession`, `updateSessionSettings`) and every plugin's error. One plugin throwing at startup does not abort the others; it surfaces as part of a labelled aggregate.
 - `enabledPlugins` (settings-intent) and `attachedPlugins` (post-dependency-cascade runtime-truth) are distinct, queryable sets. A plugin whose dependency went missing does not silently advertise itself as running.
 - Reconciliation is transactional. Per-plugin attach failures roll back to honest state (failed plugin out of the enabled set, services unregistered), and `updateSettings` rolls every reconciled session and the global scope back to the previous snapshot on any mid-loop failure. The stored `RuntimeSettings` snapshot stays at the previous value, so the caller never sees split-brain.

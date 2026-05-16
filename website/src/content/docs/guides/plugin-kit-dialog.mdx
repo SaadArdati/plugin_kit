@@ -46,7 +46,7 @@ Enable and disable plugins live. Stable plugins toggle freely; experimental plug
 
 ### Services tab
 
-Each resolved winner in `runtime.sessions.lastOrNull?.registry ?? runtime.globalRegistry` that ships a `UiConfigurableCapability` becomes an editable card. Text, numbers, dropdowns, switches, multiline, password, grouped, or custom fields are all supported.
+Each resolved winner in `runtime.sessions.lastOrNull?.registry ?? runtime.globalRegistry` that ships a `UiConfigurableCapability` becomes an editable card. Text, numbers, dropdowns, switches, multiline, password, and grouped fields are supported.
 
 ### Advanced tab
 
@@ -89,7 +89,7 @@ Visuals are a Flutter-only concern, so the canonical attachment path is a single
 
 Because the visuals plugin lives in your host app (which has Flutter), Dart-only plugins still get icons, labels, and colors without importing Flutter. The decoration is keyed by `PluginId`, `Namespace`, or `ServiceId`, so the host owns the map and the plugin source code stays portable.
 
-The plugin registers at priority `1000`, above the default registry priority of `500`, so host overrides beat anything a Flutter plugin self-attaches from its own `register()`. Unknown keys (a plugin or service that does not currently exist) are accepted silently; this lets you keep visuals for plugins that may be enabled later. When no visual is found, cards fall back to a generic gear icon and the theme's primary color.
+The plugin registers at priority `1000`, above the default registry priority of `500`, so host overrides beat visuals a Flutter plugin self-attaches at default priority from its own `register()`. Registrations above `1000` still win. Unknown keys (a plugin or service that does not currently exist) are accepted silently; this lets you keep visuals for plugins that may be enabled later. When no visual is found, cards fall back to a generic gear icon and the theme's primary color.
 
 ## Custom field renderers
 

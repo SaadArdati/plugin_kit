@@ -350,7 +350,16 @@ class ServiceRegistry {
       for (final entry in _registry.entries)
         entry.key: [for (final wrapper in entry.value) wrapper._clone()],
     },
-    overrides: [..._overrides],
+    overrides: [
+      for (final override in _overrides)
+        LocalPluginOverride(
+          plugin: override.plugin,
+          serviceId: override.serviceId,
+          enabled: override.enabled,
+          priority: override.priority,
+          settings: Map<String, dynamic>.from(override.settings),
+        ),
+    ],
   );
 
   /// Replace the current overrides and re-sort affected registration

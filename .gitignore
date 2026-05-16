@@ -31,10 +31,11 @@ firebase-debug.log
 **/test/failures/
 **/failures/
 
-# doc-audit-loop / bug-hunt-loop / coverage-loop runs (ephemeral)
+# doc-audit-loop / bug-hunt-loop / coverage-loop / decomp-loop runs (ephemeral)
 scripts/doc-audit-loop/runs/
 scripts/bug-hunt-loop/runs/
 scripts/coverage-loop/runs/
+scripts/decomp-loop/runs/
 
 # generalized dashboard build output
 scripts/dashboard/dist/

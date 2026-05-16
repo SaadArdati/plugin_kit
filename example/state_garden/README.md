@@ -1,8 +1,8 @@
 # state_garden
 
-A workshop where the same plugin_kit chat protocol is bridged to seven
-Flutter state management libraries side by side. Same plugin_kit soil,
-seven different state-holder blooms.
+A workshop where the same plugin_kit chat protocol is bridged to ten
+Flutter state-management recipes side by side. Same plugin_kit soil,
+ten different state-holder blooms.
 
 **Live demo:** [plugin-kit.saad-ardati.dev/state-garden](https://plugin-kit.saad-ardati.dev/state-garden)
 

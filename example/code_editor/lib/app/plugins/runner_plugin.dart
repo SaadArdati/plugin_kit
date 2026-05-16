@@ -6,7 +6,45 @@ import 'package:plugin_kit/plugin_kit.dart';
 
 import '../contributions.dart';
 import '../factories.dart';
-import '../theme.dart';
+
+class RunnerPlugin extends SessionPlugin {
+  static const id = PluginId('runner');
+
+  @override
+  PluginId get pluginId => id;
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<PanelWidgetFactory>(
+      ServiceSlots.panel('console'),
+      _ConsolePanelFactory.new,
+      capabilities: const {
+        UiConfigurableCapability(
+          label: 'Runner',
+          description: 'Console output cadence and reset behavior.',
+          fields: [
+            NumberConfigField(
+              key: 'tickMs',
+              label: 'Tick interval (ms)',
+              helperText: 'Delay between mock output lines while running.',
+              min: 100,
+              max: 1000,
+              step: 50,
+              isInteger: true,
+              defaultValue: 300,
+            ),
+            BoolConfigField(
+              key: 'autoClearOnRun',
+              label: 'Auto-clear on Run',
+              helperText: 'Wipe the console each time you press Run.',
+              defaultValue: true,
+            ),
+          ],
+        ),
+      },
+    );
+  }
+}
 
 class _ConsolePanel extends StatelessWidget {
   const _ConsolePanel({required this.lines, required this.isRunning});
@@ -16,33 +54,30 @@ class _ConsolePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final mono = theme.textTheme.bodyMedium?.copyWith(fontFamily: 'monospace');
     return Container(
-      color: EditorColors.canvas,
-      padding: const EdgeInsets.all(8),
+      color: theme.colorScheme.surface,
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (isRunning)
             Padding(
-              padding: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.only(bottom: 6),
               child: Row(
                 children: [
                   SizedBox(
                     width: 12,
                     height: 12,
                     child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: EditorColors.success,
+                      color: theme.colorScheme.tertiary,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Running...',
-                    style: TextStyle(
-                      color: EditorColors.success,
-                      fontSize: 12,
-                      fontFamily: 'monospace',
-                    ),
+                    style: mono?.copyWith(color: theme.colorScheme.tertiary),
                   ),
                 ],
               ),
@@ -52,10 +87,8 @@ class _ConsolePanel extends StatelessWidget {
                 ? Center(
                     child: Text(
                       'Press Run to start',
-                      style: TextStyle(
-                        color: EditorColors.textMuted,
-                        fontSize: 12,
-                        fontFamily: 'monospace',
+                      style: mono?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   )
@@ -67,18 +100,12 @@ class _ConsolePanel extends StatelessWidget {
                           line.startsWith('Error') || line.startsWith('!');
                       final isSuccess =
                           line.startsWith('✓') || line.contains('completed');
-                      return Text(
-                        line,
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                          color: isError
-                              ? EditorColors.error
-                              : isSuccess
-                              ? EditorColors.success
-                              : EditorColors.textPrimary,
-                        ),
-                      );
+                      final color = isError
+                          ? theme.colorScheme.error
+                          : isSuccess
+                          ? theme.colorScheme.tertiary
+                          : theme.colorScheme.onSurface;
+                      return Text(line, style: mono?.copyWith(color: color));
                     },
                   ),
           ),
@@ -95,9 +122,20 @@ class _ConsolePanelFactory extends SessionStatefulPluginService
   Timer? _timer;
   var _outputIndex = 0;
 
+  int get _tickMs => (config.get<num>('tickMs') ?? 300).toInt();
+  bool get _autoClear => config.get<bool>('autoClearOnRun') ?? true;
+
   @override
   Widget build(BuildContext context) =>
       _ConsolePanel(lines: List.of(_lines), isRunning: _isRunning);
+
+  @override
+  void onSettingsInjected() {
+    // Initial injection can run before attach() binds the context; emit only
+    // when context is live. Subsequent injections (via updateSessionSettings)
+    // happen with context bound, so the live editor sees the refresh.
+    if (hasContext) emit(const UIRefreshRequest());
+  }
 
   @override
   void attach() {
@@ -110,8 +148,8 @@ class _ConsolePanelFactory extends SessionStatefulPluginService
               ? Icons.stop.codePoint
               : Icons.play_arrow.codePoint,
           colorValue: _isRunning
-              ? EditorColors.error.toARGB32()
-              : EditorColors.success.toARGB32(),
+              ? const Color(0xFFE55765).toARGB32()
+              : const Color(0xFF57A64A).toARGB32(),
         ),
       );
     });
@@ -151,10 +189,10 @@ class _ConsolePanelFactory extends SessionStatefulPluginService
   Future<void> _startRun() async {
     _isRunning = true;
     _outputIndex = 0;
-    _lines = [];
+    if (_autoClear) _lines = [];
     await emit(const UIRefreshRequest());
 
-    _timer = Timer.periodic(const Duration(milliseconds: 300), (timer) async {
+    _timer = Timer.periodic(Duration(milliseconds: _tickMs), (timer) async {
       if (_outputIndex < runnerFakeOutput.length) {
         _lines.add(runnerFakeOutput[_outputIndex]);
         _outputIndex++;
@@ -178,18 +216,5 @@ class _ConsolePanelFactory extends SessionStatefulPluginService
   @override
   Future<void> detach() async {
     _timer?.cancel();
-  }
-}
-
-class RunnerPlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('runner');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<PanelWidgetFactory>(
-      ServiceSlots.panel('console'),
-      () => _ConsolePanelFactory(),
-    );
   }
 }

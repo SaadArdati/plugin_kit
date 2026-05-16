@@ -235,6 +235,21 @@ abstract class StatefulPluginService<PKC extends PluginContext>
         StackTrace.current,
       ));
     }
+    final List<EventSubscription> bindingReentrySubs = [...activeSubscriptions];
+    activeSubscriptions.clear();
+    for (final sub in bindingReentrySubs) {
+      try {
+        await sub.cancel();
+      } catch (e, st) {
+        if (_isFatalError(e)) rethrow;
+        _pluginLog.severe(
+          '$serviceId subscription cancel threw during unbind',
+          e,
+          st,
+        );
+        stepFailures.add(('$serviceId.subscription.cancel', e, st));
+      }
+    }
     _context = null;
     return stepFailures;
   }

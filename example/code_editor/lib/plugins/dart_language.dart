@@ -7,6 +7,23 @@ library;
 import 'package:code_editor/code_editor.dart';
 import 'package:plugin_kit/plugin_kit.dart';
 
+class DartLanguagePlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('dart_language');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<DartAnalyzer>(
+      const ServiceId('dart_analyzer'),
+      DartAnalyzer.new,
+    );
+    registry.registerSingleton<_DartCompletionHandler>(
+      const ServiceId('completion_handler'),
+      _DartCompletionHandler.new,
+    );
+  }
+}
+
 class DartAnalyzer implements LanguageService {
   @override
   String get languageId => 'dart';
@@ -48,23 +65,6 @@ class DartAnalyzer implements LanguageService {
         source: 'dart_analyzer',
       ),
     ];
-  }
-}
-
-class DartLanguagePlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('dart_language');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<DartAnalyzer>(
-      const ServiceId('dart_analyzer'),
-      () => DartAnalyzer(),
-    );
-    registry.registerSingleton<_DartCompletionHandler>(
-      const ServiceId('completion_handler'),
-      () => _DartCompletionHandler(),
-    );
   }
 }
 

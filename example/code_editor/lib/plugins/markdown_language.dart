@@ -7,6 +7,19 @@ library;
 import 'package:code_editor/code_editor.dart';
 import 'package:plugin_kit/plugin_kit.dart';
 
+class MarkdownLanguagePlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('markdown_language');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<MarkdownAnalyzer>(
+      const ServiceId('markdown_analyzer'),
+      MarkdownAnalyzer.new,
+    );
+  }
+}
+
 class MarkdownAnalyzer implements LanguageService {
   @override
   String get languageId => 'markdown';
@@ -39,18 +52,5 @@ class MarkdownAnalyzer implements LanguageService {
         source: 'markdown_analyzer',
       ),
     ];
-  }
-}
-
-class MarkdownLanguagePlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('markdown_language');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<MarkdownAnalyzer>(
-      const ServiceId('markdown_analyzer'),
-      () => MarkdownAnalyzer(),
-    );
   }
 }

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/logo-256.png" width="160" alt="Plugin Kit logo" />
+  <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/social-banner-plugin_kit-1500x500.png" alt="plugin_kit. A plugin runtime for Dart." />
 </p>
 
 <p align="center">

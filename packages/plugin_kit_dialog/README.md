@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/plugin_kit_dialog-256.png" width="160" alt="plugin_kit_dialog logo" />
+  <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/social-banner-plugin_kit_dialog-1500x500.png" alt="plugin_kit_dialog. A live customization dialog for plugin_kit." />
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@ you writing a settings screen per plugin set.
 `plugin_kit` carries the dart-only declaration types (`UiConfigurableCapability`, `ConfigField`, etc). `plugin_kit_dialog` adds the Flutter UI.
 
 - **Plugins tab**: enable/disable each plugin; locked entries can't be toggled, experimental ones are flagged.
-- **Services tab**: every service that ships a `UiConfigurableCapability` becomes an editable card. Edit text,
+- **Services tab**: each resolved winning service registration that ships a `UiConfigurableCapability` becomes an editable card. Edit text,
   numbers, dropdowns, switches, multiline, password, grouped, or custom fields.
 - **Advanced tab**: registry inspector with priority chains, winners, shadowed contenders, plus a JSON view of the
   working settings.
@@ -49,7 +49,7 @@ Future<void> openConfigDialog(
 }
 ```
 
-That's it. If your plugins already attach `UiConfigurableCapability`, the Services tab populates itself.
+That's it. If your plugins already attach `UiConfigurableCapability`, the Services tab populates itself from global registrations, then from the most recently created session registry after a session starts.
 
 ## Declaring configurable services
 

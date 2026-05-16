@@ -12,8 +12,8 @@ import 'package:plugin_kit/plugin_kit.dart';
 /// Conflict semantics: this plugin registers above the default priority used
 /// when a Flutter plugin self-attaches its own visuals from its own
 /// `register()`. Two host plugins decorating the same key resolve via
-/// standard registry priority then registration order; pass distinct
-/// [pluginId]s to make ownership traceable in the registry inspector.
+/// standard registry priority; pass distinct [pluginId]s to make ownership
+/// traceable in the registry inspector.
 ///
 /// Unknown keys (a [PluginId], [Namespace], or [ServiceId] that no plugin
 /// currently registers) are accepted silently. The visual is retained so
@@ -101,7 +101,6 @@ class PluginKitVisualsPlugin extends GlobalPlugin {
 
   @override
   void register(ScopedServiceRegistry registry) {
-    // New three-axis registrations.
     for (final MapEntry(key: pid, value: visual) in pluginVisuals.entries) {
       registry.registerSingleton<PluginKitVisual>(
         visualFor(pid),

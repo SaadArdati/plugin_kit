@@ -189,15 +189,6 @@ Future<void> main() async {
     TrapDepartmentPlugin(),
   ]);
 
-  // settingsStream publishes every reconciled PluginSettings.
-  final settingsSub = runtime.settingsStream.listen((settings) {
-    final enabled = settings.plugins.entries
-        .where((e) => e.value.enabled)
-        .map((e) => e.key)
-        .toList();
-    print('\n  [Settings Stream] Active plugins: $enabled');
-  });
-
   // Plugin enablement is set at init (global scope). Service overrides
   // target session plugins, so they flow in at createSession time.
   final initialPluginSettings = RuntimeSettings(
@@ -208,6 +199,16 @@ Future<void> main() async {
     },
   );
   runtime.init(settings: initialPluginSettings);
+
+  // settingsStream is available after init and publishes every new
+  // RuntimeSettings snapshot.
+  final settingsSub = runtime.settingsStream.listen((settings) {
+    final enabled = settings.plugins.entries
+        .where((e) => e.value.enabled)
+        .map((e) => e.key)
+        .toList();
+    print('\n  [Settings Stream] Active plugins: $enabled');
+  });
 
   // Service config targets `pluginId:serviceId` keys. That's how
   // settings reach a PluginService: its `config` field is filled from
@@ -302,8 +303,8 @@ Future<void> main() async {
 
   print('\n=== Scenario C: updateSettingsSnapshot (No Reconciliation) ===');
   // updateSettingsSnapshot swaps settings on the stream without running
-  // attach/detach/onPluginSettingsChanged. The service's config is
-  // updated in place; the next resolve or read reflects it.
+  // attach/detach/onPluginSettingsChanged. It does not update live
+  // session services until a reconcile path runs.
   runtime.updateSettingsSnapshot(
     cuts.copyWith(
       services: {

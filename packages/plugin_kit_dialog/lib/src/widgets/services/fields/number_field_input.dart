@@ -42,7 +42,11 @@ class _NumberFieldInputState extends State<NumberFieldInput> {
   }
 
   num _coerceForWrite(double value) {
-    return widget.field.isInteger ? value.round() : value;
+    // Integers truncate the fractional part (toward zero) rather than
+    // rounding. `1.6 -> 1`, `-1.6 -> -1`. Rounding (which `1.6 -> 2`)
+    // surprised users who typed a decimal into an integer field expecting
+    // their leading digits to stick.
+    return widget.field.isInteger ? value.truncate() : value;
   }
 
   @override
@@ -164,8 +168,12 @@ class _NumberFieldInputState extends State<NumberFieldInput> {
       return;
     }
 
+    // Integer fields: try int first, then fall back to parsing a double and
+    // TRUNCATING (matching _coerceForWrite). The previous fallback rounded,
+    // so `"1.6"` became `2`; users typing into an integer field expect the
+    // fractional part to be discarded, not rounded.
     final parsed = widget.field.isInteger
-        ? (int.tryParse(trimmed) ?? double.tryParse(trimmed)?.round())
+        ? (int.tryParse(trimmed) ?? double.tryParse(trimmed)?.truncate())
         : double.tryParse(trimmed);
     if (parsed == null) {
       return;

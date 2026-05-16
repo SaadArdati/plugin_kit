@@ -685,9 +685,25 @@ class EventBus {
     // Forward event to all bound callbacks (skip internal events). Iterate
     // a snapshot so a callback that calls its cancel closure mid-dispatch
     // doesn't ConcurrentModificationError on _eventBindings.
+    //
+    // Bind callbacks must not be able to TRUNCATE the typed cascade via
+    // .stop(); that is the cascade contract of typed handlers only (see
+    // reference/event-bus-and-events.mdx). Since .stop(value) sets both
+    // `_stopped` and `event` on the shared envelope, both must be reverted
+    // when a bind callback called it - reverting only `_stopped` would let
+    // bind callbacks silently override the payload via the .stop side
+    // channel. Bind callbacks that mutate `event` WITHOUT calling .stop()
+    // are unaffected by this restore; their mutation still propagates to
+    // typed handlers (intentional: covered by the iter_20 regression
+    // test).
     if (!internal) {
+      final preBindEvent = wrapped.event;
       for (final callback in List<EventBindingCallback>.of(_eventBindings)) {
         callback(wrapped);
+      }
+      if (wrapped.stopped) {
+        wrapped.event = preBindEvent;
+        wrapped._stopped = false;
       }
     }
 
@@ -734,12 +750,17 @@ class EventBus {
     _checkNotDisposed();
     final wrapped = EventEnvelope<T>(event: event, identifier: identifier);
 
-    // Forward event to all bound callbacks (skip internal events). Iterate
-    // a snapshot so a callback that calls its cancel closure mid-dispatch
-    // doesn't ConcurrentModificationError on _eventBindings.
+    // Bind callbacks cannot truncate the typed cascade via .stop(); mirror
+    // the revert pattern in emit() above. Non-.stop() mutations to `event`
+    // still propagate to typed handlers.
     if (!internal) {
+      final preBindEvent = wrapped.event;
       for (final callback in List<EventBindingCallback>.of(_eventBindings)) {
         callback(wrapped);
+      }
+      if (wrapped.stopped) {
+        wrapped.event = preBindEvent;
+        wrapped._stopped = false;
       }
     }
 

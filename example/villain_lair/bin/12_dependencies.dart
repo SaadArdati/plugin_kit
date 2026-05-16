@@ -8,8 +8,8 @@
 /// - `Plugin.dependencies`: declaring required plugin ids
 /// - Auto-disable when a dependency is missing or disabled
 /// - Transitive disable through a chain (A depends on B depends on C)
-/// - `PluginFeatureFlags.experimental`: opt-in enabling
-/// - `PluginFeatureFlags.locked`: cannot be disabled
+/// - `FeatureFlag.experimental`: opt-in enabling
+/// - `FeatureFlag.locked`: cannot be disabled
 library;
 
 import 'package:plugin_kit/plugin_kit.dart';

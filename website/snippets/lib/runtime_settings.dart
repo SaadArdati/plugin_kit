@@ -142,13 +142,9 @@ RuntimeSettings demonstrateSettingsWithPin() {
 /// The correct way to clear a priority override on [ServiceSettings].
 ///
 /// [copyWith(priority: null)] keeps the existing priority because the
-/// implementation uses [??]. Construct a fresh instance to clear it.
+/// implementation uses [??]. Use [ServiceSettings.withClearedPriority].
 ServiceSettings clearPriority(ServiceSettings existing) {
-  return ServiceSettings(
-    enabled: existing.enabled,
-    config: existing.config,
-    // priority intentionally omitted, so it falls back to the default.
-  );
+  return existing.withClearedPriority();
 }
 // #enddocregion service-settings-clear-priority
 

@@ -255,7 +255,7 @@ Within a scope, every enabled plugin finishes each phase before any plugin start
 |---|---|---|
 | `register` | During `runtime.init` (global) or `runtime.createSession` (session) | `plugin.register(scopedRegistry)` populates the registry. No bus access yet. |
 | `attach` | After every plugin in the scope has registered | The runtime attaches owned `StatefulPluginService`s, then calls `plugin.attach(context)`. Plugins subscribe to events here. |
-| `onPluginSettingsChanged` | During `updateGlobalSettings` or `updateSessionSettings` for plugins enabled both before and after | Receives `oldContext` and `newContext` so the plugin can diff and react. |
+| `onPluginSettingsChanged` | During `updateGlobalSettings` or `updateSessionSettings` for every plugin enabled after the update (including newly enabled plugins) | Receives `oldContext` and `newContext` so the plugin can diff and react. |
 | `detach` | During `dispose`, or during a settings update for a plugin transitioning enabled to disabled | The runtime calls `plugin.detach(context)`, detaches owned services, cancels tracked subscriptions, and clears the bound context. |
 
 The practical rule: anything that depends on another plugin belongs in `attach`. At `register` time, peers may not have registered yet.

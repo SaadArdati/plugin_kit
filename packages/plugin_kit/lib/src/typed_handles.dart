@@ -147,7 +147,7 @@ extension type const Namespace(String value) implements String {
   ///
   /// ```dart
   /// const agent = Namespace('agent');
-  /// registry.registerSingleton(agent.service('model'), ModelImpl());
+  /// registry.registerSingleton(agent.service('model'), () => ModelImpl());
   /// context.resolve<Model>(agent.service('model'));
   /// ```
   ServiceId service(String id) => ServiceId('$value.$id');
@@ -158,7 +158,7 @@ extension type const Namespace(String value) implements String {
   ///
   /// ```dart
   /// const agent = Namespace('agent');
-  /// registry.registerSingleton(agent('model'), ModelImpl());
+  /// registry.registerSingleton(agent('model'), () => ModelImpl());
   /// context.resolve<Model>(agent('model'));
   /// ```
   ServiceId call(String id) => service(id);

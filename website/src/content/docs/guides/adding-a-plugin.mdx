@@ -119,8 +119,9 @@ task completes:
 <Code code={extractRegion(pluginServicesSource, 'adding-plugin-notification-reactive')} lang="dart" />
 
 The plugin class itself did not override `attach(...)`. When the session
-starts, the framework walks every *winning* `StatefulPluginService` the plugin
-registered and attaches each one before invoking the plugin's own
+starts, the framework walks every registered, non-disabled
+`StatefulPluginService` (factories skipped) the plugin owns and attaches
+each one before invoking the plugin's own
 `attach(...)`. The watcher subscribes to `TaskCompleted` from inside its
 own `attach()`, and the framework cancels that subscription when the
 service detaches.

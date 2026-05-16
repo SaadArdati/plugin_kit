@@ -1,8 +1,9 @@
 ---
-title: Plugin Kit
-description: A Dart plugin runtime for apps that have grown into platforms. Replaceable services, isolated sessions, settings that reshape the running system.
+title: 'Plugin Kit: A Dart plugin runtime for apps that have grown into platforms'
+description: A Dart plugin runtime for apps that have grown into platforms. Replaceable services, isolated sessions, settings that reshape the running system, and a drop-in Flutter dialog to flip plugins live.
 template: splash
 hero:
+  title: Plugin Kit
   tagline: For apps where "just add a flag" has become the beginning of every bug.
   actions:
     - text: Introduction
@@ -15,6 +16,38 @@ hero:
       link: https://github.com/SaadArdati/plugin_kit
       icon: external
       variant: minimal
+head:
+  - tag: meta
+    attrs:
+      property: 'og:type'
+      content: 'website'
+  - tag: script
+    attrs:
+      type: 'application/ld+json'
+    content: |
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Plugin Kit",
+        "description": "A Dart plugin runtime for apps that have grown into platforms. Replaceable services, isolated sessions, settings that reshape the running system, and a drop-in Flutter dialog to flip plugins live.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Cross-platform",
+        "url": "https://plugin-kit.saad-ardati.dev",
+        "image": "https://plugin-kit.saad-ardati.dev/og.png",
+        "programmingLanguage": ["Dart", "Flutter"],
+        "license": "https://github.com/SaadArdati/plugin_kit/blob/main/LICENSE",
+        "codeRepository": "https://github.com/SaadArdati/plugin_kit",
+        "author": {
+          "@type": "Person",
+          "name": "Saad Ardati",
+          "url": "https://saad-ardati.dev"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
 ---
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';

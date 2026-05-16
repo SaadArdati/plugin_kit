@@ -48,13 +48,25 @@ mixin PluginSessionListener {
   }
 
   /// Cancel every active subscription. No-op if not attached.
-  void detachSubscriptions() {
+  ///
+  /// Returns a [Future] that completes after every [EventSubscription.cancel]
+  /// future has resolved. Callers that need to know subscriptions have
+  /// fully stopped delivering events (e.g. before disposing the session or
+  /// asserting on observed events in tests) must `await` this future. Old
+  /// callers that ignored the return type still work; the cancellation
+  /// just isn't synchronously observable.
+  ///
+  /// `EventSubscription.cancel()` is async: until it resolves, an in-flight
+  /// emit can still deliver to the original handler. Old code that ignored
+  /// `sub.cancel()`'s future allowed a documented custom binding to keep
+  /// firing after detach. Closes
+  /// ISSUE-session-listener-detach-drops-cancel-future.
+  Future<void> detachSubscriptions() async {
     if (!_attached) return;
     _attached = false;
-    for (final sub in _eventSubs) {
-      sub.cancel();
-    }
+    final pending = [for (final sub in _eventSubs) sub.cancel()];
     _eventSubs.clear();
+    await Future.wait(pending);
   }
 
   /// Helper to build a standard [EventBinding] for the given handler and

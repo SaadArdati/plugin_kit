@@ -43,7 +43,7 @@ export default {
     { id: 'unfixable', label: 'Unfix', kind: 'number' },
   ],
 
-  buildOrchestratorContext(orchestratorLogText) {
+  buildOrchestratorContext({ orchestratorLogText } = {}) {
     return {
       orchestratorStatusByIter: parseOrchestratorVerifierStatuses(orchestratorLogText || ''),
     };

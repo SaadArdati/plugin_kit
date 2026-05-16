@@ -170,7 +170,7 @@ The two patterns worth remembering when designing a request type:
 
 - **Make `Response` nullable.** `return null` means "I concede; let the next handler try."
 That is how a chain of handlers falls through until one provides an answer.
-A non-nullable response forces every handler to win or throw.
+Non-nullable responses still cascade because handlers can concede with `null`.
 - **Match `request` to `maybeRequest` based on caller expectations.**
 `request` throws when nothing answers; `maybeRequest` returns `null`.
 Pick the one that matches what the call site actually wants to do on a missed handler.

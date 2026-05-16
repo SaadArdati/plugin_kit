@@ -34,7 +34,10 @@ void main() {
         create: () => eagerInstance,
       );
 
-      final services = registry.getPluginServices(pluginId, skipFactories: true);
+      final services = registry.getPluginServices(
+        pluginId,
+        skipFactories: true,
+      );
 
       expect(factoryBuilds, 0);
       expect(lazyBuilds, 1);

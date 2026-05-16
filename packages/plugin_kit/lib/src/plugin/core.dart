@@ -117,7 +117,7 @@ abstract class Plugin {
   /// Plugin ids this plugin depends on. Defaults to empty.
   ///
   /// The [PluginRuntime] auto-disables a plugin whose dependency is not
-  /// enabled and logs a warning. Locked plugins with unsatisfied
+  /// enabled and logs at info. Locked plugins with unsatisfied
   /// dependencies are kept enabled and logged at severe.
   Set<PluginId> get dependencies => const {};
 

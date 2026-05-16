@@ -38,7 +38,10 @@ void main() {
         create: () => 'low-${++lowBuilds}',
       );
 
-      expect(registry.resolveCapability<_TaggedCapability>(serviceId), same(lowCapability));
+      expect(
+        registry.resolveCapability<_TaggedCapability>(serviceId),
+        same(lowCapability),
+      );
       expect(highBuilds, 0);
       expect(lowBuilds, 0);
       expect(registry.resolve<String>(serviceId), 'low-1');

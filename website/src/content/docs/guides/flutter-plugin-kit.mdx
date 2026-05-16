@@ -119,7 +119,7 @@ The scope reacts correctly when you swap arguments mid-tree: switching from auto
 
 A mixin on `State<W>`. Two methods:
 
-- `listen<E>(void Function(EventEnvelope<E> envelope) handler)`: register a handler for events of type `E`. Returns nothing; cancellation is automatic on `dispose`. The handler receives the envelope, so `envelope.identifier`, `envelope.event`, and `envelope.stopped` stay reachable.
+- `listen<E>(void Function(EventEnvelope<E> envelope) handler, {int priority = 0, String? identifier})`: register a handler for events of type `E`. Returns nothing; cancellation is automatic on `dispose`. The handler receives the envelope, so `envelope.identifier`, `envelope.event`, and `envelope.stopped` stay reachable.
 - `rebuildOn<E>([bool Function(EventEnvelope<E> envelope)? when])`: register a setState-trigger handler for events of type `E`, optionally filtered by `when`. The predicate receives the envelope too, so filtering can gate on `identifier`, payload, or stop state.
 
 Both are callable from `initState` (and any later lifecycle callback). Behind the scenes the mixin records each `listen` / `rebuildOn` call as a descriptor and attaches descriptors against the active session as soon as one becomes available, typically the next `didChangeDependencies` after `initState`. There is no `_wired` flag, no "subscribe in `didChangeDependencies` instead" caveat.
@@ -149,9 +149,9 @@ The mixin re-attaches descriptors automatically when the session changes (a `Plu
 - Your `Provider`/`ChangeNotifierProvider` boundary needs a real `Listenable` to compose with `Listenable.merge`, signals, or other listenables.
 - You're writing a state holder (Cubit, controller, AsyncNotifier) that wants to expose "the latest event of type `E`" through its own surface, and the host doesn't have access to a `BuildContext`.
 - The session lives outside `PluginSessionScope` (e.g., in a service locator) and `watchEvent` can't find it.
-- You need `priority` or `identifier` on the subscription. `watchEvent` registers as a default-priority, no-identifier handler; `PluginEventNotifier`'s constructor forwards both to `EventBus.on` for callers who need scoped delivery or a non-default cascade position.
+- You need `priority` or `identifier` on the subscription. `watchEvent` registers as a no-identifier handler at `EventBus.on`'s default priority (`Priority.normal`). `PluginEventNotifier` forwards both to `EventBus.on`, but its constructor default `priority` is `0`, so pass `Priority.normal` if you want the bus default.
 
-<Code code={extractRegion(flutterIntegrationSource, 'flutter-plugin-event-notifier')} lang="dart" />
+<Code code={extractRegion(flutterIntegrationSource, 'flutter-plugin-kit-provider-notifier')} lang="dart" />
 
 It also implements `ValueListenable<E?>`, so `ValueListenableProvider`, `ValueListenableBuilder`, and `Listenable.merge` consume it without ceremony.
 

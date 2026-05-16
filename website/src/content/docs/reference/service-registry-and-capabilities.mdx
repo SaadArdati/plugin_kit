@@ -224,7 +224,7 @@ instance.
 
 | Wrapper | Built when | Built how often | Reach for it when |
 |---|---|---|---|
-| `SingletonWrapper<T>` | At registration | Once, by the caller | The instance already exists, or eager construction is desired |
+| `SingletonWrapper<T>` | At registration | Once, by the registry (via your factory) | The instance already exists, or eager construction is desired |
 | `LazySingletonWrapper<T>` | On first `provide()` | Once, by the registry | Setup is expensive but shared state is fine |
 | `FactoryWrapper<T>` | On every `provide()` | Per resolve | Service is cheap and stateless, or callers need fresh instances |
 

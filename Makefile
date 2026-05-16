@@ -12,6 +12,7 @@
         doc-audit doc-audit-resume doc-audit-dashboard \
         bug-hunt bug-hunt-resume bug-hunt-dashboard \
         coverage coverage-resume \
+        decomp decomp-resume decomp-dashboard \
         dashboard
 
 # Default target. Run the full CI pipeline AND golden tests.
@@ -188,6 +189,26 @@ coverage-resume:
 		--resume "$$(cd scripts/coverage-loop/runs/latest && pwd -P)" \
 		--max $(COVERAGE_MAX)
 
+# --- Runtime decomposition autonomous loop ---------------------------------
+
+# Execute one step of the runtime decomposition spec
+# (docs/superpowers/plans/2026-05-16-runtime-decomposition.md). Each step
+# runs the codex executor, then gates (analyze, test, grep, signatures),
+# then the codex reviewer. On success the diff is staged and the loop STOPS;
+# the user reviews and commits manually. `make decomp-resume` continues from
+# the latest run dir.
+decomp:
+	bash scripts/decomp-loop/orchestrator.sh
+
+decomp-resume:
+	bash scripts/decomp-loop/orchestrator.sh \
+		--resume "$$(cd scripts/decomp-loop/runs/latest && pwd -P)"
+
+decomp-dashboard:
+	cd scripts/dashboard && \
+		[ -d node_modules ] || npm install && \
+		npm run dev -- --open '/#loop=decomp'
+
 clean:
 	flutter clean
 	find packages example website -type d -name .dart_tool -prune -exec rm -rf {} +
@@ -210,7 +231,10 @@ help:
 	@echo "  make bug-hunt-resume   Resume the most recent bug-hunt run."
 	@echo "  make coverage       Run the autonomous coverage-completion loop (mutation-gated)."
 	@echo "  make coverage-resume   Resume the most recent coverage run."
+	@echo "  make decomp         Execute next step of the runtime decomposition spec."
+	@echo "  make decomp-resume     Resume the most recent decomp run."
 	@echo "  make dashboard      Start the live loop dashboard at :4322 (toggle loops in UI)."
 	@echo "  make doc-audit-dashboard   Alias: dashboard with #loop=doc-audit selected."
 	@echo "  make bug-hunt-dashboard    Alias: dashboard with #loop=bug-hunt selected."
+	@echo "  make decomp-dashboard      Alias: dashboard with #loop=decomp selected."
 	@echo "  make clean      Remove .dart_tool / build dirs."

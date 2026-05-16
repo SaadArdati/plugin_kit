@@ -8,6 +8,37 @@ library;
 import 'package:code_editor/code_editor.dart';
 import 'package:plugin_kit/plugin_kit.dart';
 
+class SqlLanguagePlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('sql_language');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<SqlAnalyzer>(
+      const ServiceId('sql_analyzer'),
+      SqlAnalyzer.new,
+    );
+
+    registry.registerSingleton<SqlFormatter>(
+      const ServiceId('sql_formatter'),
+      SqlFormatter.new,
+    );
+
+    registry.registerSingleton<SqlKeywordLinter>(
+      const ServiceId('sql_keyword_linter'),
+      SqlKeywordLinter.new,
+    );
+    registry.registerSingleton<_SqlSaveHook>(
+      const ServiceId('save_hook'),
+      _SqlSaveHook.new,
+    );
+    registry.registerSingleton<_SqlCompletionHandler>(
+      const ServiceId('completion_handler'),
+      _SqlCompletionHandler.new,
+    );
+  }
+}
+
 const _sqlKeywords = [
   'select',
   'from',
@@ -213,37 +244,6 @@ class SqlKeywordLinter implements LinterService {
     }
 
     return dp[m][n];
-  }
-}
-
-class SqlLanguagePlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('sql_language');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<SqlAnalyzer>(
-      const ServiceId('sql_analyzer'),
-      () => SqlAnalyzer(),
-    );
-
-    registry.registerSingleton<SqlFormatter>(
-      const ServiceId('sql_formatter'),
-      () => SqlFormatter(),
-    );
-
-    registry.registerSingleton<SqlKeywordLinter>(
-      const ServiceId('sql_keyword_linter'),
-      () => const SqlKeywordLinter(),
-    );
-    registry.registerSingleton<_SqlSaveHook>(
-      const ServiceId('save_hook'),
-      () => _SqlSaveHook(),
-    );
-    registry.registerSingleton<_SqlCompletionHandler>(
-      const ServiceId('completion_handler'),
-      () => _SqlCompletionHandler(),
-    );
   }
 }
 

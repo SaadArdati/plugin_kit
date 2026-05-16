@@ -11,6 +11,8 @@ environment:
 dependencies:
   plugin_kit:
     path: ../../packages/plugin_kit
+  plugin_kit_dialog:
+    path: ../../packages/plugin_kit_dialog
   flutter_plugin_kit:
     path: ../../packages/flutter_plugin_kit
   flutter:

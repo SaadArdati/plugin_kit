@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/flutter_plugin_kit-256.png" width="160" alt="flutter_plugin_kit logo" />
+  <img src="https://raw.githubusercontent.com/SaadArdati/plugin_kit/main/assets/social-banner-flutter_plugin_kit-1500x500.png" alt="flutter_plugin_kit. Flutter ergonomics for plugin_kit." />
 </p>
 
 <p align="center">

@@ -60,10 +60,10 @@ The `ScopedServiceRegistry` passed to `register` already knows your plugin id, s
 
 ![Plugin Kit Dialog Plugins tab showing a grid of registered plugins with their enabled state, badges, and descriptions](/images/dialog/plugins_tab_dark.png)
 
-*The Plugins tab is what your `pluginId` declarations look like once the runtime has them. Each tile is one plugin; the toggle on each runs the full lifecycle.*
+The Plugins tab is what your `pluginId` declarations look like once the runtime has them. Each tile is one plugin, and each toggle updates the dialog draft.
 
-The visuals are from the Plugin Kit Dialog, a built-in customization surface that ships with the library. It reflects the runtime's state live, so
-toggling a plugin on or off runs the lifecycle right there and then. The dialog is optional, but it is a useful reference for what your plugin 
+The visuals are from the Plugin Kit Dialog, a built-in customization surface that ships with the library. It reflects runtime state and staged draft changes, and
+lifecycle updates run when you save. The dialog is optional, but it is a useful reference for what your plugin 
 metadata looks like in practice. The color, icon, title, and description of your plugin can be registered via the `plugin_kit_dialog` package.
 
 ## How the lifecycle shapes plugin code

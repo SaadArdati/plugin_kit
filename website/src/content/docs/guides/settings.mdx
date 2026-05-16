@@ -121,7 +121,7 @@ A `*:serviceId` entry applies to whichever registration currently wins that slot
 When both a wildcard and a plugin-specific entry target the same slot, the runtime merges them knob by knob:
 
 - `enabled`: AND-merge. If either layer disables the slot, it stays disabled. A plugin-specific entry cannot force-enable a slot the wildcard disabled.
-- `priority`: plugin-specific wins if set; otherwise the wildcard's priority applies to the current winner.
+- `priority`: plugin-specific wins if set. Wildcard priority only applies to the plugin that was winning when wildcard overrides were materialized, it does not automatically transfer when a different plugin later wins.
 - `config`: plugin-specific config wins if non-empty; otherwise the wildcard's config fills in.
 
 A concrete example: two plugins both register `model_router`. The wildcard supplies `temperature: 0.5`. A plugin-specific entry on `beta` only bumps priority. The result is that `beta` is now the winning registration, and it resolves with `temperature: 0.5` from the wildcard, because `beta`'s plugin-specific row has no `config` of its own for the merge to prefer.

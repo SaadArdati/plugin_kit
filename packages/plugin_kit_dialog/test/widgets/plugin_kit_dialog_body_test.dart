@@ -220,6 +220,61 @@ void main() {
     },
   );
 
+  testWidgets(
+    'barrier-tap is suppressed during save when barrierDismissible: true '
+    '(ISSUE-dialog-save-barrier-dismiss regression)',
+    (tester) async {
+      late BuildContext capturedContext;
+      final runtime = PluginRuntime()..addPlugin(_StubPlugin());
+      runtime.init(settings: RuntimeSettings());
+      addTearDown(runtime.dispose);
+
+      await tester.pumpWidget(
+        _app(
+          Builder(
+            builder: (context) {
+              capturedContext = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      final saveCompleter = Completer<void>();
+      final futureResult = showPluginKitDialog(
+        context: capturedContext,
+        runtime: runtime,
+        initialSettings: RuntimeSettings(),
+        onSave: (_) => saveCompleter.future,
+        // ignore: avoid_redundant_argument_values
+        barrierDismissible: true,
+      );
+
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('sample_plugin'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pump();
+      expect(find.text('Saving…'), findsOneWidget);
+
+      // Tap the modal barrier (top-left corner of the screen, well outside
+      // any dialog bounds). With PopScope canPop: false, Navigator.maybePop
+      // must NOT dismiss the dialog.
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pump();
+      expect(
+        find.text('Saving…'),
+        findsOneWidget,
+        reason: 'dialog must NOT dismiss on barrier tap while saving',
+      );
+
+      saveCompleter.complete();
+      await tester.pumpAndSettle();
+      final result = await futureResult;
+      expect(result, isNotNull);
+    },
+  );
+
   testWidgets('showPluginKitDialog treats system back as cancel', (
     tester,
   ) async {

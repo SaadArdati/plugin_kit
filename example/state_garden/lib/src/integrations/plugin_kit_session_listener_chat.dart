@@ -13,8 +13,8 @@ import '../widgets/chat_view.dart';
 /// [PluginSessionListener] and supplies its bindings declaratively through
 /// the [subscriptions] getter. The mixin owns the [EventSubscription]
 /// list, [attachSubscriptions] / [detachSubscriptions] are idempotent, and
-/// the host does not store a `_disposed` flag because dispose runs detach
-/// before `notifyListeners` could fire from a late envelope.
+/// [detachSubscriptions] is async. Because this notifier's [dispose] does not
+/// await detach, an in-flight envelope can still call [notifyListeners].
 ///
 /// Use this mixin when the host is a pure-Dart object (cubit, controller,
 /// `ChangeNotifier`) that owns its session for its full lifetime. For a

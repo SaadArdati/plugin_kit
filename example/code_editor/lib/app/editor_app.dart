@@ -5,17 +5,9 @@
 /// the descriptors plugins append, resolves widget factories from the
 /// ServiceRegistry, and renders.
 ///
-/// Visual style: JetBrains Islands Dark inspired. Dark canvas with floating
-/// panel "islands," rounded corners, and blue accents.
-///
-/// Flutter integration shape: the runtime is owned by `PluginRuntimeScope`
-/// at the top of the shell, and dispose is routed through
-/// `disposeAndReport` so an async detach failure surfaces via
-/// `FlutterError.reportError`. The session itself stays imperative because
-/// the chip toggle path calls `runtime.updateSessionSettings` to reconfigure
-/// the live session, which `PluginSessionScope` does not currently model.
-/// For the listener-mixin / event-notifier patterns, see the recipes in
-/// `example/state_garden/lib/src/integrations/`.
+/// Visual style: JetBrains "Islands Dark" inspired, but built from stock
+/// Material widgets only — every color, text style, and shape comes from
+/// `Theme.of(context)`. The single theme builder lives in `theme.dart`.
 library;
 
 import 'dart:async';
@@ -30,9 +22,11 @@ import 'package:code_editor/plugins/sql_language.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_plugin_kit/flutter_plugin_kit.dart';
 import 'package:plugin_kit/plugin_kit.dart';
+import 'package:plugin_kit_dialog/plugin_kit_dialog.dart';
 
 import 'contributions.dart';
 import 'factories.dart';
+import 'plugin_visuals.dart';
 import 'plugins/ai_assist_plugin.dart';
 import 'plugins/git_plugin.dart';
 import 'plugins/minimap_plugin.dart';
@@ -43,6 +37,9 @@ import 'theme.dart';
 /// How long to wait after the last keystroke before emitting
 /// [DocumentChangedEvent]. Keeps plugins from thrashing on every character.
 const _documentChangeDebounce = Duration(milliseconds: 150);
+
+/// Gap between island Cards (canvas shows through to give the "floating" feel).
+const _islandGap = 4.0;
 
 /// UI plugins, exposed as chips so the user can toggle them at runtime.
 List<Plugin> _uiPlugins() => [
@@ -65,13 +62,15 @@ List<Plugin> _behaviorPlugins() => [
   LinterSuitePlugin(),
 ];
 
-const _pluginLabels = {
-  PluginId('runner'): 'Runner',
-  PluginId('git'): 'Git',
-  PluginId('terminal'): 'Terminal',
-  PluginId('ai_assist'): 'AI Assist',
-  PluginId('minimap'): 'Minimap',
-};
+/// Ordered list of UI plugin ids — drives the chip row and the default
+/// enabled-state map. Order is stable so chips don't reshuffle.
+const _uiPluginIds = [
+  RunnerPlugin.id,
+  GitPlugin.id,
+  TerminalPlugin.id,
+  AiAssistPlugin.id,
+  MinimapPlugin.id,
+];
 
 class EditorApp extends StatelessWidget {
   const EditorApp({super.key});
@@ -81,14 +80,13 @@ class EditorApp extends StatelessWidget {
     return MaterialApp(
       title: 'Code Editor',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        scaffoldBackgroundColor: EditorColors.canvas,
-        colorSchemeSeed: EditorColors.accent,
-        brightness: Brightness.dark,
-        useMaterial3: true,
-      ),
+      theme: editorTheme(),
       home: PluginRuntimeScope(
-        plugins: [..._uiPlugins(), ..._behaviorPlugins()],
+        plugins: [
+          ..._uiPlugins(),
+          ..._behaviorPlugins(),
+          editorVisualsPlugin(),
+        ],
         child: const _EditorScreen(),
       ),
     );
@@ -115,6 +113,7 @@ class _EditorScreenState extends State<_EditorScreen>
   int _activeIndex = 0;
 
   late final Map<PluginId, bool> _pluginEnabled;
+  RuntimeSettings _settings = const RuntimeSettings();
 
   List<ToolbarActionDescriptor> _toolbarActions = [];
   List<PanelDescriptor> _panels = [];
@@ -138,31 +137,26 @@ class _EditorScreenState extends State<_EditorScreen>
     _tabController = TabController(length: _documents.length, vsync: this)
       ..addListener(_onTabChanged);
     _textController = TextEditingController(text: _documents[0].content);
-    _pluginEnabled = {for (final id in _pluginLabels.keys) id: true};
+    _pluginEnabled = {for (final id in _uiPluginIds) id: true};
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_runtimeInitialized) return;
-    // Runtime is owned by the ambient PluginRuntimeScope; this state only
-    // builds and disposes the session it needs (the toggle handler calls
-    // updateSessionSettings, which requires imperative session ownership).
     _runtime = PluginRuntimeScope.of(context);
     _runtimeInitialized = true;
     unawaited(_createSession());
   }
 
   Future<void> _createSession() async {
-    final pluginConfigs = <PluginId, PluginConfig>{
-      for (final e in _pluginEnabled.entries)
-        e.key: PluginConfig(enabled: e.value),
-    };
-
-    _session = await _runtime.createSession(
-      settings: RuntimeSettings(plugins: pluginConfigs),
+    _settings = RuntimeSettings(
+      plugins: {
+        for (final e in _pluginEnabled.entries)
+          e.key: PluginConfig(enabled: e.value),
+      },
     );
-
+    _session = await _runtime.createSession(settings: _settings);
     _registerShellHandlers();
     _subscribeToRefresh();
     _emitDocumentOpened();
@@ -222,7 +216,6 @@ class _EditorScreenState extends State<_EditorScreen>
       _panels = panels.panels;
       _statusBarItems = status.items;
 
-      // Auto-open any panel that requested it via PanelDescriptor.autoOpen.
       for (final p in _panels) {
         if (p.autoOpen) _openPanelIds.add(p.id);
       }
@@ -266,23 +259,76 @@ class _EditorScreenState extends State<_EditorScreen>
     _collectUI();
   }
 
+  /// Queues a settings mutation that runs against the latest committed
+  /// `_settings`. The mutator is invoked inside the serialized future so
+  /// rapid toggles never compute `next` from a stale snapshot. Errors are
+  /// swallowed at the tail so a single failed reconciliation doesn't poison
+  /// the queue for subsequent toggles.
+  Future<void> _queueSettingsMutation(
+    RuntimeSettings Function(RuntimeSettings current) mutate,
+  ) {
+    final next = _togglePending
+        .then((_) async {
+          final session = _session;
+          if (session == null) return;
+          final newSettings = mutate(_settings);
+          await _runtime.updateSessionSettings(
+            session,
+            newSettings: newSettings,
+          );
+          if (!mounted) return;
+          setState(() => _settings = newSettings);
+          await _collectUI();
+        })
+        .catchError((Object error, StackTrace stack) {
+          FlutterError.reportError(
+            FlutterErrorDetails(
+              exception: error,
+              stack: stack,
+              library: 'code_editor',
+            ),
+          );
+        });
+    _togglePending = next;
+    return next;
+  }
+
   Future<void> _onTogglePlugin(PluginId pluginId, bool enabled) async {
     setState(() => _pluginEnabled[pluginId] = enabled);
-
-    _togglePending = _togglePending.then((_) async {
-      final session = _session;
-      if (session == null) return;
-      final next = RuntimeSettings(
+    await _queueSettingsMutation(
+      (current) => current.copyWith(
         plugins: {
-          for (final e in _pluginEnabled.entries)
-            e.key: PluginConfig(enabled: e.value),
+          ...current.plugins,
+          pluginId: PluginConfig(enabled: enabled),
         },
-      );
-      await _runtime.updateSessionSettings(session, newSettings: next);
-      await _collectUI();
-    });
-    await _togglePending;
+      ),
+    );
   }
+
+  Future<void> _openSettingsDialog() async {
+    final result = await showPluginKitDialog(
+      context: context,
+      runtime: _runtime,
+      initialSettings: _settings,
+      onSave: (next) async {
+        await _queueSettingsMutation((_) => next);
+      },
+    );
+    if (result != null && mounted) {
+      setState(() {
+        for (final id in _uiPluginIds) {
+          // Preserve current state if the dialog didn't carry an entry —
+          // avoids forcing an unspecified plugin "enabled" by default and
+          // works correctly if a plugin later becomes locked or experimental.
+          final returned = result.plugins[id]?.enabled;
+          if (returned != null) _pluginEnabled[id] = returned;
+        }
+      });
+    }
+  }
+
+  PluginKitVisual? _visualFor(PluginId id) => _runtime.globalRegistry
+      .maybeResolve<PluginKitVisual>(PluginKitVisualsPlugin.visualFor(id));
 
   @override
   Widget build(BuildContext context) {
@@ -297,253 +343,127 @@ class _EditorScreenState extends State<_EditorScreen>
         .toList();
 
     return Scaffold(
-      backgroundColor: EditorColors.canvas,
       body: Column(
         children: [
-          _buildChipBar(),
-          _buildToolbar(),
+          _ChipBar(
+            pluginIds: _uiPluginIds,
+            enabled: _pluginEnabled,
+            visualFor: _visualFor,
+            onToggle: _onTogglePlugin,
+            onOpenSettings: _openSettingsDialog,
+          ),
+          _Toolbar(
+            actions: _toolbarActions,
+            activeDocFilename: _documents[_activeIndex].filename,
+            onTrigger: (id) {
+              _session?.bus.emit<ToolbarActionTriggered>(
+                event: ToolbarActionTriggered(id),
+              );
+            },
+          ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(3, 0, 3, 3),
+              padding: const EdgeInsets.fromLTRB(
+                _islandGap,
+                0,
+                _islandGap,
+                _islandGap,
+              ),
               child: Row(
                 children: [
-                  // Editor column
                   Expanded(
                     child: Column(
                       children: [
-                        _buildDocumentTabs(),
-                        Expanded(child: _buildEditor()),
-                        // Bottom panels: tabs on TOP, content below
-                        if (bottomPanels.isNotEmpty)
-                          _buildBottomArea(bottomPanels),
+                        Expanded(
+                          child: Card(
+                            child: Column(
+                              children: [
+                                _DocTabs(
+                                  controller: _tabController,
+                                  documents: _documents,
+                                ),
+                                Expanded(child: _buildEditor(context)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (bottomPanels.isNotEmpty) ...[
+                          const SizedBox(height: _islandGap),
+                          _BottomPanelArea(
+                            panels: bottomPanels,
+                            activeIndex: _activeBottomTab.clamp(
+                              0,
+                              bottomPanels.length - 1,
+                            ),
+                            open: _bottomPanelOpen,
+                            onSelect: (i) {
+                              setState(() {
+                                if (_activeBottomTab == i && _bottomPanelOpen) {
+                                  _bottomPanelOpen = false;
+                                } else {
+                                  _activeBottomTab = i;
+                                  _bottomPanelOpen = true;
+                                }
+                              });
+                            },
+                            onToggleOpen: () => setState(
+                              () => _bottomPanelOpen = !_bottomPanelOpen,
+                            ),
+                            resolvePanel: _resolvePanel,
+                          ),
+                        ],
                       ],
                     ),
                   ),
-
-                  // Right panels (floating islands)
                   for (final panel in visibleRight) ...[
-                    const SizedBox(width: 3),
-                    _buildSidePanel(panel),
+                    const SizedBox(width: _islandGap),
+                    _SidePanel(
+                      panel: panel,
+                      onClose: () =>
+                          setState(() => _openPanelIds.remove(panel.id)),
+                      resolvePanel: _resolvePanel,
+                    ),
                   ],
                 ],
               ),
             ),
           ),
-          _buildStatusBar(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChipBar() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      color: EditorColors.surface,
-      child: Row(
-        children: [
-          const Text('Plugins', style: EditorTextStyles.label),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                for (final entry in _pluginEnabled.entries)
-                  _PluginChip(
-                    label: _pluginLabels[entry.key] ?? entry.key.toString(),
-                    selected: entry.value,
-                    onSelected: (v) => _onTogglePlugin(entry.key, v),
-                  ),
-              ],
-            ),
+          _StatusBar(
+            languageId: _documents[_activeIndex].languageId,
+            items: _statusBarItems,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildToolbar() {
-    return Container(
-      height: 38,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: const BoxDecoration(
-        color: EditorColors.surface,
-        border: Border(bottom: BorderSide(color: EditorColors.borderSubtle)),
+  Widget _buildEditor(BuildContext context) {
+    final theme = Theme.of(context);
+    return TextField(
+      controller: _textController,
+      maxLines: null,
+      expands: true,
+      style: theme.textTheme.bodyLarge?.copyWith(fontFamily: 'monospace'),
+      cursorColor: theme.colorScheme.primary,
+      decoration: const InputDecoration(
+        filled: false,
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        contentPadding: EdgeInsets.fromLTRB(16, 12, 16, 12),
       ),
-      child: Row(
-        children: [
-          for (final action in _toolbarActions)
-            _ToolbarButton(
-              label: action.label,
-              iconCodePoint: action.iconCodePoint,
-              colorValue: action.colorValue,
-              onPressed: () {
-                _session?.bus.emit<ToolbarActionTriggered>(
-                  event: ToolbarActionTriggered(action.id),
-                );
-              },
+      onChanged: (value) {
+        _documents[_activeIndex].content = value;
+        _changeDebounce?.cancel();
+        _changeDebounce = Timer(_documentChangeDebounce, () {
+          _session?.bus.emit<DocumentChangedEvent>(
+            event: DocumentChangedEvent(
+              filename: _documents[_activeIndex].filename,
+              content: value,
             ),
-
-          const Spacer(),
-
-          // Document badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: EditorColors.surfaceBright,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              _documents[_activeIndex].filename,
-              style: EditorTextStyles.label,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDocumentTabs() {
-    return Container(
-      height: 34,
-      color: EditorColors.surface,
-      child: Row(
-        children: [
-          for (var i = 0; i < _documents.length; i++)
-            _DocTab(
-              filename: _documents[i].filename,
-              isActive: _activeIndex == i,
-              onTap: () {
-                _tabController.animateTo(i);
-              },
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEditor() {
-    return Container(
-      color: EditorColors.editorBg,
-      child: TextField(
-        controller: _textController,
-        maxLines: null,
-        expands: true,
-        style: EditorTextStyles.mono13,
-        cursorColor: EditorColors.accent,
-        decoration: const InputDecoration(
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.fromLTRB(16, 12, 16, 12),
-        ),
-        onChanged: (value) {
-          _documents[_activeIndex].content = value;
-          _changeDebounce?.cancel();
-          _changeDebounce = Timer(_documentChangeDebounce, () {
-            _session?.bus.emit<DocumentChangedEvent>(
-              event: DocumentChangedEvent(
-                filename: _documents[_activeIndex].filename,
-                content: value,
-              ),
-            );
-          });
-        },
-      ),
-    );
-  }
-
-  /// Bottom panel area: tab bar on top, content below.
-  Widget _buildBottomArea(List<PanelDescriptor> bottomPanels) {
-    final safeIndex = _activeBottomTab.clamp(0, bottomPanels.length - 1);
-
-    return Container(
-      margin: const EdgeInsets.only(top: 3),
-      decoration: EditorDecorations.panelBox(),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Tab bar (on top).
-          Container(
-            height: 30,
-            color: EditorColors.surfaceHigh,
-            child: Row(
-              children: [
-                for (var i = 0; i < bottomPanels.length; i++)
-                  _PanelTab(
-                    title: bottomPanels[i].title,
-                    isActive: i == safeIndex && _bottomPanelOpen,
-                    onTap: () {
-                      setState(() {
-                        if (_activeBottomTab == i && _bottomPanelOpen) {
-                          _bottomPanelOpen = false;
-                        } else {
-                          _activeBottomTab = i;
-                          _bottomPanelOpen = true;
-                        }
-                      });
-                    },
-                  ),
-                const Spacer(),
-                _IconBtn(
-                  icon: _bottomPanelOpen
-                      ? Icons.keyboard_arrow_down
-                      : Icons.keyboard_arrow_up,
-                  tooltip: _bottomPanelOpen ? 'Collapse' : 'Expand',
-                  onTap: () =>
-                      setState(() => _bottomPanelOpen = !_bottomPanelOpen),
-                ),
-                const SizedBox(width: 4),
-              ],
-            ),
-          ),
-
-          // Content
-          if (_bottomPanelOpen)
-            SizedBox(
-              height: 200,
-              child: _resolvePanel(bottomPanels[safeIndex]),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidePanel(PanelDescriptor panel) {
-    final width = panel.preferredWidth ?? 280;
-    final isNarrow = width < 200;
-
-    return Container(
-      width: width,
-      decoration: EditorDecorations.panelBox(),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          if (!isNarrow)
-            Container(
-              height: 30,
-              padding: const EdgeInsets.only(left: 10),
-              color: EditorColors.surfaceHigh,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      panel.title,
-                      style: EditorTextStyles.panelTitle,
-                    ),
-                  ),
-                  _IconBtn(
-                    icon: Icons.close,
-                    tooltip: 'Close ${panel.title}',
-                    onTap: () => setState(() => _openPanelIds.remove(panel.id)),
-                  ),
-                  const SizedBox(width: 4),
-                ],
-              ),
-            ),
-          Expanded(child: _resolvePanel(panel)),
-        ],
-      ),
+          );
+        });
+      },
     );
   }
 
@@ -551,274 +471,274 @@ class _EditorScreenState extends State<_EditorScreen>
     final factory = _session?.context.maybeResolve<PanelWidgetFactory>(
       ServiceSlots.panel(panel.id),
     );
-    return factory?.build(context) ??
-        const Center(
-          child: Text(
-            'No content',
-            style: TextStyle(color: EditorColors.textMuted, fontSize: 12),
-          ),
-        );
-  }
-
-  Widget _buildStatusBar() {
-    return Container(
-      key: const Key('editor-status-bar'),
-      height: 24,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      color: EditorColors.accentMuted,
-      child: Row(
-        children: [
-          Text(
-            _documents[_activeIndex].languageId.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 11,
-              color: EditorColors.textOnAccent,
+    return Builder(
+      builder: (context) =>
+          factory?.build(context) ??
+          Center(
+            child: Text(
+              'No content',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
-          const SizedBox(width: 16),
+    );
+  }
+}
 
-          for (final item in _statusBarItems) ...[
-            if (item.iconCodePoint != null)
+class _ChipBar extends StatelessWidget {
+  const _ChipBar({
+    required this.pluginIds,
+    required this.enabled,
+    required this.visualFor,
+    required this.onToggle,
+    required this.onOpenSettings,
+  });
+
+  final List<PluginId> pluginIds;
+  final Map<PluginId, bool> enabled;
+  final PluginKitVisual? Function(PluginId) visualFor;
+  final void Function(PluginId id, bool enabled) onToggle;
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 40,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  for (final id in pluginIds)
+                    _PluginChip(
+                      id: id,
+                      visual: visualFor(id),
+                      selected: enabled[id] ?? true,
+                      onSelected: (v) => onToggle(id, v),
+                    ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.tune),
+              tooltip: 'Plugin settings',
+              onPressed: onOpenSettings,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PluginChip extends StatelessWidget {
+  const _PluginChip({
+    required this.id,
+    required this.visual,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final PluginId id;
+  final PluginKitVisual? visual;
+  final bool selected;
+  final ValueChanged<bool> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = visual?.label ?? id.toString();
+    final icon = visual?.icon;
+    final accent = visual?.color ?? Theme.of(context).colorScheme.primary;
+    return FilterChip(
+      label: Text(label),
+      avatar: icon == null
+          ? null
+          : IconTheme(
+              data: IconThemeData(
+                size: 14,
+                color: selected
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : accent,
+              ),
+              child: icon,
+            ),
+      selected: selected,
+      selectedColor: accent,
+      onSelected: onSelected,
+    );
+  }
+}
+
+class _Toolbar extends StatelessWidget {
+  const _Toolbar({
+    required this.actions,
+    required this.activeDocFilename,
+    required this.onTrigger,
+  });
+
+  final List<ToolbarActionDescriptor> actions;
+  final String activeDocFilename;
+  final void Function(String id) onTrigger;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      height: 36,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
+            for (final action in actions)
               Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: Icon(
-                  IconData(item.iconCodePoint!, fontFamily: 'MaterialIcons'),
-                  size: 12,
-                  color: EditorColors.textOnAccent.withValues(alpha: 0.7),
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: TextButton.icon(
+                  onPressed: () => onTrigger(action.id),
+                  icon: Icon(
+                    IconData(action.iconCodePoint, fontFamily: 'MaterialIcons'),
+                    size: 14,
+                    color: action.colorValue != null
+                        ? Color(action.colorValue!)
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                  label: Text(action.label),
                 ),
               ),
-            Text(
-              item.text,
-              style: const TextStyle(
-                fontSize: 11,
-                color: EditorColors.textOnAccent,
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                activeDocFilename,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
-            const SizedBox(width: 16),
           ],
+        ),
+      ),
+    );
+  }
+}
 
-          const Spacer(),
-          Text(
-            'plugin_kit',
-            style: TextStyle(
-              fontSize: 11,
-              color: EditorColors.textOnAccent.withValues(alpha: 0.5),
+class _DocTabs extends StatelessWidget {
+  const _DocTabs({required this.controller, required this.documents});
+
+  final TabController controller;
+  final List<TextDocument> documents;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 34,
+      child: TabBar(
+        controller: controller,
+        isScrollable: true,
+        tabAlignment: TabAlignment.start,
+        tabs: [for (final doc in documents) Tab(text: doc.filename)],
+      ),
+    );
+  }
+}
+
+class _BottomPanelArea extends StatelessWidget {
+  const _BottomPanelArea({
+    required this.panels,
+    required this.activeIndex,
+    required this.open,
+    required this.onSelect,
+    required this.onToggleOpen,
+    required this.resolvePanel,
+  });
+
+  final List<PanelDescriptor> panels;
+  final int activeIndex;
+  final bool open;
+  final void Function(int index) onSelect;
+  final VoidCallback onToggleOpen;
+  final Widget Function(PanelDescriptor panel) resolvePanel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 32,
+            child: Row(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: panels.length,
+                    itemBuilder: (context, i) => _PanelTabButton(
+                      title: panels[i].title,
+                      active: i == activeIndex && open,
+                      onTap: () => onSelect(i),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(
+                    open ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
+                  ),
+                  tooltip: open ? 'Collapse' : 'Expand',
+                  onPressed: onToggleOpen,
+                ),
+                const SizedBox(width: 4),
+              ],
             ),
           ),
+          if (open)
+            SizedBox(height: 220, child: resolvePanel(panels[activeIndex])),
         ],
       ),
     );
   }
 }
 
-// Shared small widgets used by the shell, themed consistently.
-
-/// Plugin toggle chip.
-class _PluginChip extends StatelessWidget {
-  const _PluginChip({
-    required this.label,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final String label;
-  final bool selected;
-  final ValueChanged<bool> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => onSelected(!selected),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: selected
-              ? EditorColors.selectedChip
-              : EditorColors.surfaceBright,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: selected
-                ? EditorColors.textOnAccent
-                : EditorColors.textSecondary,
-            fontWeight: selected ? FontWeight.w500 : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Toolbar button with hover state.
-class _ToolbarButton extends StatefulWidget {
-  const _ToolbarButton({
-    required this.label,
-    required this.iconCodePoint,
-    required this.onPressed,
-    this.colorValue,
-  });
-
-  final String label;
-  final int iconCodePoint;
-  final int? colorValue;
-  final VoidCallback onPressed;
-
-  @override
-  State<_ToolbarButton> createState() => _ToolbarButtonState();
-}
-
-class _ToolbarButtonState extends State<_ToolbarButton> {
-  bool _hovering = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final iconColor = widget.colorValue != null
-        ? Color(widget.colorValue!)
-        : EditorColors.textSecondary;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 100),
-          margin: const EdgeInsets.symmetric(horizontal: 1, vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: _hovering ? EditorColors.surfaceBright : Colors.transparent,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                IconData(widget.iconCodePoint, fontFamily: 'MaterialIcons'),
-                size: 15,
-                color: iconColor,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _hovering
-                      ? EditorColors.textPrimary
-                      : EditorColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Document tab.
-class _DocTab extends StatefulWidget {
-  const _DocTab({
-    required this.filename,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  final String filename;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  @override
-  State<_DocTab> createState() => _DocTabState();
-}
-
-class _DocTabState extends State<_DocTab> {
-  bool _hovering = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: widget.isActive
-                ? EditorColors.editorBg
-                : _hovering
-                ? EditorColors.surfaceBright
-                : Colors.transparent,
-            border: Border(
-              bottom: widget.isActive
-                  ? const BorderSide(color: EditorColors.accent, width: 2)
-                  : BorderSide.none,
-            ),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            widget.filename,
-            style: widget.isActive
-                ? EditorTextStyles.tabActive
-                : EditorTextStyles.tabInactive,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Bottom panel tab.
-class _PanelTab extends StatefulWidget {
-  const _PanelTab({
+class _PanelTabButton extends StatelessWidget {
+  const _PanelTabButton({
     required this.title,
-    required this.isActive,
+    required this.active,
     required this.onTap,
   });
 
   final String title;
-  final bool isActive;
+  final bool active;
   final VoidCallback onTap;
 
   @override
-  State<_PanelTab> createState() => _PanelTabState();
-}
-
-class _PanelTabState extends State<_PanelTab> {
-  bool _hovering = false;
-
-  @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: _hovering && !widget.isActive
-                ? EditorColors.hoverOverlay
-                : Colors.transparent,
-            border: Border(
-              bottom: widget.isActive
-                  ? const BorderSide(color: EditorColors.accent, width: 2)
-                  : BorderSide.none,
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: active ? theme.colorScheme.primary : Colors.transparent,
+              width: 2,
             ),
           ),
-          child: Text(
-            widget.title,
-            style: widget.isActive
-                ? EditorTextStyles.tabActive
-                : EditorTextStyles.tabInactive,
+        ),
+        child: Text(
+          title,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: active
+                ? theme.colorScheme.onSurface
+                : theme.colorScheme.onSurfaceVariant,
           ),
         ),
       ),
@@ -826,49 +746,96 @@ class _PanelTabState extends State<_PanelTab> {
   }
 }
 
-/// Small icon button with hover + tooltip.
-class _IconBtn extends StatefulWidget {
-  const _IconBtn({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
+class _SidePanel extends StatelessWidget {
+  const _SidePanel({
+    required this.panel,
+    required this.onClose,
+    required this.resolvePanel,
   });
 
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  @override
-  State<_IconBtn> createState() => _IconBtnState();
-}
-
-class _IconBtnState extends State<_IconBtn> {
-  bool _hovering = false;
+  final PanelDescriptor panel;
+  final VoidCallback onClose;
+  final Widget Function(PanelDescriptor panel) resolvePanel;
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: widget.tooltip,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovering = true),
-        onExit: (_) => setState(() => _hovering = false),
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: _hovering ? EditorColors.hoverOverlay : Colors.transparent,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Icon(
-              widget.icon,
-              size: 14,
-              color: EditorColors.textSecondary,
-            ),
-          ),
+    final theme = Theme.of(context);
+    final width = panel.preferredWidth ?? 280;
+    final isNarrow = width < 200;
+    return SizedBox(
+      width: width,
+      child: Card(
+        child: Column(
+          children: [
+            if (!isNarrow)
+              SizedBox(
+                height: 32,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          panel.title,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        tooltip: 'Close ${panel.title}',
+                        onPressed: onClose,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                  ),
+                ),
+              ),
+            Expanded(child: resolvePanel(panel)),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _StatusBar extends StatelessWidget {
+  const _StatusBar({required this.languageId, required this.items});
+
+  final String languageId;
+  final List<StatusBarDescriptor> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textStyle = theme.textTheme.labelSmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    return Container(
+      key: const Key('editor-status-bar'),
+      height: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      color: theme.colorScheme.surface,
+      child: Row(
+        children: [
+          Text(languageId.toUpperCase(), style: textStyle),
+          const SizedBox(width: 16),
+          for (final item in items) ...[
+            if (item.iconCodePoint != null) ...[
+              Icon(
+                IconData(item.iconCodePoint!, fontFamily: 'MaterialIcons'),
+                size: 11,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 4),
+            ],
+            Text(item.text, style: textStyle),
+            const SizedBox(width: 16),
+          ],
+          const Spacer(),
+          Text('plugin_kit', style: textStyle),
+        ],
       ),
     );
   }

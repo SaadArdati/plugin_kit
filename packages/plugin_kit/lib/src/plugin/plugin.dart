@@ -23,9 +23,14 @@ import '../settings.dart';
 import '../typed_handles.dart';
 import '../types.dart';
 import 'exceptions.dart';
+import 'runtime/settings_normalizer.dart';
 
 part 'core.dart';
 part 'extensions.dart';
 part 'runtime.dart';
-part 'runtime_session.dart';
+part 'runtime/enablement.dart';
+part 'runtime/dispose.dart';
+part 'runtime/init.dart';
+part 'runtime/reconcile.dart';
+part 'runtime/session.dart';
 part 'service.dart';

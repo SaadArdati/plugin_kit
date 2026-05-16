@@ -1,5 +1,6 @@
 import 'package:plugin_kit/plugin_kit.dart';
 import 'package:test/test.dart';
+
 void main() {
   test(
     'getPluginServicesWithIds skipFactories returns enabled eager and lazy instances paired to their service ids',
@@ -13,9 +14,11 @@ void main() {
       var disabledBuilds = 0;
       final eagerInstance = Object();
       final lazyInstance = Object();
-      final registry = ServiceRegistry(overrides: const [
-        LocalPluginOverride.disable(plugin: pluginId, serviceId: disabledId),
-      ]);
+      final registry = ServiceRegistry(
+        overrides: const [
+          LocalPluginOverride.disable(plugin: pluginId, serviceId: disabledId),
+        ],
+      );
       registry.registerSingleton<Object>(
         pluginId: pluginId,
         serviceId: eagerId,
@@ -43,10 +46,10 @@ void main() {
         },
       );
       final byId = {
-        for (
-          final pair
-              in registry.getPluginServicesWithIds(pluginId, skipFactories: true)
-        )
+        for (final pair in registry.getPluginServicesWithIds(
+          pluginId,
+          skipFactories: true,
+        ))
           pair.$1: pair.$2,
       };
       expect(byId.keys, unorderedEquals([eagerId, lazyId]));

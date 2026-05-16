@@ -7,10 +7,26 @@ library;
 import 'package:code_editor/code_editor.dart';
 import 'package:plugin_kit/plugin_kit.dart';
 
+class DebuggerPlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('debugger');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    registry.registerSingleton<DebugAdapterService>(
+      const ServiceId('debug_adapter'),
+      DebugAdapterService.new,
+    );
+  }
+}
+
 class DebugAdapterService extends SessionStatefulPluginService {
   DebugAdapterService();
 
   DebugState _state = DebugState.idle;
+
+  DebugState get state => _state;
+
   int _breakpointHitCount = 0;
   int _stepCount = 0;
 
@@ -52,22 +68,4 @@ class DebugAdapterService extends SessionStatefulPluginService {
       '[Debug] Adapter detached. Stats: $_breakpointHitCount breakpoints hit, $_stepCount steps taken',
     );
   }
-
-  DebugState get state => _state;
-}
-
-class DebuggerPlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('debugger');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    registry.registerSingleton<DebugAdapterService>(
-      const ServiceId('debug_adapter'),
-      () => DebugAdapterService(),
-    );
-  }
-
-  // attach/detach are handled automatically by the base Plugin class
-  // because DebugAdapterService extends StatefulPluginService.
 }

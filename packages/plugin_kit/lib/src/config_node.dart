@@ -37,6 +37,9 @@ class ConfigNode {
 
   /// Returns the value at [key] if it is of type [T], otherwise null.
   T? get<T>(String key) {
+    if (T == Map<String, dynamic>) {
+      return map(key) as T?;
+    }
     final v = _node[key];
     if (v is T) return v;
     return null;
@@ -94,6 +97,14 @@ class ConfigNode {
     final v = _node[key];
     if (v is List) {
       try {
+        if (T == Map<String, dynamic>) {
+          return List<T>.unmodifiable(
+            v.cast<Map>().map(
+              (item) =>
+                  Map<String, dynamic>.from(item.cast<String, dynamic>()) as T,
+            ),
+          );
+        }
         return List<T>.unmodifiable(v.cast<T>());
       } catch (_) {
         return null;
@@ -116,7 +127,7 @@ class ConfigNode {
     final v = _node[key];
     if (v is Map) {
       try {
-        return v.cast<String, dynamic>();
+        return Map<String, dynamic>.from(v.cast<String, dynamic>());
       } catch (_) {
         return null;
       }

@@ -1,4 +1,4 @@
-/// Linter suite: TODO detector and line-length checker.
+/// Linter suite: TO-DO detector and line-length checker.
 ///
 /// Subscribes to [DocumentSavedEvent] and runs both linters, emitting
 /// a [DiagnosticPublishedEvent] with the collected results.
@@ -6,6 +6,33 @@ library;
 
 import 'package:code_editor/code_editor.dart';
 import 'package:plugin_kit/plugin_kit.dart';
+
+class LinterSuitePlugin extends SessionPlugin {
+  @override
+  PluginId get pluginId => const PluginId('linter_suite');
+
+  @override
+  void register(ScopedServiceRegistry registry) {
+    // TodoLinter: no config, register as eager singleton.
+    registry.registerSingleton<TodoLinter>(
+      const ServiceId('todo_linter'),
+      TodoLinter.new,
+    );
+
+    // LineLengthLinter: reads config, register as lazy singleton.
+    registry.registerLazySingleton<LineLengthLinter>(
+      const ServiceId('line_length_linter'),
+      LineLengthLinter.new,
+    );
+
+    // Save-handler service. The plugin's inherited attach/detach drives
+    // it, so the subscription is reconciled correctly on settings changes.
+    registry.registerSingleton<_LinterSaveHook>(
+      const ServiceId('save_hook'),
+      _LinterSaveHook.new,
+    );
+  }
+}
 
 class TodoLinter implements LinterService {
   const TodoLinter();
@@ -87,32 +114,5 @@ class _LinterSaveHook extends SessionStatefulPluginService {
       ];
       await emit(DiagnosticPublishedEvent(doc.filename, diagnostics));
     });
-  }
-}
-
-class LinterSuitePlugin extends SessionPlugin {
-  @override
-  PluginId get pluginId => const PluginId('linter_suite');
-
-  @override
-  void register(ScopedServiceRegistry registry) {
-    // TodoLinter: no config, register as eager singleton.
-    registry.registerSingleton<TodoLinter>(
-      const ServiceId('todo_linter'),
-      () => const TodoLinter(),
-    );
-
-    // LineLengthLinter: reads config, register as lazy singleton.
-    registry.registerLazySingleton<LineLengthLinter>(
-      const ServiceId('line_length_linter'),
-      LineLengthLinter.new,
-    );
-
-    // Save-handler service. The plugin's inherited attach/detach drives
-    // it, so the subscription is reconciled correctly on settings changes.
-    registry.registerSingleton<_LinterSaveHook>(
-      const ServiceId('save_hook'),
-      () => _LinterSaveHook(),
-    );
   }
 }

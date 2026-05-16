@@ -2,11 +2,11 @@
 ///
 /// Covers:
 /// - `ConfigNode`: type-safe reads with coercion
-/// - `PluginSettings` / `PluginConfig` / `ServiceSettings` and JSON I/O
+/// - `RuntimeSettings` / `PluginConfig` / `ServiceSettings` and JSON I/O
 /// - Scoped service keys (`pluginId:serviceId`)
 /// - Wildcard overrides (`*:serviceId`) targeting the priority winner
 /// - Automatic `config` injection into a `PluginService`
-/// - `SettingsUtils.parseScoped`
+/// - `Pin.fromWire`
 library;
 
 import 'package:plugin_kit/plugin_kit.dart';

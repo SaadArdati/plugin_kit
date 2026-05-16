@@ -142,7 +142,7 @@ The `Future` return is awaited end-to-end; throwing from `onSave` surfaces a Sna
 
 `theme` is a `PluginKitDialogTheme` (a `ThemeExtension`), not a `ThemeData`. The dialog merges it onto the host's existing theme extensions inside the `showDialog` builder so the dialog route picks it up even though it lives under the root navigator. Pass `null` to inherit the host's theme as-is.
 
-`barrierDismissible: true` is the default. Barrier taps still follow this flag while a save is in flight. System-back is blocked while saving.
+`barrierDismissible: true` is the default. While saving, both barrier taps and system-back are blocked.
 
 ### `PluginKitDialog`
 
@@ -232,7 +232,7 @@ class PluginKitVisualsPlugin extends GlobalPlugin {
 
 Locked `GlobalPlugin` (not user-toggleable) that registers host-app visual overrides. Three independent maps so a Flutter host can decorate plugins owned by Dart-only packages without those packages depending on Flutter.
 
-The plugin registers each visual at `Priority.elevated` (1000), above the default registry priority `Priority.normal` (500), so host overrides beat anything a Flutter plugin self-attaches at the default. When two host plugins decorate the same key, the standard registry priority and registration order rules apply.
+The plugin registers each visual at `Priority.elevated` (1000), above the default registry priority `Priority.normal` (500), so host overrides beat anything a Flutter plugin self-attaches at the default. When two host plugins decorate the same key, the standard registry priority rules apply.
 
 Unknown keys are accepted silently. A `PluginId`, `Namespace`, or `ServiceId` that no current plugin registers is retained without warning, so the visual picks up automatically when the matching plugin gets enabled later. Resolution happens at the consumption site (the dialog's chip builder, the services tab card list); the visuals plugin itself never inspects the registry on attach. If you need to detect leftover or typo'd keys, resolve at the consumption site.
 

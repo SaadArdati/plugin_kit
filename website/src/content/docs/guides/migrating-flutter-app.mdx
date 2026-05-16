@@ -172,12 +172,11 @@ Avoid putting Flutter objects in them unless the event is explicitly a UI
 contract. `BuildContext`, controllers, focus nodes, and widgets usually belong
 on the Flutter side of the bridge, not inside plugin events.
 
-If events cross a server boundary, make them serializable. For requests where
-you want more than one handler to get a chance, declare the response type as
-nullable. Handlers run in descending priority order (highest first); a non-null
-return claims the call and stops dispatch, while returning `null` concedes to
-the next handler. With a non-nullable response there is no cascade; the first
-handler in priority order always wins.
+If events cross a server boundary, make them serializable. For requests,
+handlers run in descending priority order (highest first); a non-null return
+claims the call and stops dispatch, while returning `null` concedes to the next
+handler. That concession-based cascade works even when the response type is
+non-nullable.
 
 ## Provider and ChangeNotifier
 

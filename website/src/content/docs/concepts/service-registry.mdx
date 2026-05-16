@@ -55,7 +55,7 @@ Resolve from a `PluginContext`, a `PluginSession`, or the registry directly. The
 |---|---|
 | `resolve<T>(serviceId)` | return the winning registration, throw if none |
 | `maybeResolve<T>(serviceId)` | return the winner or `null` |
-| `resolveAfter<T>(pluginId, serviceId)` | skip one registration and return the next |
+| `resolveAfter<T>(pluginId: ..., serviceId: ...)` | skip one registration and return the next |
 | `resolveRaw<T>(serviceId)` | return the wrapper, do not instantiate |
 
 ## Priority

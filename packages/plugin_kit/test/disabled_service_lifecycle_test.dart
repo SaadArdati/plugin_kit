@@ -295,9 +295,7 @@ void main() {
           // session override. Resolving therefore throws, consistent with
           // the documented LocalPluginOverride.disable contract.
           expect(
-            () => session.resolve<_SneakyService>(
-              const ServiceId('sneaky'),
-            ),
+            () => session.resolve<_SneakyService>(const ServiceId('sneaky')),
             throwsA(isA<StateError>()),
             reason:
                 'After rollback the session is restored to its pre-update '

@@ -82,7 +82,7 @@ The aggregation is intentional. Fail-fast on the first exception would hide down
 
 **Cause.** `updateSettingsSnapshot` deliberately does not reconcile. It updates the runtime's stored settings value and emits on `settingsStream`, but it does not run plugin lifecycle, does not call `onPluginSettingsChanged`, and does not push new config into already-resolved services. It is for the cases where you only want to publish a new snapshot to listeners (a debug panel, an analytics ping) without any actual lifecycle work.
 
-**Fix.** Use `updateSettings` for the all-scopes path or `updateGlobalSettings` / `updateSessionSettings` for the lower-level per-scope paths when you want the runtime to converge on the new settings. Those run the full pipeline: detach plugins that lost enablement, attach newly enabled ones, fire `onPluginSettingsChanged` on plugins whose configuration changed, re-inject settings into resolved services.
+**Fix.** Use `updateSettings` for the all-scopes path or `updateGlobalSettings` / `updateSessionSettings` for the lower-level per-scope paths when you want the runtime to converge on the new settings. Those run the full pipeline: detach plugins that lost enablement, attach newly enabled ones, fire `onPluginSettingsChanged` on every enabled plugin in the post-update set (including unchanged and newly enabled plugins), re-inject settings into resolved services.
 
 If you wanted reconciliation and got silence, you almost certainly called the snapshot variant. See [Settings](/guides/settings/) and the [Settings & Configuration reference](/reference/settings-and-configuration/).
 
@@ -185,11 +185,11 @@ Pick one based on what reads better. `maybeRequest` is usually clearer at the ca
 
 That pattern cannot tell `null` (clear it) from "argument not passed" (keep current). Both look the same to the function body.
 
-**Fix.** When you actually want to clear the priority, construct the `ServiceSettings` directly rather than going through `copyWith`:
+**Fix.** When you actually want to clear the priority, call `withClearedPriority()` (optionally after `copyWith` when you also need other field changes):
 
 <Code code={extractRegion(runtimeSettingsSource, 'service-settings-clear-priority')} lang="dart" />
 
-This is the same quirk every `copyWith` pattern in Dart has. The library could add a sentinel object, but it does not, because the rebuild approach is unambiguous.
+This is the same quirk every `copyWith` pattern in Dart has. `withClearedPriority()` is the explicit clear path.
 
 ## Tests, goldens, and CI
 

@@ -63,7 +63,7 @@ For each enabled plugin in the scope, the runtime runs an internal `_runAttach(c
 1. Iterate the plugin's owned `StatefulPluginService`s, bind each service's context, and call its `attach()` hook.
 2. Call the user's `plugin.attach(context)` hook.
 
-Each hook runs in isolation: a failure is logged and captured, the remaining services and the plugin's own `attach` still run, and captured failures surface as a `PluginStepAggregateException` once the phase completes. Because services are activated first, the plugin's `attach(context)` can already resolve and use its own services, peer services, and the bus.
+Each hook runs in isolation: a failure is logged and captured, the remaining services and the plugin's own `attach` still run, and `_runAttach(context)` rethrows the original exception when one step fails or a `PluginStepAggregateException` when multiple steps fail. After the global attach pass, `runtime.init` throws `PluginLifecycleException('attachGlobal', failures)` if any plugins failed. Because services are activated first, the plugin's `attach(context)` can already resolve and use its own services, peer services, and the bus.
 
 **Detach phase**
 

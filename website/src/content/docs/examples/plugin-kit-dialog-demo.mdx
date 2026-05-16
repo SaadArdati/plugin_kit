@@ -25,13 +25,13 @@ The app opens with a single button that calls `showPluginKitDialog(...)` on the 
 - **Priority towers.** Multiple plugins claim the same service slot at staggered priorities, so the **Advanced** tab can show a real winner-and-shadowed-contenders cascade. The four towers are on `agent.model`, `agent.system_message`, `retry.policy`, and `search.provider`.
 - **Locked tier.** Plugins flagged as required surface as un-toggleable on the **Plugins** tab. The host cannot disable them through the UI.
 - **Experimental tier.** Plugins flagged as experimental surface with a warning chip on the **Plugins** tab. Toggling them off does not affect the locked baseline.
-- **Capabilities.** Several services attach `UiConfigurableCapability` with mixed field shapes (text, number, dropdown, bool, multiline, group, extension) so the **Services** tab populates with the full field renderer matrix.
+- **Capabilities.** Several services attach `UiConfigurableCapability` with mixed field shapes (text, number, dropdown, bool, multiline, group) so the **Services** tab populates with the field renderer matrix.
 
 ## The three tabs the demo exercises
 
-**Plugins.** A grid of every registered plugin with per-plugin icon, color, label, and tier badge. Toggling a tile fires the runtime's reconciliation; locked tiles are inert; experimental tiles show their warning. The visuals plugin supplies all the per-tile metadata.
+**Plugins.** A grid of every registered plugin with per-plugin icon, color, label, and tier badge. Toggling a tile updates the dialog's working draft; locked tiles are inert; experimental tiles show their warning. The visuals plugin supplies all the per-tile metadata.
 
-**Services.** Every service that attached a `UiConfigurableCapability` becomes an editable card grouped by namespace. Drag, type, dropdown-pick; the dialog tracks edits in a working draft and never reaches the runtime until **Save**. The four priority towers each have their winner card exposed here.
+**Services.** The resolved winner for each service that attached a `UiConfigurableCapability` becomes an editable card, grouped by top-level namespace. Drag, type, dropdown-pick; the dialog tracks edits in a working draft and never reaches the runtime until **Save**. The four priority towers each have their winner card exposed here.
 
 **Advanced.** The registry inspector. Each namespace expands to show the registrations it has accumulated, sorted by priority. The current winner is picked out; shadowed contenders are listed below. A JSON view of the working `RuntimeSettings` draft sits alongside, useful for understanding what `onSave` will receive.
 

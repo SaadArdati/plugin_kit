@@ -1,4 +1,158 @@
-part of 'plugin.dart';
+part of '../plugin.dart';
+
+extension _RuntimeSession<
+  G extends GlobalPluginContext,
+  S extends SessionPluginContext
+>
+    on PluginRuntime<G, S> {
+  Future<PluginSession<S>> _createSessionImpl({
+    RuntimeSettings? settings,
+    SessionContextFactory<G, S>? contextFactory,
+  }) async {
+    if (!_initialized) {
+      throw StateError(
+        'PluginRuntime.createSession() called before init(). '
+        'Call init() first to initialize the global scope.',
+      );
+    }
+
+    settings ??= this.settings;
+
+    _validateServiceSettingPluginIds(
+      entryPoint: 'createSession',
+      services: settings.services,
+    );
+    _validatePluginConfigPluginIds(
+      entryPoint: 'createSession',
+      plugins: settings.plugins,
+    );
+
+    final overrides = <LocalPluginOverride>[];
+    final pendingWildcards = <ServiceId, ServiceSettings>{};
+
+    _partitionServiceSettings(
+      services: settings.services,
+      overrides: overrides,
+      pendingWildcards: pendingWildcards,
+      plugins: sessionPlugins,
+    );
+
+    final enabledPluginIds = _determineEnabledPluginIds(
+      settings,
+      pluginSubset: sessionPlugins,
+      additionalEnabledPluginIds: _enabledGlobalPluginIds,
+    );
+
+    final registry = ServiceRegistry(overrides: overrides);
+
+    // Register enabled session plugins
+    for (final plugin in sessionPlugins) {
+      if (enabledPluginIds.contains(plugin.pluginId)) {
+        plugin.register(registry.scopedFor(plugin.pluginId));
+      }
+    }
+
+    // Validate service pin service ids now that the registry is populated.
+    _validateServicePinServiceIds(
+      entryPoint: 'createSession',
+      registry: registry,
+      services: settings.services,
+      plugins: sessionPlugins,
+    );
+
+    // Resolve wildcard winner-scoped overrides now that services are registered
+    _resolveAndApplyWildcards(
+      registry: registry,
+      pendingWildcards: pendingWildcards,
+      overrides: overrides,
+    );
+
+    // Create session bus and context
+    final sessionBus = EventBus();
+
+    final S context;
+    if (contextFactory != null) {
+      context = contextFactory(registry, sessionBus, globalBus);
+    } else {
+      if (S != SessionPluginContext) {
+        throw StateError(
+          'contextFactory is required when using a custom session context '
+          'type ($S). The default factory creates a SessionPluginContext, '
+          'which cannot be assigned to $S.',
+        );
+      }
+      context =
+          SessionPluginContext(
+                registry: registry,
+                bus: sessionBus,
+                globalBus: globalBus,
+              )
+              as S;
+    }
+
+    final session = PluginSession<S>(
+      registry: registry,
+      bus: sessionBus,
+      context: context,
+      plugins: List.unmodifiable(sessionPlugins),
+      settings: settings,
+    );
+
+    // Session buses are independent of the global bus. Global plugins that
+    // want to broadcast to sessions do so explicitly via the
+    // `GlobalPluginContext.sessions.emit(...)` extension; session plugins that
+    // want to reach the global scope emit on `context.globalBus`. There is no
+    // implicit forwarding between the two.
+    session._onDispose = () {
+      _sessions.remove(session);
+      _sessionSettings.remove(session);
+    };
+
+    // Track enabled plugins so `session.init()` knows which plugins to
+    // attach. The session is NOT yet visible via `runtime.sessions` -
+    // we only publish it after init() succeeds. If init throws, the
+    // half-attached session is dropped on the floor (the caller's
+    // reference becomes unreachable after the rethrow).
+    for (final pluginId in enabledPluginIds) {
+      session.markPluginEnabled(pluginId);
+    }
+
+    try {
+      await session.init();
+    } catch (e) {
+      // session.init aggregates per-plugin attach failures. Some plugins
+      // may have attached successfully before another threw; all
+      // partial state in this dropped session needs cleanup before we
+      // throw away the session reference. Walk every enabled plugin
+      // and best-effort detach. Cleanup failures are swallowed; the
+      // original PluginLifecycleException is what the caller sees.
+      for (final plugin in sessionPlugins) {
+        if (!session.isPluginEnabled(plugin.pluginId)) continue;
+        try {
+          await plugin._runDetach(session.context);
+        } catch (_) {}
+      }
+      // Dispose the session's bus so its broadcast controller is closed
+      // and any lingering observers stop receiving events from an
+      // orphan session.
+      try {
+        sessionBus.dispose();
+      } catch (_) {}
+      rethrow;
+    }
+
+    // Publish only after successful attach so `runtime.sessions` never
+    // contains a session whose lifecycle failed.
+    _sessions.add(session);
+    _sessionSettings[session] = settings;
+
+    _runtimeLog.info(
+      'Session created with ${enabledPluginIds.length} enabled plugins',
+    );
+
+    return session;
+  }
+}
 
 /// A scoped session with its own registry, event bus, and plugin attachments.
 ///

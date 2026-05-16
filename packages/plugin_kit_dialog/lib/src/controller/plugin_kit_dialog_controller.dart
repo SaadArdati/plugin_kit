@@ -149,6 +149,9 @@ class PluginKitDialogController extends ChangeNotifier {
     if (plugin == null) {
       return draft;
     }
+    if (draft.active.plugins.containsKey(pluginId)) {
+      return draft;
+    }
 
     final declared = _pluginsById[pluginId];
     if (declared == null) {

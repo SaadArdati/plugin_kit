@@ -18,11 +18,14 @@ void main() {
       final settings = RuntimeSettings.fromJson(json);
       final wildcardPin = Pin.wildcard(['agent', 'model']);
 
-      expect(settings.services[wildcardPin], const ServiceSettings(
-        enabled: false,
-        config: {'provider': 'openai', 'model': 'gpt-4.1-mini'},
-        priority: 77,
-      ));
+      expect(
+        settings.services[wildcardPin],
+        const ServiceSettings(
+          enabled: false,
+          config: {'provider': 'openai', 'model': 'gpt-4.1-mini'},
+          priority: 77,
+        ),
+      );
       expect(settings.services.keys.single.isWildcard, isTrue);
     },
   );

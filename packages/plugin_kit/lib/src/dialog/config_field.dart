@@ -129,6 +129,12 @@ final class NumberConfigField extends ConfigField {
   final bool isInteger;
 
   /// Creates a numeric field schema.
+  ///
+  /// Passing `style: NumberFieldStyle.slider` requires BOTH [min] and [max]
+  /// to be set. Sliders without explicit bounds have no meaningful track to
+  /// drag along, so the previous silent fallback to text input violated the
+  /// caller's explicit choice. The assert fires in debug; release builds
+  /// should not hit this if developers test the slider mode at least once.
   const NumberConfigField({
     required super.key,
     required super.label,
@@ -139,7 +145,11 @@ final class NumberConfigField extends ConfigField {
     this.step,
     this.style,
     this.isInteger = false,
-  });
+  }) : assert(
+         style != NumberFieldStyle.slider || (min != null && max != null),
+         'NumberFieldStyle.slider requires both min and max; omit `style` '
+         '(or set it to NumberFieldStyle.textInput) when only one bound is set',
+       );
 }
 // #enddocregion config-field-number-config-field
 
@@ -203,12 +213,10 @@ final class GroupConfigField extends ConfigField {
 }
 // #enddocregion config-field-group-config-field
 
-/// Escape hatch for custom field renderers.
+/// Field rendered by a dialog renderer selected via [rendererKey].
 ///
-/// The dialog locates a renderer registered under [rendererKey] and forwards
-/// [args] to it. This keeps the field declaration Flutter-free; the custom
-/// widget itself lives in a Flutter-side package that registers a
-/// `ConfigFieldRenderer` for the same key with the dialog runtime.
+/// The public dialog widgets use a fixed internal runtime, so [rendererKey]
+/// must match a renderer provided by that built-in runtime.
 // #docregion config-field-extension-config-field
 final class ExtensionConfigField extends ConfigField {
   /// Identifier used to look up a renderer registered with the dialog runtime.

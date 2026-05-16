@@ -157,10 +157,18 @@ class _PluginKitDialogBodyState extends State<PluginKitDialogBody> {
     widget.controller.isSaving = true;
     try {
       await widget.onSave(widget.controller.draft.working);
+      // The default outer `handleSave` in showPluginKitDialog pops the
+      // route between the await and the mounted check, so a `!mounted`
+      // short-circuit would skip markSaved() entirely and leave isDirty
+      // true after a successful save. markSaved() mutates only the
+      // controller (which outlives the dialog widget), so it is safe to
+      // call before checking `mounted`; nothing past this line touches
+      // widget state. Mirrors the `finally` block that clears isSaving
+      // regardless of mounted.
+      widget.controller.markSaved();
       if (!mounted) {
         return;
       }
-      widget.controller.markSaved();
     } catch (error, stackTrace) {
       if (!mounted) {
         return;

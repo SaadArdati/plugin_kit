@@ -2,14 +2,16 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightPageActions from 'starlight-page-actions';
+import sitemap from '@astrojs/sitemap';
 
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://plugin-kit.saad-ardati.dev',
 	integrations: [
+		sitemap(),
 		starlight({
 			title: 'Plugin Kit',
-			description: 'A powerful, domain-agnostic plugin system for Dart applications.',
+			description: 'A Dart plugin runtime for apps that have grown into platforms. Replaceable services, isolated sessions, settings that reshape the running system.',
 			logo: {
 				src: './src/assets/logo.svg',
 			},
@@ -25,11 +27,27 @@ export default defineConfig({
 				},
 				{
 					tag: 'meta',
-					attrs: { property: 'og:image', content: '/og.png' },
+					attrs: { name: 'theme-color', content: '#15100A' },
 				},
 				{
 					tag: 'meta',
-					attrs: { name: 'twitter:image', content: '/og.png' },
+					attrs: { property: 'og:image', content: 'https://plugin-kit.saad-ardati.dev/og.png' },
+				},
+				{
+					tag: 'meta',
+					attrs: { property: 'og:image:width', content: '1200' },
+				},
+				{
+					tag: 'meta',
+					attrs: { property: 'og:image:height', content: '630' },
+				},
+				{
+					tag: 'meta',
+					attrs: { property: 'og:image:alt', content: 'Plugin Kit. Three puzzle-piece logos on a warm dark backdrop. Center: plugin_kit. Left: flutter_plugin_kit. Right: plugin_kit_dialog.' },
+				},
+				{
+					tag: 'meta',
+					attrs: { name: 'twitter:image', content: 'https://plugin-kit.saad-ardati.dev/og.png' },
 				},
 				{
 					tag: 'meta',

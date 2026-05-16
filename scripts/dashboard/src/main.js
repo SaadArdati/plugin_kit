@@ -79,9 +79,9 @@ function api(path) {
 
 function classifyStatus(value) {
   const v = String(value || '').toUpperCase();
-  if (v === 'GREEN' || v === 'PASS' || v === 'CONVERGED' || v === 'LANDED' || v === 'FIXED') return 'green';
-  if (v === 'RED' || v === 'FAIL' || v === 'FILED') return 'red';
-  if (v === 'RUNNING') return 'gray';
+  if (v === 'GREEN' || v === 'PASS' || v === 'CONVERGED' || v === 'LANDED' || v === 'FIXED' || v === 'READY') return 'green';
+  if (v === 'RED' || v === 'FAIL' || v === 'FILED' || v === 'BLOCKED') return 'red';
+  if (v === 'RUNNING' || v.startsWith('RUNNING:')) return 'gray';
   if (v === 'DROPPED' || v === 'CLEAN') return 'gray';
   return 'gray';
 }

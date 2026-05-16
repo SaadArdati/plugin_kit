@@ -46,9 +46,8 @@ class WelcomePlugin extends SessionPlugin {
 }
 
 Future<void> main() async {
-  final runtime = PluginRuntime(
-    plugins: [GreeterPlugin(), WelcomePlugin()],
-  )..init();
+  final runtime = PluginRuntime(plugins: [GreeterPlugin(), WelcomePlugin()])
+    ..init();
 
   final session = await runtime.createSession();
 

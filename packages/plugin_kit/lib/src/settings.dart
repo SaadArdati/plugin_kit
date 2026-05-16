@@ -1,6 +1,33 @@
 import 'package:collection/collection.dart';
 import 'package:plugin_kit/src/typed_handles.dart';
 
+/// Deep-copy a JSON-shaped Map so the result shares no mutable state with
+/// the source. Used at every boundary that hands out or accepts a `config`
+/// map so caller-owned references cannot mutate runtime-held settings (and
+/// vice versa). Nested Maps and Lists are recursively copied; primitives
+/// (and `null`) are returned as-is.
+///
+/// Callers should treat this as the canonical defensive-copy helper for
+/// `PluginConfig.config` and `ServiceSettings.config`. Closes the
+/// config-map-leak bug class found by bug-hunt iters 3, 10, 11, 15, and 16.
+Map<String, dynamic> _deepCopyJsonMap(Map<String, dynamic> source) {
+  if (source.isEmpty) return const {};
+  return <String, dynamic>{
+    for (final entry in source.entries)
+      entry.key: _deepCopyJsonValue(entry.value),
+  };
+}
+
+dynamic _deepCopyJsonValue(dynamic value) {
+  if (value is Map<String, dynamic>) {
+    return _deepCopyJsonMap(value);
+  }
+  if (value is List) {
+    return [for (final v in value) _deepCopyJsonValue(v)];
+  }
+  return value;
+}
+
 /// Policy for handling [RuntimeSettings] entries that reference an id
 /// the runtime does not know about. Covers every reference shape that
 /// can drift across app versions:
@@ -86,23 +113,29 @@ class ServiceSettings {
     this.priority,
   });
 
-  /// Creates service settings from a JSON map.
+  /// Creates service settings from a JSON map. The parsed `config` map is
+  /// deep-copied so later mutations to the source JSON cannot reach in.
   factory ServiceSettings.fromJson(Map<String, dynamic> json) {
     return ServiceSettings(
       enabled: json['enabled'] as bool? ?? true,
-      config: json['config'] as Map<String, dynamic>? ?? const {},
+      config: _deepCopyJsonMap(
+        json['config'] as Map<String, dynamic>? ?? const {},
+      ),
       priority: (json['priority'] as num?)?.toInt(),
     );
   }
 
-  /// Converts these service settings to JSON.
+  /// Converts these service settings to JSON. The emitted `config` map is
+  /// a deep copy so mutations to the result cannot reach back into the
+  /// settings instance.
   Map<String, dynamic> toJson() => <String, dynamic>{
     'enabled': enabled,
-    'config': config,
+    'config': _deepCopyJsonMap(config),
     if (priority != null) 'priority': priority,
   };
 
-  /// Returns a copy with any provided fields replaced.
+  /// Returns a copy with any provided fields replaced. The `config` map of
+  /// the result is detached from both the caller and the source instance.
   ///
   /// `copyWith(priority: null)` is a known Dart-language limitation: optional
   /// parameters cannot distinguish "argument omitted" from "argument passed
@@ -119,7 +152,7 @@ class ServiceSettings {
   }) {
     return ServiceSettings(
       enabled: enabled ?? this.enabled,
-      config: config ?? this.config,
+      config: _deepCopyJsonMap(config ?? this.config),
       priority: priority ?? this.priority,
     );
   }
@@ -133,7 +166,7 @@ class ServiceSettings {
   ServiceSettings withClearedPriority() {
     return ServiceSettings(
       enabled: enabled,
-      config: config,
+      config: _deepCopyJsonMap(config),
       priority: null,
     );
   }
@@ -174,8 +207,9 @@ class ServiceSettings {
 /// }
 /// ```
 class PluginConfig {
-  /// Whether this plugin is enabled. When false, [Plugin.register] is skipped
-  /// and none of the plugin's services are added to the session registry.
+  /// Whether this plugin is enabled. For plugins that are not
+  /// [FeatureFlag.locked], false skips [Plugin.register], so the plugin's
+  /// services are not added to that scope's registry.
   final bool enabled;
 
   /// Plugin-wide configuration. Unlike [ServiceSettings.config] which is
@@ -186,25 +220,30 @@ class PluginConfig {
   /// Creates plugin-level configuration.
   const PluginConfig({this.enabled = true, this.config = const {}});
 
-  /// Creates plugin config from a JSON map.
+  /// Creates plugin config from a JSON map. The parsed `config` map is
+  /// deep-copied so later mutations to the source JSON cannot reach in.
   factory PluginConfig.fromJson(Map<String, dynamic> json) {
     return PluginConfig(
       enabled: json['enabled'] as bool? ?? true,
-      config: json['config'] as Map<String, dynamic>? ?? const {},
+      config: _deepCopyJsonMap(
+        json['config'] as Map<String, dynamic>? ?? const {},
+      ),
     );
   }
 
-  /// Converts this plugin config to JSON.
+  /// Converts this plugin config to JSON. The emitted `config` map is a
+  /// deep copy so mutations to the result cannot reach back in.
   Map<String, dynamic> toJson() => <String, dynamic>{
     'enabled': enabled,
-    'config': config,
+    'config': _deepCopyJsonMap(config),
   };
 
-  /// Returns a copy with any provided fields replaced.
+  /// Returns a copy with any provided fields replaced. The `config` map of
+  /// the result is detached from both the caller and the source instance.
   PluginConfig copyWith({bool? enabled, Map<String, dynamic>? config}) {
     return PluginConfig(
       enabled: enabled ?? this.enabled,
-      config: config ?? this.config,
+      config: _deepCopyJsonMap(config ?? this.config),
     );
   }
 
@@ -233,7 +272,7 @@ class PluginConfig {
 /// [PluginRuntime.settingsStream].
 ///
 /// [plugins] is keyed by `pluginId`. [services] is keyed by [Pin],
-/// the `(PluginId, ServiceId)` record. The JSON wire form for each key
+/// an extension type over the wire key string. The JSON wire form for each key
 /// is `"pluginId:serviceId"` (or `"*:serviceId"` for wildcard). See
 /// [Pin.wire] and [Pin.fromWire].
 ///
@@ -324,19 +363,27 @@ class RuntimeSettings {
   }
 
   /// Configuration map for the service identified by [scopedKey], or an
-  /// empty map.
+  /// empty map. Returns a deep copy so callers cannot mutate the stored
+  /// settings via the returned map.
   Map<String, dynamic> getServiceConfig(Pin scopedKey) {
     final config = services[scopedKey];
-    return config?.config ?? const {};
+    if (config == null) return const {};
+    return _deepCopyJsonMap(config.config);
   }
 
-  /// Configuration map for [pluginId], or an empty map.
+  /// Configuration map for [pluginId], or an empty map. Returns a deep
+  /// copy so callers cannot mutate the stored settings via the returned
+  /// map.
   Map<String, dynamic> getPluginConfig(PluginId pluginId) {
     final config = plugins[pluginId];
-    return config?.config ?? const {};
+    if (config == null) return const {};
+    return _deepCopyJsonMap(config.config);
   }
 
-  /// Returns a copy with optional plugin/service map replacements.
+  /// Returns a copy with optional plugin/service map replacements. Both
+  /// the top-level maps AND the nested [PluginConfig] / [ServiceSettings]
+  /// values are detached: mutating the result (or any of its `config`
+  /// maps) cannot reach back into the source snapshot.
   // #docregion settings-copy-with-2
   RuntimeSettings copyWith({
     Map<PluginId, PluginConfig>? plugins,
@@ -344,8 +391,14 @@ class RuntimeSettings {
   }) {
     // #enddocregion settings-copy-with-2
     return RuntimeSettings(
-      plugins: plugins ?? {...this.plugins},
-      services: services ?? {...this.services},
+      plugins: {
+        for (final entry in (plugins ?? this.plugins).entries)
+          entry.key: entry.value.copyWith(),
+      },
+      services: {
+        for (final entry in (services ?? this.services).entries)
+          entry.key: entry.value.copyWith(),
+      },
     );
   }
 

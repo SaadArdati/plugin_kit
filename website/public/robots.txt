@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://plugin-kit.saad-ardati.dev/sitemap-index.xml

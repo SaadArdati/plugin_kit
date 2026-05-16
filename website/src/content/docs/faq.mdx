@@ -30,7 +30,7 @@ The [Migrating a Flutter App](/guides/migrating-flutter-app/) guide covers the c
 
 ### What is the runtime cost of a `resolve<T>`?
 
-Constant time after the first resolution. Singletons cache their instance the moment the registry constructs them; lazy singletons cache on first resolve. Factory registrations call the constructor every time, which is the explicit contract of a factory. Priority-sorted insertion happens at registration time, not at resolve, so resolution is a single map lookup plus an array head read.
+Resolution starts with a map lookup, then walks the priority list until it finds the first enabled registration. Singletons cache their instance the moment the registry constructs them; lazy singletons cache on first resolve. Factory registrations call the constructor every time, which is the explicit contract of a factory. Priority-sorted insertion still happens at registration time, not at resolve.
 
 If you are calling `resolve` in a hot path and worried about it, the library is not the bottleneck. Profile before optimizing.
 
@@ -38,7 +38,7 @@ If you are calling `resolve` in a hot path and worried about it, the library is 
 
 Each session is its own scope. `PluginRuntime` holds the global scope; `PluginSession` is created per session and disposed at session end. Within a session, the bus is single-threaded: handlers run sequentially in the order the cascade dictates.
 
-`updateSessionSettings` and `updateGlobalSettings` are async. Inside a single call, the runtime reconciles plugins one at a time. Across two concurrent calls, you are responsible for serialization (see the back-to-back toggles entry in [Troubleshooting](/troubleshooting/#two-back-to-back-plugin-toggles-silently-lose-the-second-one)).
+`updateSessionSettings` and `updateGlobalSettings` are async. Inside a single call, the runtime reconciles plugins one at a time. Across two concurrent calls, you are responsible for serialization (see the back-to-back toggles entry in [Troubleshooting](/troubleshooting/#two-back-to-back-plugin-toggles-throw-stateerror)).
 
 There is no implicit isolate boundary. If you need genuine parallelism, spawn isolates from inside a plugin and bridge results back through the bus.
 
