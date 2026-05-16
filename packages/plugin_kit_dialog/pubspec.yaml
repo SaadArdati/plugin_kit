@@ -3,7 +3,7 @@ description: >-
   Flutter dialog UI for inspecting and editing a plugin_kit PluginRuntime at
   runtime. Browse plugins, services, capabilities, and live configuration.
 version: 0.1.0
-homepage: https://plugin-kit-docs.saadodi44.workers.dev
+homepage: https://plugin-kit.saad-ardati.dev
 repository: https://github.com/SaadArdati/plugin_kit
 issue_tracker: https://github.com/SaadArdati/plugin_kit/issues
 topics:

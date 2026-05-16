@@ -3,7 +3,7 @@
 // other plugin handles. Run with `dart run`.
 //
 // See packages/plugin_kit/README.md and the docs at
-// https://plugin-kit-docs.saadodi44.workers.dev/ for the full guide.
+// https://plugin-kit.saad-ardati.dev/ for the full guide.
 
 import 'package:plugin_kit/plugin_kit.dart';
 

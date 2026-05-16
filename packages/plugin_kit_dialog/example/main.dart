@@ -4,7 +4,7 @@
 // RuntimeSettings on save.
 //
 // See packages/plugin_kit_dialog/README.md and the docs at
-// https://plugin-kit-docs.saadodi44.workers.dev/ for the full guide.
+// https://plugin-kit.saad-ardati.dev/ for the full guide.
 
 import 'package:flutter/material.dart';
 import 'package:plugin_kit/plugin_kit.dart';

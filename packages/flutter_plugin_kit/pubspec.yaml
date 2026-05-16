@@ -3,7 +3,7 @@ description: >-
   Flutter ergonomics for plugin_kit: scope widgets, a State mixin, a
   ChangeNotifier adapter, and BuildContext.watchEvent / readEvent helpers.
 version: 0.1.0
-homepage: https://plugin-kit-docs.saadodi44.workers.dev
+homepage: https://plugin-kit.saad-ardati.dev
 repository: https://github.com/SaadArdati/plugin_kit
 issue_tracker: https://github.com/SaadArdati/plugin_kit/issues
 topics:

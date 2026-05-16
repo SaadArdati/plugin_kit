@@ -3,7 +3,7 @@ description: >-
   A powerful plug'n'play plugin system for any Dart project. Lifecycle-aware
   plugins, scoped services, an event bus, sessions, and runtime configuration.
 version: 0.1.0
-homepage: https://plugin-kit-docs.saadodi44.workers.dev
+homepage: https://plugin-kit.saad-ardati.dev
 repository: https://github.com/SaadArdati/plugin_kit
 issue_tracker: https://github.com/SaadArdati/plugin_kit/issues
 topics:
