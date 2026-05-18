@@ -21,6 +21,12 @@ Plugins are wiring; services are the meat. The plugin class declares an id, regi
 
 Pure Dart. No Flutter. Depends only on `collection`, `logging`, and `meta`.
 
+## Current limitation: plugins are in-process only
+
+Every plugin compiles into your application binary. There is no runtime mechanism to load plugins from a separate process, a network endpoint, or a sandboxed worker. The runtime, the registry, the event bus, and the lifecycle hooks all assume in-process calls and share Dart object identity.
+
+Out-of-process plugin loading (over IPC, WebSocket, or a wasm boundary) is **planned for a future release** but not yet implemented. It needs real work on serialization, lifecycle isolation, version negotiation, and a security model that this release does not attempt. If you need cross-process plugins today, this runtime is not yet that, but it is being built toward it.
+
 ## When not to use this
 
 If your app has one HTTP client, one auth service, one analytics service, and a few screens that call them, use the boring thing. Plugin Kit earns its weight when behavior needs to be replaced, layered, disabled, overridden, or vetoed while the app is running, and settings have stopped being data your app reads and started being something that actively reshapes the system. The rest of this README assumes you are past that line.

@@ -52,6 +52,12 @@ The split is what lets a backend Dart package describe its `UiConfigurableCapabi
 
 ## Getting started and integration
 
+### Can I load plugins from another process, a server, or a sandbox?
+
+Not today. Every plugin compiles into your application binary. The runtime, registry, event bus, and lifecycle hooks all assume in-process calls and share Dart object identity, so a plugin running over IPC, WebSocket, or a wasm boundary cannot participate in resolution, the priority cascade, or the typed event flow as it stands.
+
+Out-of-process plugin loading is **planned for a future release**. It needs real work: a serialization protocol that survives the typed envelope cascade, lifecycle isolation that does not let a remote plugin wedge the host, version negotiation between independently-released remote plugins, and a security model. This release does not attempt any of that. If you need cross-process plugins today, this runtime is not yet what you want, but it is being built toward it.
+
 ### Can I share state across sessions?
 
 Yes, through the global scope. Use a `GlobalPlugin`, register services there, and emit on `globalBus` when you want every session to react. Cross-session broadcast also has the `SessionBroadcast` extension on `runtime.sessions`, which iterates active sessions and emits on each session bus.

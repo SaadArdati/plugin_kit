@@ -3,7 +3,7 @@ title: Introduction
 description: "Plugin Kit shown end-to-end: replaceable services compete for slots, sessions stay sealed, and a settings dialog flips features at runtime."
 ---
 
-import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import { Code } from '@astrojs/starlight/components';
 import { extractRegion } from '../../utils/excerpt.mjs';
 import pluginLifecycleDart from '../../../../website/snippets/lib/plugin_lifecycle.dart?raw';
@@ -14,6 +14,10 @@ Events flow between parts of your app that have never been formally introduced.
 
 It has no opinion about what your app does. It does not know about Flutter, servers, agents, editors,
 or any particular settings backend. You build those on top. The runtime stays the same.
+
+<Aside type="caution" title="In-process plugins only (today)">
+Every plugin compiles into your application binary. There is no runtime mechanism to load plugins from a separate process, a network endpoint, or a sandboxed worker. Out-of-process plugin loading (over IPC, WebSocket, or a wasm boundary) is **planned for a future release** but not yet implemented. If you need cross-process plugins today, this runtime is not yet that, but it is being built toward it.
+</Aside>
 
 For the origin story and the design decisions that follow from it, [Why Plugin Kit?](/why-plugin-kit/) is the short read.
 

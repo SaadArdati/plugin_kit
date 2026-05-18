@@ -17,6 +17,12 @@ The difference is composition. DI wires up a fixed graph at startup. A plugin ru
 
 The `plugin_kit_dialog` companion package mounted on a real runtime. Toggling a tile updates the dialog draft, and saving runs your `onSave` callback; lifecycle changes happen when that callback updates the runtime.
 
+## Current limitation: plugins are in-process only
+
+Every plugin compiles into your application binary. There is no runtime mechanism to load plugins from a separate process, a network endpoint, or a sandboxed worker. The runtime, the registry, the event bus, and the lifecycle hooks all assume in-process calls and share Dart object identity.
+
+Out-of-process plugin loading (over IPC, WebSocket, or a wasm boundary) is **planned for a future release** but not yet implemented. It needs real work on serialization, lifecycle isolation, version negotiation, and a security model that this release does not attempt. If you need cross-process plugins today, this runtime is not yet that, but it is being built toward it.
+
 ## Most apps don't need this
 
 If your app has one HTTP client, one auth service, one analytics service, and a few screens that call them, use the boring thing. Instantiate the client. Register the service. Ship the app.
